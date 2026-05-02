@@ -1555,3 +1555,100 @@ export async function getYearInMusic(
     return null;
   }
 }
+
+// ─── User feed (events) ─────────────────────────────────────────────
+
+const FeedTrackMetadataSchema = z
+  .object({
+    track_name: z.string().optional(),
+    artist_name: z.string().optional(),
+    release_name: z.string().nullish(),
+    additional_info: z
+      .object({
+        recording_mbid: z.string().nullish(),
+        release_mbid: z.string().nullish(),
+        artist_mbids: z.array(z.string()).nullish(),
+        recording_msid: z.string().nullish(),
+      })
+      .partial()
+      .passthrough()
+      .optional(),
+    mbid_mapping: z
+      .object({
+        recording_mbid: z.string().nullish(),
+        release_mbid: z.string().nullish(),
+        artist_mbids: z.array(z.string()).nullish(),
+        caa_id: z.union([z.number(), z.string()]).nullish(),
+        caa_release_mbid: z.string().nullish(),
+      })
+      .partial()
+      .passthrough()
+      .optional(),
+  })
+  .partial()
+  .passthrough();
+
+// Each event type stuffs different shapes into `metadata`. Keep it
+// loose with passthrough + per-type narrowing in the renderer.
+const FeedEventSchema = z
+  .object({
+    id: z.union([z.number(), z.null()]).optional(),
+    created: z.number(),
+    event_type: z.string(),
+    hidden: z.boolean().optional(),
+    user_name: z.string().optional(),
+    metadata: z.record(z.string(), z.unknown()).optional(),
+  })
+  .passthrough();
+
+const FeedResponseSchema = z.object({
+  payload: z.object({
+    count: z.number(),
+    events: z.array(FeedEventSchema),
+    user_id: z.string().optional(),
+  }),
+});
+
+export type FeedEvent = z.infer<typeof FeedEventSchema>;
+export type FeedTrackMetadata = z.infer<typeof FeedTrackMetadataSchema>;
+
+/**
+ * Fetch the personal feed for a LB user. Requires that user's own
+ * authentication token — LB only returns the feed for the token owner,
+ * never for arbitrary users. Caller is responsible for ensuring the
+ * passed userName matches the token's owner; if they don't,
+ * LB returns 401/403 and this function returns null.
+ *
+ * Live-mode by default since feeds change with every follow/pin and
+ * the page is rendered fresh on each visit.
+ */
+export async function getUserFeed(
+  userName: string,
+  token: string,
+  opts: { count?: number; maxTs?: number; minTs?: number } = {},
+): Promise<FeedEvent[] | null> {
+  const params = new URLSearchParams();
+  params.set("count", String(opts.count ?? 50));
+  if (opts.minTs) params.set("min_ts", String(opts.minTs));
+  if (opts.maxTs) params.set("max_ts", String(opts.maxTs));
+  try {
+    const res = await fetch(
+      `${LB_BASE}/user/${encodeURIComponent(userName)}/feed/events?${params}`,
+      {
+        headers: {
+          Authorization: `Token ${token}`,
+          "User-Agent": USER_AGENT,
+          Accept: "application/json",
+        },
+        cache: "no-store",
+      },
+    );
+    if (!res.ok) return null;
+    const json = await res.json();
+    const parsed = FeedResponseSchema.safeParse(json);
+    if (!parsed.success) return null;
+    return parsed.data.payload.events;
+  } catch {
+    return null;
+  }
+}
