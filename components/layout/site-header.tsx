@@ -29,7 +29,10 @@ export async function SiteHeader() {
               variant="ghost"
               size="sm"
               nativeButton={false}
-              render={<Link href={item.href} />}
+              // suppressHydrationWarning — see wordmark.tsx for the
+              // Parachord-extension rationale; applied to every layout-
+              // chrome anchor so DOM mutations don't break client nav.
+              render={<Link href={item.href} suppressHydrationWarning />}
             >
               {item.label}
             </Button>
@@ -41,7 +44,7 @@ export async function SiteHeader() {
             size="icon"
             aria-label="Search"
             nativeButton={false}
-            render={<Link href="/search" />}
+            render={<Link href="/search" suppressHydrationWarning />}
           >
             <Search className="size-4" />
           </Button>
@@ -51,6 +54,7 @@ export async function SiteHeader() {
               href="/settings"
               aria-label={`Settings for ${displayName}`}
               title={displayName}
+              suppressHydrationWarning
               className="hover:ring-ring/40 ml-1 inline-flex rounded-full transition-shadow hover:ring-2"
             >
               <Avatar className="size-7">
@@ -66,7 +70,7 @@ export async function SiteHeader() {
             <Button
               size="sm"
               nativeButton={false}
-              render={<Link href="/login" />}
+              render={<Link href="/login" suppressHydrationWarning />}
             >
               Sign in
             </Button>
