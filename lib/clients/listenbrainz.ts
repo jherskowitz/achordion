@@ -4,7 +4,8 @@ import { z } from "zod";
 
 const LB_BASE = "https://api.listenbrainz.org/1";
 const LB_LABS_BASE = "https://labs.api.listenbrainz.org";
-const USER_AGENT = "Achordion/0.1 (+https://github.com/jherskow/achordion)";
+const USER_AGENT =
+  "Achordion/0.1 (+https://github.com/jherskowitz/achordion)";
 
 class ListenBrainzError extends Error {
   constructor(
