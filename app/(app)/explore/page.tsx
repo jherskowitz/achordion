@@ -5,7 +5,9 @@ import {
   getRecommendedRecordings,
   getRecordingMetadata,
   getSimilarUsers,
+  getUserFreshReleases,
   playlistMbidFromIdentifier,
+  type FreshRelease,
   type LbPlaylistSummary,
   type LbRadioTrack,
 } from "@/lib/clients/listenbrainz";
@@ -14,6 +16,7 @@ import { PageShell } from "@/components/achordion/page-shell";
 import { PlaylistCard } from "@/components/achordion/playlist-card";
 import { ComingSoon } from "@/components/achordion/coming-soon";
 import { ExploreTrackList } from "@/components/achordion/explore-track-list";
+import { FreshReleasesGrid } from "@/components/achordion/fresh-releases-grid";
 import { RecommendedArtistsList } from "@/components/achordion/recommended-artists-list";
 import { SimilarUsersList } from "@/components/achordion/similar-users-list";
 import { Button } from "@/components/ui/button";
@@ -96,6 +99,70 @@ function GridSkeleton({ cols = 4, rows = 8 }: { cols?: number; rows?: number }) 
           key={i}
           className="border-border/60 space-y-2 rounded-xl border p-4"
         >
+          <Skeleton className="h-4 w-2/3" />
+          <Skeleton className="h-3 w-1/2" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function thisWeekRange(now = new Date()): { startIso: string; endIso: string } {
+  // Monday-anchored ISO week.
+  const utc = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
+  );
+  const dow = utc.getUTCDay(); // 0 = Sun
+  const diff = (dow + 6) % 7;
+  const start = new Date(utc);
+  start.setUTCDate(start.getUTCDate() - diff);
+  const end = new Date(start);
+  end.setUTCDate(end.getUTCDate() + 7);
+  return {
+    startIso: start.toISOString().slice(0, 10),
+    endIso: end.toISOString().slice(0, 10),
+  };
+}
+
+function inThisWeek(r: FreshRelease, range: { startIso: string; endIso: string }) {
+  return r.release_date >= range.startIso && r.release_date < range.endIso;
+}
+
+async function ThisWeekReleasesSection({ username }: { username: string }) {
+  // Grab a 14-day window so we have enough material to filter to this calendar
+  // week even on Sundays.
+  const releases = await getUserFreshReleases(username, {
+    days: 14,
+    past: true,
+    future: true,
+    sort: "release_date",
+  }).catch(() => [] as FreshRelease[]);
+  const range = thisWeekRange();
+  const thisWeek = releases.filter((r) => inThisWeek(r, range));
+  if (thisWeek.length === 0) {
+    return (
+      <p className="text-muted-foreground text-sm">
+        No new releases from your artists this week — check back soon, or see
+        all{" "}
+        <Link
+          href="/explore/fresh-releases"
+          className="hover:text-foreground underline-offset-4 hover:underline"
+        >
+          fresh releases
+        </Link>
+        .
+      </p>
+    );
+  }
+  return <FreshReleasesGrid releases={thisWeek} />;
+}
+
+function FreshReleaseSkeleton({ cols = 5 }: { cols?: number }) {
+  return (
+    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+      {Array.from({ length: cols * 2 }).map((_, i) => (
+        <div key={i} className="space-y-2">
+          <Skeleton className="aspect-square w-full rounded-md" />
           <Skeleton className="h-4 w-2/3" />
           <Skeleton className="h-3 w-1/2" />
         </div>
@@ -229,6 +296,17 @@ export default async function ExploreOverviewPage() {
     <PageShell className="pt-8">
       <div className="grid gap-10 lg:grid-cols-[1fr_280px]">
         <div className="min-w-0 space-y-12">
+          <section>
+            <SectionHeader
+              title="New this week"
+              hint="Just-released albums from artists you listen to."
+              seeAllHref="/explore/fresh-releases"
+            />
+            <Suspense fallback={<FreshReleaseSkeleton />}>
+              <ThisWeekReleasesSection username={username} />
+            </Suspense>
+          </section>
+
           <section>
             <SectionHeader
               title="Weekly Jams"
