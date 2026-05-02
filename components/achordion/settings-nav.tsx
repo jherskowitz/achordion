@@ -7,9 +7,6 @@ import { cn } from "@/lib/utils";
 const NAV = [
   { href: "/settings", label: "Profile" },
   { href: "/settings/connections", label: "Connections" },
-  { href: "/settings/import", label: "Import" },
-  { href: "/settings/export", label: "Export" },
-  { href: "/settings/missing-data", label: "Missing data" },
 ];
 
 export function SettingsNav() {
