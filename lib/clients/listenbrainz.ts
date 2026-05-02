@@ -931,6 +931,29 @@ function extractMbid(url: string | undefined | null, kind: "artist" | "recording
   return m?.[1] ?? null;
 }
 
+/** Convert a JSPF track (LB Radio / playlist track shape) to our flat type. */
+function jspfTrackToLbRadioTrack(
+  t: z.infer<typeof LbRadioTrackSchema>,
+): LbRadioTrack {
+  const ext = t.extension?.["https://musicbrainz.org/doc/jspf#track"];
+  const idArr = Array.isArray(t.identifier)
+    ? t.identifier
+    : t.identifier
+      ? [t.identifier]
+      : [];
+  return {
+    title: t.title,
+    artistName: t.creator ?? "",
+    artistMbid: extractMbid(ext?.artist_identifiers?.[0], "artist"),
+    recordingMbid: extractMbid(idArr[0], "recording"),
+    releaseMbid: extractMbid(ext?.release_identifier, "release"),
+    releaseName: t.album ?? null,
+    durationMs: t.duration ?? null,
+    caaId: ext?.additional_metadata?.caa_id ?? null,
+    caaReleaseMbid: ext?.additional_metadata?.caa_release_mbid ?? null,
+  };
+}
+
 export async function getLbRadio(
   prompt: string,
   mode: "easy" | "medium" | "hard" = "easy",
@@ -955,27 +978,76 @@ export async function getLbRadio(
     if (!res.ok) return null;
     const data = LbRadioResponseSchema.parse(await res.json());
     const tracks = data.payload.jspf.playlist.track ?? [];
-    return tracks.map((t) => {
-      const ext = t.extension?.["https://musicbrainz.org/doc/jspf#track"];
-      const idArr = Array.isArray(t.identifier)
-        ? t.identifier
-        : t.identifier
-          ? [t.identifier]
-          : [];
-      return {
-        title: t.title,
-        artistName: t.creator ?? "",
-        artistMbid: extractMbid(ext?.artist_identifiers?.[0], "artist"),
-        recordingMbid: extractMbid(idArr[0], "recording"),
-        releaseMbid: extractMbid(ext?.release_identifier, "release"),
-        releaseName: t.album ?? null,
-        durationMs: t.duration ?? null,
-        caaId: ext?.additional_metadata?.caa_id ?? null,
-        caaReleaseMbid: ext?.additional_metadata?.caa_release_mbid ?? null,
-      };
-    });
+    return tracks.map(jspfTrackToLbRadioTrack);
   } catch {
     return null;
+  }
+}
+
+// ─── Single playlist (with tracks) ──────────────────────────────────
+
+const PlaylistDetailResponseSchema = z.object({
+  playlist: z
+    .object({
+      title: z.string(),
+      creator: z.string().optional(),
+      annotation: z.string().nullish(),
+      date: z.string().optional(),
+      identifier: z.string().optional(),
+      extension: z
+        .object({
+          "https://musicbrainz.org/doc/jspf#playlist":
+            PlaylistExtensionSchema.optional(),
+        })
+        .partial()
+        .passthrough()
+        .optional(),
+      track: z.array(LbRadioTrackSchema).optional(),
+    })
+    .passthrough(),
+});
+
+export interface PlaylistDetail {
+  title: string;
+  creator: string | null;
+  annotation: string | null;
+  date: string | null;
+  isPublic: boolean;
+  algorithmSource: string | null;
+  collaborators: string[];
+  externalUrls: Record<string, string>;
+  tracks: LbRadioTrack[];
+}
+
+export async function getPlaylist(mbid: string): Promise<PlaylistDetail | null> {
+  try {
+    const result = await lbFetch(
+      `/playlist/${encodeURIComponent(mbid)}`,
+      PlaylistDetailResponseSchema,
+      { revalidate: 60 * 5, tags: [`lb:playlist:${mbid}`] },
+    );
+    const p = result.playlist;
+    const ext = p.extension?.["https://musicbrainz.org/doc/jspf#playlist"];
+    return {
+      title: p.title,
+      creator: p.creator ?? ext?.creator ?? null,
+      annotation: p.annotation ?? null,
+      date: p.date ?? null,
+      isPublic: ext?.public ?? true,
+      algorithmSource:
+        ext?.additional_metadata?.algorithm_metadata?.source_patch ?? null,
+      collaborators: ext?.collaborators ?? [],
+      externalUrls: ext?.additional_metadata?.external_urls ?? {},
+      tracks: (p.track ?? []).map(jspfTrackToLbRadioTrack),
+    };
+  } catch (err) {
+    if (
+      err instanceof ListenBrainzError &&
+      (err.status === 204 || err.status === 404)
+    ) {
+      return null;
+    }
+    throw err;
   }
 }
 
