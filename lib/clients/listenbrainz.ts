@@ -616,7 +616,8 @@ export async function getLbRadio(
   prompt: string,
   mode: "easy" | "medium" | "hard" = "easy",
 ): Promise<LbRadioTrack[] | null> {
-  const token = process.env.LISTENBRAINZ_TOKEN;
+  const { getLbTokenForRequest } = await import("@/lib/lb-token");
+  const token = await getLbTokenForRequest();
   if (!token) return null;
 
   const params = new URLSearchParams({ prompt, mode });
