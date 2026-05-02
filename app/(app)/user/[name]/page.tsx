@@ -5,6 +5,10 @@ import { ScrobbleList } from "@/components/achordion/scrobble-list";
 import { NowPlayingPill } from "@/components/achordion/now-playing-pill";
 import { PageShell } from "@/components/achordion/page-shell";
 import { ComingSoon } from "@/components/achordion/coming-soon";
+import {
+  WeeklyStatsSidebar,
+  WeeklyStatsSidebarSkeleton,
+} from "@/components/achordion/weekly-stats-sidebar";
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface PageParams {
@@ -83,11 +87,9 @@ export default async function UserOverviewPage({ params }: PageParams) {
           <Suspense fallback={null}>
             <NowPlayingSection name={name} />
           </Suspense>
-          <ComingSoon
-            title="Stats sidebar"
-            description="Top artists this week, listening pace, and pinned recordings will live here."
-            className="px-4 py-10"
-          />
+          <Suspense fallback={<WeeklyStatsSidebarSkeleton />}>
+            <WeeklyStatsSidebar name={name} />
+          </Suspense>
         </aside>
       </div>
     </PageShell>
