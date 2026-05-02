@@ -1,5 +1,7 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { OnAirIndicator } from "./on-air-indicator";
 
 export function UserList({
   users,
@@ -18,10 +20,13 @@ export function UserList({
   return (
     <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
       {users.map((name) => (
-        <li key={name}>
+        <li
+          key={name}
+          className="border-border/60 hover:border-foreground/30 hover:bg-muted/30 flex flex-col rounded-xl border px-3 py-2.5 transition-colors"
+        >
           <Link
             href={`/user/${encodeURIComponent(name)}`}
-            className="border-border/60 hover:border-foreground/30 hover:bg-muted/30 flex items-center gap-3 rounded-xl border px-3 py-2.5 transition-colors"
+            className="flex items-center gap-3"
           >
             <Avatar className="size-9">
               <AvatarFallback className="text-sm">
@@ -30,6 +35,9 @@ export function UserList({
             </Avatar>
             <span className="truncate text-sm font-medium">{name}</span>
           </Link>
+          <Suspense fallback={null}>
+            <OnAirIndicator username={name} className="mt-1.5" />
+          </Suspense>
         </li>
       ))}
     </ul>

@@ -5,7 +5,7 @@ import {
   getPlayingNow,
   getCurrentPin,
 } from "@/lib/clients/listenbrainz";
-import { ScrobbleList } from "@/components/achordion/scrobble-list";
+import { LiveScrobbleList } from "@/components/achordion/live-scrobble-list";
 import { NowPlayingPill } from "@/components/achordion/now-playing-pill";
 import { PinnedTrackCard } from "@/components/achordion/pinned-track-card";
 import { PageShell } from "@/components/achordion/page-shell";
@@ -34,7 +34,7 @@ async function NowPlayingSection({ name }: { name: string }) {
   try {
     const playing = await getPlayingNow(name);
     if (!playing) return null;
-    return <NowPlayingPill listen={playing} />;
+    return <NowPlayingPill listen={playing} username={name} />;
   } catch {
     return null;
   }
@@ -45,7 +45,7 @@ async function RecentListensSection({ name }: { name: string }) {
     const listens = await getRecentListens(name, { count: 25 });
     return (
       <>
-        <ScrobbleList listens={listens} />
+        <LiveScrobbleList username={name} initialListens={listens} />
         {listens.length > 0 && (
           <div className="mt-6 text-center">
             <Link

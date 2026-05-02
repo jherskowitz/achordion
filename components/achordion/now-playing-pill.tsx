@@ -1,9 +1,23 @@
 import Link from "next/link";
+import { Radio } from "lucide-react";
 import { CoverArt } from "./cover-art";
 import { caaUrlFromListen } from "@/lib/clients/coverart";
+import { parachordListenAlong } from "@/lib/parachord";
 import type { Listen } from "@/lib/clients/listenbrainz";
 
-export function NowPlayingPill({ listen }: { listen: Listen }) {
+export function NowPlayingPill({
+  listen,
+  /**
+   * The user this listen belongs to, used to construct the
+   * `parachord://listen-along` URL. Pass null/undefined to omit the
+   * Listen-along action (e.g. for embedding the pill on a context where
+   * a username isn't known).
+   */
+  username,
+}: {
+  listen: Listen;
+  username?: string;
+}) {
   const meta = listen.track_metadata;
   const cover = caaUrlFromListen(meta, 250);
   const artistMbid =
@@ -34,6 +48,19 @@ export function NowPlayingPill({ listen }: { listen: Listen }) {
           )}
         </p>
       </div>
+      {username && (
+        <a
+          href={parachordListenAlong({
+            service: "listenbrainz",
+            user: username,
+          })}
+          title={`Listen along with ${username} in Parachord`}
+          className="bg-primary text-primary-foreground inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg px-3 text-xs font-medium transition-opacity hover:opacity-90"
+        >
+          <Radio className="size-3" />
+          Listen along
+        </a>
+      )}
     </div>
   );
 }

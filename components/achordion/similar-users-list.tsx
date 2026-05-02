@@ -1,6 +1,8 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import type { SimilarUser } from "@/lib/clients/listenbrainz";
+import { OnAirIndicator } from "./on-air-indicator";
 import { cn } from "@/lib/utils";
 
 interface SimilarUsersListProps {
@@ -30,36 +32,52 @@ export function SimilarUsersList({
       {users.map((u) => {
         const pct = Math.round(u.similarity * 100);
         return (
-          <li key={u.user_name}>
-            <Link
-              href={`/user/${encodeURIComponent(u.user_name)}`}
-              className={cn(
-                "border-border/60 hover:border-foreground/30 hover:bg-muted/30 group flex items-center gap-3 rounded-xl border transition-colors",
-                layout === "stack" ? "px-2.5 py-1.5" : "px-3 py-2.5",
-              )}
-            >
-              <Avatar
-                className={layout === "stack" ? "size-7" : "size-9"}
+          <li
+            key={u.user_name}
+            className={cn(
+              "border-border/60 hover:border-foreground/30 hover:bg-muted/30 group flex flex-col rounded-xl border transition-colors",
+              layout === "stack" ? "px-2.5 py-1.5" : "px-3 py-2.5",
+            )}
+          >
+            <div className="flex items-center gap-3">
+              <Link
+                href={`/user/${encodeURIComponent(u.user_name)}`}
+                className="flex min-w-0 flex-1 items-center gap-3"
               >
-                <AvatarFallback
-                  className={layout === "stack" ? "text-xs" : "text-sm"}
+                <Avatar
+                  className={layout === "stack" ? "size-7" : "size-9"}
                 >
-                  {u.user_name.slice(0, 1).toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium">{u.user_name}</p>
-                <div className="bg-muted mt-1 h-0.5 w-full overflow-hidden rounded-full">
-                  <div
-                    className="bg-foreground/60 h-full"
-                    style={{ width: `${pct}%` }}
-                  />
+                  <AvatarFallback
+                    className={layout === "stack" ? "text-xs" : "text-sm"}
+                  >
+                    {u.user_name.slice(0, 1).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium">
+                    {u.user_name}
+                  </p>
+                  <div className="bg-muted mt-1 h-0.5 w-full overflow-hidden rounded-full">
+                    <div
+                      className="bg-foreground/60 h-full"
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
                 </div>
-              </div>
+              </Link>
               <span className="text-muted-foreground/70 shrink-0 tabular-nums text-xs">
                 {pct}%
               </span>
-            </Link>
+            </div>
+            <Suspense fallback={null}>
+              <OnAirIndicator
+                username={u.user_name}
+                className={cn(
+                  "mt-1.5",
+                  layout === "stack" ? "max-w-full" : "",
+                )}
+              />
+            </Suspense>
           </li>
         );
       })}

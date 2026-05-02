@@ -151,6 +151,23 @@ export function parachordPlayRadio(input: {
 }
 
 /**
+ * Sync to a user's now-playing on a scrobble service (PR #755).
+ * Parachord polls their listens and plays the same track in lock-step.
+ * Service defaults to listenbrainz since that's the only scrobble
+ * surface Achordion currently surfaces.
+ */
+export function parachordListenAlong(input: {
+  user: string;
+  service?: "listenbrainz" | "lastfm";
+}): string {
+  const params = new URLSearchParams({
+    service: input.service ?? "listenbrainz",
+    user: input.user,
+  });
+  return `${PROTOCOL}listen-along?${params}`;
+}
+
+/**
  * Import a playlist into Parachord's library. Use when the caller
  * specifically wants a saved playlist row in Parachord (not just a
  * one-shot play). For ephemeral playback prefer `parachordPlayPlaylist`.
