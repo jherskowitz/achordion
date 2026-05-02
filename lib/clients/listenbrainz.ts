@@ -214,6 +214,113 @@ export async function getTopRecordingsForArtist(
   }
 }
 
+// ─── Playlists ──────────────────────────────────────────────────────
+
+const PlaylistExtensionSchema = z
+  .object({
+    creator: z.string().optional(),
+    last_modified_at: z.string().optional(),
+    public: z.boolean().optional(),
+    collaborators: z.array(z.string()).optional(),
+    copied_from_deleted: z.boolean().optional(),
+    additional_metadata: z
+      .object({
+        algorithm_metadata: z
+          .object({ source_patch: z.string().optional() })
+          .partial()
+          .passthrough()
+          .optional(),
+        expires_at: z.string().optional(),
+        external_urls: z.record(z.string(), z.string()).optional(),
+      })
+      .partial()
+      .passthrough()
+      .optional(),
+  })
+  .partial()
+  .passthrough();
+
+const PlaylistSummarySchema = z.object({
+  playlist: z
+    .object({
+      title: z.string(),
+      creator: z.string().optional(),
+      annotation: z.string().nullish(),
+      date: z.string().optional(),
+      identifier: z.string(),
+      extension: z
+        .object({
+          "https://musicbrainz.org/doc/jspf#playlist":
+            PlaylistExtensionSchema.optional(),
+        })
+        .partial()
+        .passthrough()
+        .optional(),
+      track: z.array(z.unknown()).optional(),
+    })
+    .passthrough(),
+});
+
+export type LbPlaylistSummary = z.infer<typeof PlaylistSummarySchema>;
+
+const UserPlaylistsResponseSchema = z.object({
+  count: z.number(),
+  offset: z.number().optional(),
+  playlist_count: z.number().optional(),
+  playlists: z.array(PlaylistSummarySchema),
+});
+
+export interface UserPlaylistsPage {
+  playlists: LbPlaylistSummary[];
+  total: number;
+  offset: number;
+  count: number;
+}
+
+export async function getUserPlaylists(
+  name: string,
+  count = 25,
+  offset = 0,
+): Promise<UserPlaylistsPage> {
+  try {
+    const params = new URLSearchParams({
+      count: String(count),
+      offset: String(offset),
+    });
+    const result = await lbFetch(
+      `/user/${encodeURIComponent(name)}/playlists?${params}`,
+      UserPlaylistsResponseSchema,
+      {
+        revalidate: 60 * 5,
+        tags: [`lb:user:${name}:playlists`],
+      },
+    );
+    return {
+      playlists: result.playlists,
+      total: result.playlist_count ?? result.playlists.length,
+      offset: result.offset ?? offset,
+      count: result.count,
+    };
+  } catch (err) {
+    if (
+      err instanceof ListenBrainzError &&
+      (err.status === 204 || err.status === 404)
+    ) {
+      return { playlists: [], total: 0, offset: 0, count };
+    }
+    throw err;
+  }
+}
+
+/** Extract the MBID from a LB playlist identifier URL. */
+export function playlistMbidFromIdentifier(
+  identifier: string | undefined | null,
+): string | null {
+  if (!identifier) return null;
+  const m = identifier.match(/\/playlist\/([0-9a-f-]{36})/i);
+  return m?.[1] ?? null;
+}
+
 // ─── Pinned recordings ─────────────────────────────────────────────
 
 const PinnedTrackMetaSchema = z
