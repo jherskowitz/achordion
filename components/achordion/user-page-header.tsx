@@ -1,7 +1,7 @@
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { auth } from "@/auth";
 import { getFollowing } from "@/lib/clients/listenbrainz";
-import { hasUserLbToken } from "@/lib/lb-token";
+import { getLbTokenForRequest } from "@/lib/lb-token";
 import { FollowToggle } from "./follow-toggle";
 import { SectionTabs, type SectionTab } from "./section-tabs";
 
@@ -31,8 +31,8 @@ export async function UserPageHeader({ name }: { name: string }) {
   let followInitial = false;
   let disabledReason: string | undefined;
   if (viewer && !isOwnProfile) {
-    const tokenConfigured = await hasUserLbToken();
-    if (!tokenConfigured) {
+    const token = await getLbTokenForRequest();
+    if (!token) {
       disabledReason =
         "Add your ListenBrainz token in Settings to follow users.";
     }
