@@ -217,6 +217,65 @@ export async function getArtist(mbid: string): Promise<ArtistDetail> {
   );
 }
 
+const ArtistCreditSchema = z.array(
+  z
+    .object({
+      name: z.string(),
+      joinphrase: z.string().optional(),
+      artist: z
+        .object({
+          id: z.string(),
+          name: z.string(),
+          "sort-name": z.string().optional(),
+          disambiguation: z.string().optional(),
+        })
+        .partial()
+        .passthrough(),
+    })
+    .passthrough(),
+);
+
+const ReleaseStubSchema = z
+  .object({
+    id: z.string(),
+    title: z.string(),
+    status: z.string().nullish(),
+    date: z.string().nullish(),
+    country: z.string().nullish(),
+    "track-count": z.number().nullish(),
+    disambiguation: z.string().nullish(),
+    "release-events": z
+      .array(
+        z
+          .object({
+            date: z.string().nullish(),
+            area: z
+              .object({
+                name: z.string(),
+                "iso-3166-1-codes": z.array(z.string()).optional(),
+              })
+              .partial()
+              .passthrough()
+              .nullish(),
+          })
+          .partial()
+          .passthrough(),
+      )
+      .optional(),
+    media: z
+      .array(
+        z
+          .object({
+            format: z.string().nullish(),
+            "track-count": z.number().nullish(),
+          })
+          .partial()
+          .passthrough(),
+      )
+      .optional(),
+  })
+  .passthrough();
+
 const ReleaseGroupSchema = z.object({
   id: z.string(),
   title: z.string(),
@@ -227,6 +286,116 @@ const ReleaseGroupSchema = z.object({
 });
 
 export type ReleaseGroup = z.infer<typeof ReleaseGroupSchema>;
+
+const ReleaseGroupDetailSchema = ReleaseGroupSchema.extend({
+  "artist-credit": ArtistCreditSchema.optional(),
+  releases: z.array(ReleaseStubSchema).optional(),
+  tags: z
+    .array(z.object({ name: z.string(), count: z.number() }))
+    .optional(),
+  genres: z
+    .array(z.object({ name: z.string(), count: z.number() }))
+    .optional(),
+  relations: z.array(z.union([ArtistRelationSchema, UrlRelationSchema])).optional(),
+});
+
+export type ReleaseGroupDetail = z.infer<typeof ReleaseGroupDetailSchema>;
+export type ReleaseStub = z.infer<typeof ReleaseStubSchema>;
+
+export async function getReleaseGroup(mbid: string): Promise<ReleaseGroupDetail> {
+  return mbFetch(
+    `/release-group/${encodeURIComponent(mbid)}?inc=artist-credits+releases+tags+genres+url-rels+ratings`,
+    ReleaseGroupDetailSchema,
+    { tags: [cacheTagsMB.releaseGroup(mbid)] },
+  );
+}
+
+const TrackSchema = z
+  .object({
+    id: z.string(),
+    number: z.string().optional(),
+    position: z.number().optional(),
+    title: z.string(),
+    length: z.number().nullish(),
+    "artist-credit": ArtistCreditSchema.optional(),
+    recording: z
+      .object({
+        id: z.string(),
+        title: z.string(),
+        length: z.number().nullish(),
+      })
+      .partial()
+      .passthrough()
+      .optional(),
+  })
+  .passthrough();
+
+const MediumSchema = z
+  .object({
+    format: z.string().nullish(),
+    title: z.string().optional(),
+    position: z.number().optional(),
+    "track-count": z.number().nullish(),
+    tracks: z.array(TrackSchema).optional(),
+  })
+  .passthrough();
+
+const ReleaseDetailSchema = z
+  .object({
+    id: z.string(),
+    title: z.string(),
+    status: z.string().nullish(),
+    date: z.string().nullish(),
+    country: z.string().nullish(),
+    "release-group": ReleaseGroupSchema.nullish(),
+    "artist-credit": ArtistCreditSchema.optional(),
+    media: z.array(MediumSchema).optional(),
+  })
+  .passthrough();
+
+export type ReleaseDetail = z.infer<typeof ReleaseDetailSchema>;
+export type Track = z.infer<typeof TrackSchema>;
+
+export async function getRelease(mbid: string): Promise<ReleaseDetail> {
+  return mbFetch(
+    `/release/${encodeURIComponent(mbid)}?inc=recordings+artist-credits+release-groups`,
+    ReleaseDetailSchema,
+    { tags: [cacheTagsMB.release(mbid)] },
+  );
+}
+
+/**
+ * Pick the most representative release from a release group:
+ * 1. Status = "Official" preferred
+ * 2. Earliest date (typically the original release)
+ * 3. Fall back to the first release if none qualify
+ */
+export function pickCanonicalRelease(
+  rg: ReleaseGroupDetail,
+): ReleaseStub | null {
+  const releases = rg.releases ?? [];
+  if (releases.length === 0) return null;
+  const official = releases.filter((r) => r.status === "Official");
+  const pool = official.length > 0 ? official : releases;
+  return pool
+    .slice()
+    .sort((a, b) => (a.date ?? "9999").localeCompare(b.date ?? "9999"))[0];
+}
+
+export function formatArtistCredit(
+  credit: z.infer<typeof ArtistCreditSchema> | undefined,
+): { name: string; primaryArtistId: string | null; parts: Array<{ name: string; id: string | null; join: string }> } {
+  if (!credit || credit.length === 0) {
+    return { name: "Unknown", primaryArtistId: null, parts: [] };
+  }
+  const parts = credit.map((c) => ({
+    name: c.name,
+    id: c.artist?.id ?? null,
+    join: c.joinphrase ?? "",
+  }));
+  const name = parts.map((p) => p.name + p.join).join("");
+  return { name, primaryArtistId: parts[0]?.id ?? null, parts };
+}
 
 const ArtistReleaseGroupsSchema = z.object({
   "release-group-count": z.number().optional(),

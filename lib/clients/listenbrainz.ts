@@ -417,6 +417,72 @@ const TopReleaseGroupForArtistSchema = z.object({
 
 export type TopReleaseGroup = z.infer<typeof TopReleaseGroupForArtistSchema>;
 
+const ReleaseGroupListenersSchema = z.object({
+  payload: z.object({
+    release_group_mbid: z.string(),
+    release_group_name: z.string().optional(),
+    artist_name: z.string().optional(),
+    artist_mbids: z.array(z.string()).optional(),
+    total_listen_count: z.number().optional(),
+    total_user_count: z.number().optional(),
+    listeners: z
+      .array(z.object({ user_name: z.string(), listen_count: z.number() }))
+      .optional(),
+  }),
+});
+
+export type ReleaseGroupListeners = z.infer<typeof ReleaseGroupListenersSchema>["payload"];
+
+export async function getReleaseGroupListeners(
+  mbid: string,
+): Promise<ReleaseGroupListeners | null> {
+  try {
+    const result = await lbFetch(
+      `/stats/release-group/${encodeURIComponent(mbid)}/listeners`,
+      ReleaseGroupListenersSchema,
+      { revalidate: 60 * 60 * 6 },
+    );
+    return result.payload;
+  } catch (err) {
+    if (err instanceof ListenBrainzError && (err.status === 204 || err.status === 404)) {
+      return null;
+    }
+    throw err;
+  }
+}
+
+const ArtistListenersSchema = z.object({
+  payload: z.object({
+    artist_mbid: z.string(),
+    artist_name: z.string().optional(),
+    total_listen_count: z.number().optional(),
+    total_user_count: z.number().optional(),
+    listeners: z
+      .array(z.object({ user_name: z.string(), listen_count: z.number() }))
+      .optional(),
+  }),
+});
+
+export type ArtistListeners = z.infer<typeof ArtistListenersSchema>["payload"];
+
+export async function getArtistListeners(
+  mbid: string,
+): Promise<ArtistListeners | null> {
+  try {
+    const result = await lbFetch(
+      `/stats/artist/${encodeURIComponent(mbid)}/listeners`,
+      ArtistListenersSchema,
+      { revalidate: 60 * 60 * 6 },
+    );
+    return result.payload;
+  } catch (err) {
+    if (err instanceof ListenBrainzError && (err.status === 204 || err.status === 404)) {
+      return null;
+    }
+    throw err;
+  }
+}
+
 export async function getTopReleaseGroupsForArtist(
   artistMbid: string,
 ): Promise<TopReleaseGroup[]> {
