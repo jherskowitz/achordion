@@ -1,4 +1,8 @@
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { auth } from "@/auth";
+import { getFollowing } from "@/lib/clients/listenbrainz";
+import { hasUserLbToken } from "@/lib/lb-token";
+import { FollowToggle } from "./follow-toggle";
 import { SectionTabs, type SectionTab } from "./section-tabs";
 
 function userTabs(name: string): SectionTab[] {
@@ -17,8 +21,32 @@ function userTabs(name: string): SectionTab[] {
   ];
 }
 
-export function UserPageHeader({ name }: { name: string }) {
+export async function UserPageHeader({ name }: { name: string }) {
   const initial = name.slice(0, 1).toUpperCase();
+  const session = await auth();
+  const viewer = session?.user?.mbUsername;
+  const isOwnProfile =
+    !!viewer && viewer.toLowerCase() === name.toLowerCase();
+
+  let followInitial = false;
+  let disabledReason: string | undefined;
+  if (viewer && !isOwnProfile) {
+    const tokenConfigured = await hasUserLbToken();
+    if (!tokenConfigured) {
+      disabledReason =
+        "Add your ListenBrainz token in Settings to follow users.";
+    }
+    try {
+      const following = await getFollowing(viewer);
+      followInitial = following.some(
+        (u) => u.toLowerCase() === name.toLowerCase(),
+      );
+    } catch {
+      // Ignore — toggle defaults to "Follow" and the user's first
+      // click will surface a real LB error if anything's actually broken.
+    }
+  }
+
   return (
     <header className="border-border/60 border-b">
       <div className="mx-auto max-w-7xl px-4 pt-10 pb-0 sm:px-6">
@@ -26,7 +54,7 @@ export function UserPageHeader({ name }: { name: string }) {
           <Avatar className="size-16 sm:size-20">
             <AvatarFallback className="text-xl">{initial}</AvatarFallback>
           </Avatar>
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <p className="text-muted-foreground text-xs tracking-wide uppercase">
               ListenBrainz user
             </p>
@@ -34,6 +62,13 @@ export function UserPageHeader({ name }: { name: string }) {
               {name}
             </h1>
           </div>
+          {viewer && !isOwnProfile && (
+            <FollowToggle
+              target={name}
+              initiallyFollowing={followInitial}
+              disabledReason={disabledReason}
+            />
+          )}
         </div>
         <SectionTabs tabs={userTabs(name)} />
       </div>

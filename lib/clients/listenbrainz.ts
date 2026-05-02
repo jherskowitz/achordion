@@ -214,6 +214,92 @@ export async function getTopRecordingsForArtist(
   }
 }
 
+// ─── Social: follow / unfollow ──────────────────────────────────────
+
+const FollowingSchema = z.object({
+  following: z.array(z.string()),
+});
+
+const FollowersSchema = z.object({
+  followers: z.array(z.string()),
+});
+
+export async function getFollowing(userName: string): Promise<string[]> {
+  try {
+    const result = await lbFetch(
+      `/user/${encodeURIComponent(userName)}/following`,
+      FollowingSchema,
+      { revalidate: 60, tags: [`lb:user:${userName}:following`] },
+    );
+    return result.following;
+  } catch (err) {
+    if (
+      err instanceof ListenBrainzError &&
+      (err.status === 204 || err.status === 404)
+    ) {
+      return [];
+    }
+    throw err;
+  }
+}
+
+export async function getFollowers(userName: string): Promise<string[]> {
+  try {
+    const result = await lbFetch(
+      `/user/${encodeURIComponent(userName)}/followers`,
+      FollowersSchema,
+      { revalidate: 60, tags: [`lb:user:${userName}:followers`] },
+    );
+    return result.followers;
+  } catch (err) {
+    if (
+      err instanceof ListenBrainzError &&
+      (err.status === 204 || err.status === 404)
+    ) {
+      return [];
+    }
+    throw err;
+  }
+}
+
+export async function followUser(
+  target: string,
+  token: string,
+): Promise<{ ok: boolean; status: number }> {
+  const res = await fetch(
+    `${LB_BASE}/user/${encodeURIComponent(target)}/follow`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Token ${token}`,
+        "User-Agent": USER_AGENT,
+        Accept: "application/json",
+      },
+      cache: "no-store",
+    },
+  );
+  return { ok: res.ok, status: res.status };
+}
+
+export async function unfollowUser(
+  target: string,
+  token: string,
+): Promise<{ ok: boolean; status: number }> {
+  const res = await fetch(
+    `${LB_BASE}/user/${encodeURIComponent(target)}/follow`,
+    {
+      method: "DELETE",
+      headers: {
+        Authorization: `Token ${token}`,
+        "User-Agent": USER_AGENT,
+        Accept: "application/json",
+      },
+      cache: "no-store",
+    },
+  );
+  return { ok: res.ok, status: res.status };
+}
+
 // ─── User stats ─────────────────────────────────────────────────────
 
 export {
