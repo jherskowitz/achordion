@@ -8,8 +8,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 const NAV = [
   { href: "/explore", label: "Explore" },
-  { href: "/explore/fresh-releases", label: "Fresh" },
-  { href: "/explore/lb-radio", label: "Radio" },
+  { href: "/radio", label: "Radio" },
 ];
 
 export async function SiteHeader() {
