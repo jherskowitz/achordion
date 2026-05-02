@@ -1230,15 +1230,68 @@ function jspfTrackToLbRadioTrack(
   };
 }
 
+/**
+ * Pre-process an LB Radio prompt so common user input shapes work.
+ *
+ * LB's parser rejects spaces inside `tag:(...)` and `country:(...)`
+ * (returns "An unknown error occured"), but it happily accepts the
+ * hyphenated form — `tag:(indie-rock)` works the same as the raw MB
+ * tag "indie rock". So users typing the tag the way they'd say it out
+ * loud doesn't fail. Comma-separated values are preserved.
+ */
+function normaliseRadioPrompt(prompt: string): string {
+  // `\s*` between the colon and the paren so users can type
+  // "tag: (indie rock)" or "tag:(indie rock)" — both normalise to
+  // "tag:(indie-rock)". Output always uses the no-space canonical form
+  // since LB's parser is strict about it.
+  return prompt.replace(
+    /\b(tag|country|artist):\s*\(([^)]*)\)/gi,
+    (_, prefix: string, body: string) => {
+      const lower = prefix.toLowerCase();
+      // Don't touch artist:(<mbid>) — bare UUIDs shouldn't be hyphenated.
+      if (lower === "artist") return `${lower}:(${body.trim()})`;
+      const cleaned = body
+        .split(",")
+        .map((part) => part.trim().replace(/\s+/g, "-"))
+        .filter(Boolean)
+        .join(",");
+      return `${lower}:(${cleaned})`;
+    },
+  );
+}
+
 export async function getLbRadio(
   prompt: string,
   mode: "easy" | "medium" | "hard" = "easy",
 ): Promise<LbRadioTrack[] | null> {
+  const result = await tryGetLbRadio(prompt, mode);
+  return result.ok ? result.tracks : null;
+}
+
+export type LbRadioResult =
+  | { ok: true; tracks: LbRadioTrack[] }
+  | { ok: false; error: string };
+
+/**
+ * Same as getLbRadio but surfaces LB's actual error message when the
+ * request fails — used by the /radio page's station builder so users
+ * see "cannot parse prompt" instead of a generic blank.
+ */
+export async function tryGetLbRadio(
+  prompt: string,
+  mode: "easy" | "medium" | "hard" = "easy",
+): Promise<LbRadioResult> {
   const { getLbTokenForRequest } = await import("@/lib/lb-token");
   const token = await getLbTokenForRequest();
-  if (!token) return null;
+  if (!token) {
+    return {
+      ok: false,
+      error: "ListenBrainz token missing — add one in Settings → Connections.",
+    };
+  }
 
-  const params = new URLSearchParams({ prompt, mode });
+  const normalised = normaliseRadioPrompt(prompt);
+  const params = new URLSearchParams({ prompt: normalised, mode });
   try {
     const res = await fetch(`${LB_BASE}/explore/lb-radio?${params}`, {
       headers: {
@@ -1248,15 +1301,31 @@ export async function getLbRadio(
       },
       next: {
         revalidate: 60 * 60,
-        tags: [`lb:radio:${prompt}:${mode}`],
+        tags: [`lb:radio:${normalised}:${mode}`],
       },
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      const body = (await res.json().catch(() => null)) as
+        | { error?: string; message?: string }
+        | null;
+      const msg =
+        body?.error ??
+        body?.message ??
+        `ListenBrainz returned ${res.status}.`;
+      // LB sometimes prefixes with "LB Radio generation failed:" — keep
+      // the prefix since it cues the user that this came from LB.
+      return { ok: false, error: msg };
+    }
     const data = LbRadioResponseSchema.parse(await res.json());
-    const tracks = data.payload.jspf.playlist.track ?? [];
-    return tracks.map(jspfTrackToLbRadioTrack);
-  } catch {
-    return null;
+    const tracks = (data.payload.jspf.playlist.track ?? []).map(
+      jspfTrackToLbRadioTrack,
+    );
+    return { ok: true, tracks };
+  } catch (err) {
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : "Network error.",
+    };
   }
 }
 

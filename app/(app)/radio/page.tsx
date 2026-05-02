@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import { getLbRadio } from "@/lib/clients/listenbrainz";
+import { tryGetLbRadio } from "@/lib/clients/listenbrainz";
 import { PageShell } from "@/components/achordion/page-shell";
 import { LbRadioSection } from "@/components/achordion/lb-radio-section";
 import {
@@ -27,17 +27,35 @@ async function StationResults({
   prompt: string;
   mode: RadioMode;
 }) {
-  const tracks = await getLbRadio(prompt, mode);
-  if (!tracks) {
+  const result = await tryGetLbRadio(prompt, mode);
+  if (!result.ok) {
     return (
-      <p className="text-muted-foreground text-sm">
-        Couldn&apos;t generate this station. Either the prompt didn&apos;t
-        resolve to anything, or LB Radio needs your token (add one in
-        Settings → Connections).
-      </p>
+      <div className="border-border/60 bg-card/40 rounded-xl border p-4">
+        <p className="text-foreground text-sm font-medium">
+          Station didn&apos;t generate
+        </p>
+        <p className="text-muted-foreground mt-1 text-sm">{result.error}</p>
+        <p className="text-muted-foreground/70 mt-3 text-xs leading-5">
+          Tip: multi-word tags need hyphens —{" "}
+          <code className="bg-muted/70 rounded px-1 py-0.5">
+            tag:(indie-rock)
+          </code>{" "}
+          rather than{" "}
+          <code className="bg-muted/70 rounded px-1 py-0.5">
+            tag:(indie rock)
+          </code>
+          . The form auto-hyphenates inside{" "}
+          <code className="bg-muted/70 rounded px-1 py-0.5">tag:(...)</code>
+          /
+          <code className="bg-muted/70 rounded px-1 py-0.5">
+            country:(...)
+          </code>
+          , so plain typing usually works too.
+        </p>
+      </div>
     );
   }
-  if (tracks.length === 0) {
+  if (result.tracks.length === 0) {
     return (
       <p className="text-muted-foreground text-sm">
         ListenBrainz returned no tracks for{" "}
@@ -49,7 +67,7 @@ async function StationResults({
   return (
     <LbRadioSection
       seedLabel={prompt}
-      tracks={tracks}
+      tracks={result.tracks}
       refillUrl={radioRefillUrl(prompt, mode)}
     />
   );
