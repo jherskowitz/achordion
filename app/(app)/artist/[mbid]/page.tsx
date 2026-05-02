@@ -73,20 +73,20 @@ async function ArtistBody({ mbid }: { mbid: string }) {
       <div className="mt-8 grid gap-10 lg:grid-cols-[1fr_240px]">
         <div className="min-w-0 space-y-12">
           <section>
-            <h2 className="mb-6 text-sm font-semibold tracking-wide uppercase">
-              Discography
-            </h2>
-            <Suspense fallback={<DiscographySkeleton />}>
-              <DiscographySection mbid={mbid} />
-            </Suspense>
-          </section>
-
-          <section>
             <h2 className="mb-4 text-sm font-semibold tracking-wide uppercase">
               Popular tracks
             </h2>
             <Suspense fallback={<ListSkeleton />}>
               <TopTracksSection mbid={mbid} />
+            </Suspense>
+          </section>
+
+          <section>
+            <h2 className="mb-6 text-sm font-semibold tracking-wide uppercase">
+              Discography
+            </h2>
+            <Suspense fallback={<DiscographySkeleton />}>
+              <DiscographySection mbid={mbid} />
             </Suspense>
           </section>
         </div>
