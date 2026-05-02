@@ -568,11 +568,13 @@ export async function getRecordingMetadata(
   await Promise.all(
     chunks.map(async (chunk) => {
       try {
-        const params = new URLSearchParams({
-          recording_mbids: chunk.join(","),
-          inc: "artist+release",
-        });
-        const res = await fetch(`${LB_BASE}/metadata/recording/?${params}`, {
+        // LB's `inc` param expects a literal `+` between values. URLSearchParams
+        // would encode it as %2B, which the API rejects with a 400 ("invalid
+        // inc argument 'artist+release'"). Build the query string by hand so
+        // the plus survives.
+        const mbids = encodeURIComponent(chunk.join(","));
+        const url = `${LB_BASE}/metadata/recording/?recording_mbids=${mbids}&inc=artist+release`;
+        const res = await fetch(url, {
           headers: {
             "User-Agent": USER_AGENT,
             Accept: "application/json",
