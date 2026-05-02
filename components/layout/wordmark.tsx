@@ -1,10 +1,16 @@
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 
-export function Wordmark({ className }: { className?: string }) {
+export function Wordmark({
+  className,
+  href = "/explore",
+}: {
+  className?: string;
+  href?: string;
+}) {
   return (
     <Link
-      href="/"
+      href={href}
       // Parachord's browser extension tags <a> elements with
       // `data-parachord-btn` before React hydrates, producing a
       // mismatch React 19 refuses to patch up — and on a client-

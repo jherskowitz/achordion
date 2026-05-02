@@ -6,23 +6,29 @@ import { ThemeToggle } from "./theme-toggle";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
-const NAV = [
-  { href: "/explore", label: "Explore" },
-  { href: "/radio", label: "Radio" },
-];
-
 export async function SiteHeader() {
   const session = await auth();
   const username = session?.user?.mbUsername;
   const avatarUrl = session?.user?.image ?? undefined;
   const displayName = session?.user?.name ?? username ?? "";
 
+  const nav: { href: string; label: string }[] = [
+    { href: "/explore", label: "Explore" },
+    { href: "/radio", label: "Radio" },
+  ];
+  if (username) {
+    nav.push({
+      href: `/user/${encodeURIComponent(username)}`,
+      label: "My profile",
+    });
+  }
+
   return (
     <header className="border-border/60 bg-background/80 supports-[backdrop-filter]:bg-background/60 sticky top-0 z-40 w-full border-b backdrop-blur">
       <div className="mx-auto flex h-14 max-w-7xl items-center gap-6 px-4 sm:px-6">
         <Wordmark />
         <nav className="hidden items-center gap-1 md:flex">
-          {NAV.map((item) => (
+          {nav.map((item) => (
             <Button
               key={item.href}
               variant="ghost"
