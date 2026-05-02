@@ -4,6 +4,7 @@ import { SectionTabs, type SectionTab } from "@/components/achordion/section-tab
 const EXPLORE_TABS: SectionTab[] = [
   { href: "/explore", label: "Overview" },
   { href: "/explore/fresh-releases", label: "Fresh releases" },
+  { href: "/explore/critical-darlings", label: "Critical Darlings" },
   { href: "/explore/lb-radio", label: "LB Radio" },
   { href: "/explore/similar-users", label: "Similar users" },
   { href: "/explore/year-in-music", label: "Year in Music" },
