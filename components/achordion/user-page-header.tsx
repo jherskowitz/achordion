@@ -14,10 +14,12 @@ function userTabs(name: string): SectionTab[] {
     { href: `/user/${name}/playlists`, label: "Playlists" },
     { href: `/user/${name}/pins`, label: "Pins" },
     { href: `/user/${name}/taste`, label: "Taste" },
-    { href: `/user/${name}/recommendations`, label: "Recommendations" },
-    { href: `/user/${name}/feed`, label: "Feed" },
-    { href: `/user/${name}/followers`, label: "Followers" },
-    { href: `/user/${name}/following`, label: "Following" },
+    // Community covers Followers + Following sub-tabs.
+    {
+      href: `/user/${name}/community`,
+      label: "Community",
+      exact: false,
+    },
   ];
 }
 

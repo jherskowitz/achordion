@@ -1,6 +1,5 @@
 import { Suspense } from "react";
 import { getFollowers } from "@/lib/clients/listenbrainz";
-import { PageShell } from "@/components/achordion/page-shell";
 import { UserList } from "@/components/achordion/user-list";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -38,15 +37,8 @@ function FollowersSkeleton() {
 export default async function FollowersPage({ params }: PageParams) {
   const { name } = await params;
   return (
-    <PageShell className="pt-8">
-      <header className="mb-6">
-        <h2 className="text-sm font-semibold tracking-wide uppercase">
-          Followers
-        </h2>
-      </header>
-      <Suspense fallback={<FollowersSkeleton />}>
-        <Followers name={name} />
-      </Suspense>
-    </PageShell>
+    <Suspense fallback={<FollowersSkeleton />}>
+      <Followers name={name} />
+    </Suspense>
   );
 }
