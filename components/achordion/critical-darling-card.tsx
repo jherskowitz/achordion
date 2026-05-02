@@ -22,7 +22,7 @@ async function resolveCover(album: CriticsPickAlbum): Promise<{
     const results = await searchReleaseGroups(query, 1);
     const top = results[0];
     if (!top) return { mbid: null, coverUrl: null };
-    return { mbid: top.id, coverUrl: caaReleaseGroupUrl(top.id, 500) };
+    return { mbid: top.id, coverUrl: caaReleaseGroupUrl(top.id, 250) };
   } catch {
     return { mbid: null, coverUrl: null };
   }
@@ -41,7 +41,7 @@ export async function CriticalDarlingCard({
     <CoverArt
       src={coverUrl}
       alt={album.title}
-      size={500}
+      size={240}
       className="aspect-square h-auto w-full transition-opacity group-hover:opacity-90"
       rounded="md"
     />
@@ -69,7 +69,9 @@ export async function CriticalDarlingCard({
         <p className="text-muted-foreground truncate text-xs">{album.artist}</p>
       </div>
       {album.description && (
-        <p className="text-muted-foreground/80 line-clamp-3 text-xs leading-5">
+        // Synopses are written to fit in a tweet (~280 chars), so always
+        // render the whole thing — no line-clamp.
+        <p className="text-muted-foreground/80 text-xs leading-5">
           {album.description}
         </p>
       )}
@@ -114,9 +116,17 @@ export function CriticalDarlingCardSkeleton() {
         <div className="bg-muted h-4 w-2/3 animate-pulse rounded" />
         <div className="bg-muted h-3 w-1/2 animate-pulse rounded" />
       </div>
+      {/* Reserve roughly tweet-sized text height so the grid doesn't
+          jump when synopses fill in. */}
       <div className="space-y-1">
-        <div className="bg-muted h-3 w-full animate-pulse rounded" />
-        <div className="bg-muted h-3 w-5/6 animate-pulse rounded" />
+        {Array.from({ length: 5 }).map((_, i) => (
+          <div
+            key={i}
+            className={`bg-muted h-3 animate-pulse rounded ${
+              i === 4 ? "w-2/3" : "w-full"
+            }`}
+          />
+        ))}
       </div>
     </article>
   );

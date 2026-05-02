@@ -33,13 +33,24 @@ function stripCdata(s: string): string {
 }
 
 function decodeHtmlEntities(s: string): string {
-  return s
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&apos;/g, "'")
-    .replace(/&amp;/g, "&");
+  return (
+    s
+      // Numeric character references — decimal (`&#039;`) and hex (`&#x27;`).
+      // These come through the RSS feed for any non-ASCII char and for
+      // straight-quoted apostrophes ("I&#039;m People").
+      .replace(/&#(\d+);/g, (_, code) =>
+        String.fromCodePoint(Number.parseInt(code, 10)),
+      )
+      .replace(/&#x([0-9a-fA-F]+);/g, (_, code) =>
+        String.fromCodePoint(Number.parseInt(code, 16)),
+      )
+      // Named entities, decoded last so &amp; doesn't double-decode.
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">")
+      .replace(/&quot;/g, '"')
+      .replace(/&apos;/g, "'")
+      .replace(/&amp;/g, "&")
+  );
 }
 
 function cleanHtml(html: string): string {
