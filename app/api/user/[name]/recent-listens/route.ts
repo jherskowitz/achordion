@@ -24,13 +24,16 @@ export async function GET(_req: NextRequest, ctx: RouteContext) {
     return NextResponse.json({ error: "missing username" }, { status: 400 });
   }
   try {
-    const listens = await getRecentListens(name, { count: 25 });
+    // Bypass Next data cache so each poll actually hits LB. Without
+    // `live: true` the cached response would freeze for 60s and the
+    // client-side polling would only see new scrobbles every minute.
+    const listens = await getRecentListens(name, { count: 25, live: true });
     const latestTs = listens[0]?.listened_at ?? null;
     return NextResponse.json(
       { listens, latestTs },
-      // Browsers and intermediate caches can hold for 10s, then must
-      // revalidate. Aligns roughly with the polling cadence.
-      { headers: { "Cache-Control": "public, max-age=10, must-revalidate" } },
+      // Tell browsers + intermediate caches to never store this — the
+      // whole point of the route is real-time-ish updates.
+      { headers: { "Cache-Control": "no-store" } },
     );
   } catch (err) {
     return NextResponse.json(

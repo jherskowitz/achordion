@@ -1,10 +1,9 @@
-import { Suspense } from "react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { auth } from "@/auth";
-import { getFollowing } from "@/lib/clients/listenbrainz";
+import { getFollowing, getPlayingNow } from "@/lib/clients/listenbrainz";
 import { getLbTokenForRequest } from "@/lib/lb-token";
 import { FollowToggle } from "./follow-toggle";
-import { OnAirIndicator } from "./on-air-indicator";
+import { LiveOnAirIndicator } from "./live-on-air-indicator";
 import { SectionTabs, type SectionTab } from "./section-tabs";
 
 function userTabs(name: string): SectionTab[] {
@@ -29,6 +28,10 @@ export async function UserPageHeader({ name }: { name: string }) {
   const isOwnProfile =
     !!viewer && viewer.toLowerCase() === name.toLowerCase();
 
+  // Fetch initial playing-now in parallel with the rest so the header
+  // renders without a flash; LiveOnAirIndicator polls from there.
+  const initialPlayingPromise = getPlayingNow(name).catch(() => null);
+
   let followInitial = false;
   let disabledReason: string | undefined;
   if (viewer && !isOwnProfile) {
@@ -48,6 +51,8 @@ export async function UserPageHeader({ name }: { name: string }) {
     }
   }
 
+  const initialPlaying = await initialPlayingPromise;
+
   return (
     <header className="border-border/60 border-b">
       <div className="mx-auto max-w-7xl px-4 pt-10 pb-0 sm:px-6">
@@ -62,13 +67,13 @@ export async function UserPageHeader({ name }: { name: string }) {
             <h1 className="truncate text-3xl font-semibold tracking-tight sm:text-4xl">
               {name}
             </h1>
-            <Suspense fallback={null}>
-              <OnAirIndicator
-                username={name}
-                size="default"
-                className="mt-2"
-              />
-            </Suspense>
+            <LiveOnAirIndicator
+              username={name}
+              initialListen={initialPlaying}
+              hideListenAlong={isOwnProfile}
+              size="default"
+              className="mt-2"
+            />
           </div>
           {viewer && !isOwnProfile && (
             <FollowToggle

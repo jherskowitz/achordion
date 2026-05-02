@@ -25,6 +25,12 @@ interface FetchOptions {
   /** Seconds — default 60. Pass 0 to disable caching. */
   revalidate?: number;
   tags?: string[];
+  /**
+   * Bypass the Next data cache entirely. Used by live polling routes
+   * (recent-listens, playing-now) where stale-from-cache defeats the
+   * point of polling.
+   */
+  noStore?: boolean;
 }
 
 async function lbFetch<T>(
@@ -35,10 +41,13 @@ async function lbFetch<T>(
   const url = `${LB_BASE}${path}`;
   const res = await fetch(url, {
     headers: { "User-Agent": USER_AGENT, Accept: "application/json" },
-    next: {
-      revalidate: opts.revalidate ?? 60,
-      tags: opts.tags,
-    },
+    cache: opts.noStore ? "no-store" : undefined,
+    next: opts.noStore
+      ? undefined
+      : {
+          revalidate: opts.revalidate ?? 60,
+          tags: opts.tags,
+        },
   });
 
   if (!res.ok) {
@@ -98,7 +107,13 @@ const ListensResponseSchema = z.object({
 
 export async function getRecentListens(
   userName: string,
-  opts: { count?: number; minTs?: number; maxTs?: number } = {},
+  opts: {
+    count?: number;
+    minTs?: number;
+    maxTs?: number;
+    /** Skip the Next data cache — for client-polled live views. */
+    live?: boolean;
+  } = {},
 ): Promise<Listen[]> {
   const params = new URLSearchParams();
   if (opts.count) params.set("count", String(opts.count));
@@ -107,10 +122,16 @@ export async function getRecentListens(
   const qs = params.toString();
   const path = `/user/${encodeURIComponent(userName)}/listens${qs ? `?${qs}` : ""}`;
 
-  const result = await lbFetch(path, ListensResponseSchema, {
-    revalidate: 60,
-    tags: [cacheTagsLB.userListens(userName), cacheTagsLB.user(userName)],
-  });
+  const result = await lbFetch(
+    path,
+    ListensResponseSchema,
+    opts.live
+      ? { noStore: true }
+      : {
+          revalidate: 60,
+          tags: [cacheTagsLB.userListens(userName), cacheTagsLB.user(userName)],
+        },
+  );
   return result.payload.listens;
 }
 
@@ -136,12 +157,15 @@ const PlayingNowResponseSchema = z.object({
 
 export async function getPlayingNow(
   userName: string,
+  opts: { live?: boolean } = {},
 ): Promise<PlayingNowListen | null> {
   try {
     const result = await lbFetch(
       `/user/${encodeURIComponent(userName)}/playing-now`,
       PlayingNowResponseSchema,
-      { revalidate: 30, tags: [cacheTagsLB.user(userName)] },
+      opts.live
+        ? { noStore: true }
+        : { revalidate: 30, tags: [cacheTagsLB.user(userName)] },
     );
     return result.payload.listens[0] ?? null;
   } catch (err) {
