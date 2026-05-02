@@ -40,7 +40,7 @@ const CLIENTS: LbClient[] = [
     platforms: ["Browser"],
     blurb:
       "Browser extension that scrobbles plays from 100+ web players (Bandcamp, YouTube Music, Tidal, etc.).",
-    url: "https://web-scrobbler.com",
+    url: "https://github.com/web-scrobbler/web-scrobbler",
   },
   {
     name: "Multi-Scrobbler",
