@@ -466,6 +466,117 @@ const ArtistListenersSchema = z.object({
 
 export type ArtistListeners = z.infer<typeof ArtistListenersSchema>["payload"];
 
+// ─── LB Radio ───────────────────────────────────────────────────────
+
+const LbRadioTrackSchema = z
+  .object({
+    title: z.string(),
+    creator: z.string().optional(),
+    album: z.string().nullish(),
+    duration: z.number().nullish(),
+    identifier: z.union([z.string(), z.array(z.string())]).optional(),
+    extension: z
+      .object({
+        "https://musicbrainz.org/doc/jspf#track": z
+          .object({
+            release_identifier: z.string().nullish(),
+            artist_identifiers: z.array(z.string()).optional(),
+            additional_metadata: z
+              .object({
+                caa_id: z.union([z.number(), z.string()]).nullish(),
+                caa_release_mbid: z.string().nullish(),
+              })
+              .partial()
+              .passthrough()
+              .optional(),
+          })
+          .partial()
+          .passthrough()
+          .optional(),
+      })
+      .partial()
+      .passthrough()
+      .optional(),
+  })
+  .passthrough();
+
+const LbRadioResponseSchema = z.object({
+  payload: z.object({
+    jspf: z.object({
+      playlist: z.object({
+        title: z.string().optional(),
+        annotation: z.string().optional(),
+        track: z.array(LbRadioTrackSchema).optional(),
+      }),
+    }),
+  }),
+});
+
+export interface LbRadioTrack {
+  title: string;
+  artistName: string;
+  artistMbid: string | null;
+  recordingMbid: string | null;
+  releaseMbid: string | null;
+  releaseName: string | null;
+  durationMs: number | null;
+  caaId: number | string | null;
+  caaReleaseMbid: string | null;
+}
+
+function extractMbid(url: string | undefined | null, kind: "artist" | "recording" | "release"): string | null {
+  if (!url) return null;
+  const m = url.match(new RegExp(`/${kind}/([0-9a-f-]{36})`));
+  return m?.[1] ?? null;
+}
+
+export async function getLbRadio(
+  prompt: string,
+  mode: "easy" | "medium" | "hard" = "easy",
+): Promise<LbRadioTrack[] | null> {
+  const token = process.env.LISTENBRAINZ_TOKEN;
+  if (!token) return null;
+
+  const params = new URLSearchParams({ prompt, mode });
+  try {
+    const res = await fetch(`${LB_BASE}/explore/lb-radio?${params}`, {
+      headers: {
+        Authorization: `Token ${token}`,
+        "User-Agent": USER_AGENT,
+        Accept: "application/json",
+      },
+      next: {
+        revalidate: 60 * 60,
+        tags: [`lb:radio:${prompt}:${mode}`],
+      },
+    });
+    if (!res.ok) return null;
+    const data = LbRadioResponseSchema.parse(await res.json());
+    const tracks = data.payload.jspf.playlist.track ?? [];
+    return tracks.map((t) => {
+      const ext = t.extension?.["https://musicbrainz.org/doc/jspf#track"];
+      const idArr = Array.isArray(t.identifier)
+        ? t.identifier
+        : t.identifier
+          ? [t.identifier]
+          : [];
+      return {
+        title: t.title,
+        artistName: t.creator ?? "",
+        artistMbid: extractMbid(ext?.artist_identifiers?.[0], "artist"),
+        recordingMbid: extractMbid(idArr[0], "recording"),
+        releaseMbid: extractMbid(ext?.release_identifier, "release"),
+        releaseName: t.album ?? null,
+        durationMs: t.duration ?? null,
+        caaId: ext?.additional_metadata?.caa_id ?? null,
+        caaReleaseMbid: ext?.additional_metadata?.caa_release_mbid ?? null,
+      };
+    });
+  } catch {
+    return null;
+  }
+}
+
 // ─── Similar artists (LB Labs) ──────────────────────────────────────
 
 const SIMILAR_ARTISTS_ALGORITHM =

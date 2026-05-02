@@ -7,6 +7,7 @@ import {
   partitionArtistRelations,
 } from "@/lib/clients/musicbrainz";
 import {
+  getLbRadio,
   getSimilarArtists,
   getTopRecordingsForArtist,
 } from "@/lib/clients/listenbrainz";
@@ -16,6 +17,7 @@ import { PageHeader } from "@/components/achordion/page-header";
 import { ArtistInfoSidebar } from "@/components/achordion/artist-info-sidebar";
 import { Biography } from "@/components/achordion/biography";
 import { Discography } from "@/components/achordion/discography";
+import { LbRadioSection } from "@/components/achordion/lb-radio-section";
 import { SimilarArtists } from "@/components/achordion/similar-artists";
 import { TopTracksList } from "@/components/achordion/top-tracks-list";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -96,6 +98,12 @@ async function ArtistBody({ mbid }: { mbid: string }) {
         </Suspense>
       )}
 
+      <Suspense
+        fallback={<Skeleton className="my-6 h-24 w-full rounded-2xl" />}
+      >
+        <LbRadioBlock mbid={mbid} artistName={artist.name} />
+      </Suspense>
+
       <div className="mt-8 grid gap-10 lg:grid-cols-[1fr_240px]">
         <div className="min-w-0 space-y-12">
           <section>
@@ -128,6 +136,25 @@ async function ArtistBody({ mbid }: { mbid: string }) {
         </Suspense>
       </section>
     </>
+  );
+}
+
+async function LbRadioBlock({
+  mbid,
+  artistName,
+}: {
+  mbid: string;
+  artistName: string;
+}) {
+  const tracks = await getLbRadio(`artist:(${mbid})`, "easy");
+  return (
+    <div className="my-6">
+      <LbRadioSection
+        artistMbid={mbid}
+        artistName={artistName}
+        tracks={tracks}
+      />
+    </div>
   );
 }
 
