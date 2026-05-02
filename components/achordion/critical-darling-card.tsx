@@ -18,10 +18,18 @@ async function resolveCover(album: CriticsPickAlbum): Promise<{
   coverUrl: string | null;
 }> {
   try {
+    // Pull a handful of candidates and prefer Album over Single/EP/etc.
+    // Critical Darlings entries are reviews of full albums, but plain
+    // `release:"…" AND artist:"…"` often returns a same-titled single
+    // ahead of the album when both exist (e.g. lead-single sharing the
+    // album name). Bias the result by primary-type, falling back to
+    // MB's own score order when no Album candidate exists.
     const query = `release:"${album.title.replace(/"/g, '\\"')}" AND artist:"${album.artist.replace(/"/g, '\\"')}"`;
-    const results = await searchReleaseGroups(query, 1);
-    const top = results[0];
-    if (!top) return { mbid: null, coverUrl: null };
+    const results = await searchReleaseGroups(query, 8);
+    if (results.length === 0) return { mbid: null, coverUrl: null };
+    const album_ = results.find((r) => r["primary-type"] === "Album");
+    const ep = results.find((r) => r["primary-type"] === "EP");
+    const top = album_ ?? ep ?? results[0];
     return { mbid: top.id, coverUrl: caaReleaseGroupUrl(top.id, 250) };
   } catch {
     return { mbid: null, coverUrl: null };
