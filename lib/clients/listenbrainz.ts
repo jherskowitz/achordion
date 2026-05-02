@@ -3,6 +3,7 @@ import "server-only";
 import { z } from "zod";
 
 const LB_BASE = "https://api.listenbrainz.org/1";
+const LB_LABS_BASE = "https://labs.api.listenbrainz.org";
 const USER_AGENT = "Achordion/0.1 (+https://github.com/jherskow/achordion)";
 
 class ListenBrainzError extends Error {
@@ -464,6 +465,56 @@ const ArtistListenersSchema = z.object({
 });
 
 export type ArtistListeners = z.infer<typeof ArtistListenersSchema>["payload"];
+
+// ─── Similar artists (LB Labs) ──────────────────────────────────────
+
+const SIMILAR_ARTISTS_ALGORITHM =
+  "session_based_days_7500_session_300_contribution_3_threshold_10_limit_100_filter_True_skip_30";
+
+const SimilarArtistSchema = z.object({
+  artist_mbid: z.string(),
+  name: z.string(),
+  comment: z.string().nullish(),
+  type: z.string().nullish(),
+  score: z.number(),
+  reference_mbid: z.string().optional(),
+});
+
+export type SimilarArtist = z.infer<typeof SimilarArtistSchema>;
+
+export async function getSimilarArtists(
+  mbid: string,
+  limit = 12,
+): Promise<SimilarArtist[]> {
+  try {
+    const res = await fetch(`${LB_LABS_BASE}/similar-artists/json`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "User-Agent": USER_AGENT,
+        Accept: "application/json",
+      },
+      body: JSON.stringify([
+        { artist_mbids: [mbid], algorithm: SIMILAR_ARTISTS_ALGORITHM },
+      ]),
+      next: {
+        revalidate: 60 * 60 * 24,
+        tags: [`lb:similar-artists:${mbid}`],
+      },
+    });
+    if (!res.ok) return [];
+    const json = await res.json();
+    if (!Array.isArray(json)) return [];
+    const parsed = z.array(SimilarArtistSchema).safeParse(json);
+    if (!parsed.success) return [];
+    // LB returns the seed artist first sometimes — filter it
+    return parsed.data
+      .filter((a) => a.artist_mbid !== mbid)
+      .slice(0, limit);
+  } catch {
+    return [];
+  }
+}
 
 export async function getArtistListeners(
   mbid: string,

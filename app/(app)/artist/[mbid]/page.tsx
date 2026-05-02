@@ -6,13 +6,17 @@ import {
   getArtistReleaseGroups,
   partitionArtistRelations,
 } from "@/lib/clients/musicbrainz";
-import { getTopRecordingsForArtist } from "@/lib/clients/listenbrainz";
+import {
+  getSimilarArtists,
+  getTopRecordingsForArtist,
+} from "@/lib/clients/listenbrainz";
 import { findBioSource, getBiography } from "@/lib/clients/wikipedia";
 import { PageShell } from "@/components/achordion/page-shell";
 import { PageHeader } from "@/components/achordion/page-header";
 import { ArtistInfoSidebar } from "@/components/achordion/artist-info-sidebar";
 import { Biography } from "@/components/achordion/biography";
 import { Discography } from "@/components/achordion/discography";
+import { SimilarArtists } from "@/components/achordion/similar-artists";
 import { TopTracksList } from "@/components/achordion/top-tracks-list";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -114,7 +118,44 @@ async function ArtistBody({ mbid }: { mbid: string }) {
         </div>
         <ArtistInfoSidebar artist={artist} />
       </div>
+
+      <section className="mt-16">
+        <h2 className="mb-6 text-sm font-semibold tracking-wide uppercase">
+          Fans also like
+        </h2>
+        <Suspense fallback={<SimilarArtistsSkeleton />}>
+          <SimilarArtistsSection mbid={mbid} />
+        </Suspense>
+      </section>
     </>
+  );
+}
+
+async function SimilarArtistsSection({ mbid }: { mbid: string }) {
+  const similar = await getSimilarArtists(mbid, 12);
+  if (similar.length === 0) {
+    return (
+      <p className="text-muted-foreground text-sm">
+        No similar artists on file.
+      </p>
+    );
+  }
+  return <SimilarArtists artists={similar} />;
+}
+
+function SimilarArtistsSkeleton() {
+  return (
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+      {Array.from({ length: 8 }).map((_, i) => (
+        <div
+          key={i}
+          className="border-border/60 space-y-2 rounded-xl border p-4"
+        >
+          <Skeleton className="h-4 w-2/3" />
+          <Skeleton className="h-3 w-full" />
+        </div>
+      ))}
+    </div>
   );
 }
 
