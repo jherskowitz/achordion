@@ -213,6 +213,197 @@ export async function getTopRecordingsForArtist(
   }
 }
 
+// ─── User stats ─────────────────────────────────────────────────────
+
+export {
+  STAT_RANGES,
+  STAT_RANGE_LABELS,
+  type StatRange,
+} from "@/lib/types/stat-range";
+import type { StatRange } from "@/lib/types/stat-range";
+
+const StatTopArtistsSchema = z.object({
+  payload: z.object({
+    artists: z.array(
+      z.object({
+        artist_name: z.string(),
+        artist_mbid: z.string().nullish(),
+        listen_count: z.number(),
+      }),
+    ),
+    count: z.number().optional(),
+    range: z.string(),
+    last_updated: z.number().optional(),
+    total_artist_count: z.number().optional(),
+    from_ts: z.number().optional(),
+    to_ts: z.number().optional(),
+  }),
+});
+
+export async function getUserTopArtists(
+  name: string,
+  range: StatRange = "all_time",
+  count = 25,
+) {
+  try {
+    const params = new URLSearchParams({ range, count: String(count) });
+    const result = await lbFetch(
+      `/stats/user/${encodeURIComponent(name)}/artists?${params}`,
+      StatTopArtistsSchema,
+      { revalidate: 60 * 60, tags: [cacheTagsLB.userStats(name)] },
+    );
+    return result.payload.artists;
+  } catch (err) {
+    if (err instanceof ListenBrainzError && err.status === 204) return [];
+    throw err;
+  }
+}
+
+const StatTopReleaseGroupsSchema = z.object({
+  payload: z.object({
+    release_groups: z.array(
+      z.object({
+        release_group_name: z.string(),
+        release_group_mbid: z.string().nullish(),
+        artist_name: z.string(),
+        artist_mbids: z.array(z.string()).optional(),
+        listen_count: z.number(),
+        caa_id: z.union([z.number(), z.string()]).nullish(),
+        caa_release_mbid: z.string().nullish(),
+      }),
+    ),
+    count: z.number().optional(),
+    range: z.string(),
+    total_release_group_count: z.number().optional(),
+  }),
+});
+
+export async function getUserTopReleaseGroups(
+  name: string,
+  range: StatRange = "all_time",
+  count = 24,
+) {
+  try {
+    const params = new URLSearchParams({ range, count: String(count) });
+    const result = await lbFetch(
+      `/stats/user/${encodeURIComponent(name)}/release-groups?${params}`,
+      StatTopReleaseGroupsSchema,
+      { revalidate: 60 * 60, tags: [cacheTagsLB.userStats(name)] },
+    );
+    return result.payload.release_groups;
+  } catch (err) {
+    if (err instanceof ListenBrainzError && err.status === 204) return [];
+    throw err;
+  }
+}
+
+const StatTopRecordingsSchema = z.object({
+  payload: z.object({
+    recordings: z.array(
+      z.object({
+        track_name: z.string(),
+        recording_mbid: z.string().nullish(),
+        artist_name: z.string(),
+        artist_mbids: z.array(z.string()).optional(),
+        release_name: z.string().nullish(),
+        release_mbid: z.string().nullish(),
+        listen_count: z.number(),
+        caa_id: z.union([z.number(), z.string()]).nullish(),
+        caa_release_mbid: z.string().nullish(),
+      }),
+    ),
+    count: z.number().optional(),
+    range: z.string(),
+    total_recording_count: z.number().optional(),
+  }),
+});
+
+export async function getUserTopRecordings(
+  name: string,
+  range: StatRange = "all_time",
+  count = 25,
+) {
+  try {
+    const params = new URLSearchParams({ range, count: String(count) });
+    const result = await lbFetch(
+      `/stats/user/${encodeURIComponent(name)}/recordings?${params}`,
+      StatTopRecordingsSchema,
+      { revalidate: 60 * 60, tags: [cacheTagsLB.userStats(name)] },
+    );
+    return result.payload.recordings;
+  } catch (err) {
+    if (err instanceof ListenBrainzError && err.status === 204) return [];
+    throw err;
+  }
+}
+
+const ListeningActivitySchema = z.object({
+  payload: z.object({
+    listening_activity: z.array(
+      z.object({
+        from_ts: z.number(),
+        to_ts: z.number(),
+        listen_count: z.number(),
+        time_range: z.string(),
+      }),
+    ),
+    range: z.string(),
+    last_updated: z.number().optional(),
+  }),
+});
+
+export async function getListeningActivity(
+  name: string,
+  range: StatRange = "year",
+) {
+  try {
+    const result = await lbFetch(
+      `/stats/user/${encodeURIComponent(name)}/listening-activity?range=${range}`,
+      ListeningActivitySchema,
+      { revalidate: 60 * 60, tags: [cacheTagsLB.userStats(name)] },
+    );
+    return result.payload.listening_activity;
+  } catch (err) {
+    if (err instanceof ListenBrainzError && err.status === 204) return [];
+    throw err;
+  }
+}
+
+const DailyActivitySchema = z.object({
+  payload: z.object({
+    daily_activity: z.record(
+      z.string(),
+      z.array(
+        z.object({
+          hour: z.number(),
+          listen_count: z.number(),
+        }),
+      ),
+    ),
+    range: z.string(),
+    last_updated: z.number().optional(),
+    from_ts: z.number().optional(),
+    to_ts: z.number().optional(),
+  }),
+});
+
+export async function getDailyActivity(
+  name: string,
+  range: StatRange = "all_time",
+) {
+  try {
+    const result = await lbFetch(
+      `/stats/user/${encodeURIComponent(name)}/daily-activity?range=${range}`,
+      DailyActivitySchema,
+      { revalidate: 60 * 60, tags: [cacheTagsLB.userStats(name)] },
+    );
+    return result.payload.daily_activity;
+  } catch (err) {
+    if (err instanceof ListenBrainzError && err.status === 204) return {};
+    throw err;
+  }
+}
+
 const TopReleaseGroupForArtistSchema = z.object({
   release_group_mbid: z.string(),
   release_group_name: z.string(),
