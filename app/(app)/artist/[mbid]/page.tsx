@@ -92,14 +92,16 @@ async function ArtistBody({ mbid }: { mbid: string }) {
         </div>
       )}
 
-      {bioSource && (
-        <Suspense fallback={<Skeleton className="mb-6 h-32 w-full rounded-xl" />}>
-          <BiographySection source={bioSource} />
-        </Suspense>
-      )}
-
-      <div className="mt-8 grid gap-10 lg:grid-cols-[1fr_240px]">
+      <div className="mt-6 grid gap-10 lg:grid-cols-[1fr_240px]">
         <div className="min-w-0 space-y-12">
+          {bioSource && (
+            <Suspense
+              fallback={<Skeleton className="h-32 w-full rounded-xl" />}
+            >
+              <BiographySection source={bioSource} />
+            </Suspense>
+          )}
+
           <Suspense
             fallback={<Skeleton className="h-24 w-full rounded-2xl" />}
           >
