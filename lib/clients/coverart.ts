@@ -1,10 +1,8 @@
-import "server-only";
-
 /**
- * CoverArtArchive doesn't need to be fetched server-side at all — the public
- * URL pattern is deterministic. We just resolve a URL and let next/image
- * handle the rest. We include a HEAD-check helper for cases where we want
- * to know whether art exists before rendering.
+ * CoverArtArchive helpers — pure URL builders, safe in both server and
+ * client components. The CAA URL pattern is deterministic: given an MBID
+ * (and optionally a caa_id), the cover-art URL is fully constructed
+ * client-side, so no fetch is needed and no secrets are involved.
  */
 
 const CAA_BASE = "https://coverartarchive.org";
