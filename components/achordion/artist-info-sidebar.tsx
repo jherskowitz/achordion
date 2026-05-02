@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Pencil } from "lucide-react";
 import type {
   ArtistDetail,
   ArtistMember,
@@ -121,6 +122,18 @@ export function ArtistInfoSidebar({ artist }: { artist: ArtistDetail }) {
           <ExternalLinks links={urls} />
         </div>
       )}
+
+      <div className="border-border/60 border-t pt-4">
+        <a
+          href={`https://musicbrainz.org/artist/${artist.id}/edit`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-muted-foreground/70 hover:text-foreground inline-flex items-center gap-1.5 text-xs"
+        >
+          <Pencil className="size-3" />
+          Edit on MusicBrainz
+        </a>
+      </div>
     </aside>
   );
 }
