@@ -1,5 +1,7 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { ArrowRight, BarChart3, Disc3, Radio } from "lucide-react";
+import { auth } from "@/auth";
 import { Button } from "@/components/ui/button";
 
 const FEATURES = [
@@ -20,7 +22,11 @@ const FEATURES = [
   },
 ];
 
-export default function HomePage() {
+export default async function HomePage() {
+  const session = await auth();
+  if (session?.user?.mbUsername) {
+    redirect(`/user/${session.user.mbUsername}`);
+  }
   return (
     <>
       <section className="mx-auto max-w-7xl px-4 pt-20 pb-16 sm:px-6 sm:pt-28 sm:pb-24">

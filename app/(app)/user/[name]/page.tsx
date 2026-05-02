@@ -1,19 +1,95 @@
+import Link from "next/link";
+import { Suspense } from "react";
+import { getRecentListens, getPlayingNow } from "@/lib/clients/listenbrainz";
+import { ScrobbleList } from "@/components/achordion/scrobble-list";
+import { NowPlayingPill } from "@/components/achordion/now-playing-pill";
 import { PageShell } from "@/components/achordion/page-shell";
 import { ComingSoon } from "@/components/achordion/coming-soon";
+import { Skeleton } from "@/components/ui/skeleton";
 
-export default async function UserOverviewPage({
-  params,
-}: {
+interface PageParams {
   params: Promise<{ name: string }>;
-}) {
+}
+
+async function NowPlayingSection({ name }: { name: string }) {
+  try {
+    const playing = await getPlayingNow(name);
+    if (!playing) return null;
+    return <NowPlayingPill listen={playing} />;
+  } catch {
+    return null;
+  }
+}
+
+async function RecentListensSection({ name }: { name: string }) {
+  try {
+    const listens = await getRecentListens(name, { count: 25 });
+    return (
+      <>
+        <ScrobbleList listens={listens} />
+        {listens.length > 0 && (
+          <div className="mt-6 text-center">
+            <Link
+              href={`/user/${name}/listens`}
+              className="text-muted-foreground hover:text-foreground text-sm underline-offset-4 hover:underline"
+            >
+              See full listen history →
+            </Link>
+          </div>
+        )}
+      </>
+    );
+  } catch (err) {
+    return (
+      <ComingSoon
+        title="Couldn't reach ListenBrainz"
+        description={err instanceof Error ? err.message : "Try again in a moment."}
+      />
+    );
+  }
+}
+
+function ScrobbleListSkeleton() {
+  return (
+    <ul className="border-border/60 divide-border/60 divide-y rounded-xl border px-4">
+      {Array.from({ length: 8 }).map((_, i) => (
+        <li key={i} className="flex items-center gap-3 py-3">
+          <Skeleton className="size-12 rounded-md" />
+          <div className="flex-1 space-y-2">
+            <Skeleton className="h-3.5 w-2/3" />
+            <Skeleton className="h-3 w-1/2" />
+          </div>
+          <Skeleton className="h-3 w-12" />
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+export default async function UserOverviewPage({ params }: PageParams) {
   const { name } = await params;
   return (
     <PageShell className="pt-8">
-      <ComingSoon
-        title="Overview"
-        description={`${name}'s recent listens, top items, and listening rhythm.`}
-        hint="Wired up in Phase 2."
-      />
+      <div className="grid gap-8 lg:grid-cols-[1fr_280px]">
+        <div className="min-w-0">
+          <h2 className="mb-4 text-sm font-semibold tracking-wide uppercase">
+            Recent listens
+          </h2>
+          <Suspense fallback={<ScrobbleListSkeleton />}>
+            <RecentListensSection name={name} />
+          </Suspense>
+        </div>
+        <aside className="space-y-4">
+          <Suspense fallback={null}>
+            <NowPlayingSection name={name} />
+          </Suspense>
+          <ComingSoon
+            title="Stats sidebar"
+            description="Top artists this week, listening pace, and pinned recordings will live here."
+            className="px-4 py-10"
+          />
+        </aside>
+      </div>
     </PageShell>
   );
 }

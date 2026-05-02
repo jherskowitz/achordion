@@ -1,0 +1,242 @@
+import "server-only";
+
+import { z } from "zod";
+
+const LB_BASE = "https://api.listenbrainz.org/1";
+const USER_AGENT = "Achordion/0.1 (+https://github.com/jherskow/achordion)";
+
+class ListenBrainzError extends Error {
+  constructor(
+    public status: number,
+    message: string,
+  ) {
+    super(message);
+  }
+}
+
+export const cacheTagsLB = {
+  userListens: (name: string) => `lb:user:${name}:listens`,
+  userStats: (name: string) => `lb:user:${name}:stats`,
+  user: (name: string) => `lb:user:${name}`,
+};
+
+interface FetchOptions {
+  /** Seconds — default 60. Pass 0 to disable caching. */
+  revalidate?: number;
+  tags?: string[];
+}
+
+async function lbFetch<T>(
+  path: string,
+  schema: z.ZodSchema<T>,
+  opts: FetchOptions = {},
+): Promise<T> {
+  const url = `${LB_BASE}${path}`;
+  const res = await fetch(url, {
+    headers: { "User-Agent": USER_AGENT, Accept: "application/json" },
+    next: {
+      revalidate: opts.revalidate ?? 60,
+      tags: opts.tags,
+    },
+  });
+
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new ListenBrainzError(res.status, `LB ${res.status}: ${body.slice(0, 200)}`);
+  }
+
+  const json = await res.json();
+  return schema.parse(json);
+}
+
+const ListenSchema = z.object({
+  listened_at: z.number(),
+  user_name: z.string().optional(),
+  track_metadata: z.object({
+    track_name: z.string(),
+    artist_name: z.string(),
+    release_name: z.string().nullish(),
+    additional_info: z
+      .object({
+        recording_mbid: z.string().optional(),
+        release_mbid: z.string().optional(),
+        release_group_mbid: z.string().optional(),
+        artist_mbids: z.array(z.string()).optional(),
+        duration_ms: z.number().optional(),
+        spotify_id: z.string().optional(),
+        origin_url: z.string().optional(),
+      })
+      .partial()
+      .passthrough()
+      .optional(),
+    mbid_mapping: z
+      .object({
+        recording_mbid: z.string().optional(),
+        release_mbid: z.string().optional(),
+        artist_mbids: z.array(z.string()).optional(),
+        caa_id: z.union([z.number(), z.string()]).optional(),
+        caa_release_mbid: z.string().optional(),
+      })
+      .partial()
+      .passthrough()
+      .optional(),
+  }),
+});
+
+export type Listen = z.infer<typeof ListenSchema>;
+
+const ListensResponseSchema = z.object({
+  payload: z.object({
+    count: z.number(),
+    user_id: z.string().optional(),
+    latest_listen_ts: z.number().optional(),
+    oldest_listen_ts: z.number().optional(),
+    listens: z.array(ListenSchema),
+  }),
+});
+
+export async function getRecentListens(
+  userName: string,
+  opts: { count?: number; minTs?: number; maxTs?: number } = {},
+): Promise<Listen[]> {
+  const params = new URLSearchParams();
+  if (opts.count) params.set("count", String(opts.count));
+  if (opts.minTs) params.set("min_ts", String(opts.minTs));
+  if (opts.maxTs) params.set("max_ts", String(opts.maxTs));
+  const qs = params.toString();
+  const path = `/user/${encodeURIComponent(userName)}/listens${qs ? `?${qs}` : ""}`;
+
+  const result = await lbFetch(path, ListensResponseSchema, {
+    revalidate: 60,
+    tags: [cacheTagsLB.userListens(userName), cacheTagsLB.user(userName)],
+  });
+  return result.payload.listens;
+}
+
+const PlayingNowResponseSchema = z.object({
+  payload: z.object({
+    count: z.number(),
+    user_id: z.string().optional(),
+    listens: z.array(ListenSchema),
+    playing_now: z.boolean().optional(),
+  }),
+});
+
+export async function getPlayingNow(userName: string): Promise<Listen | null> {
+  try {
+    const result = await lbFetch(
+      `/user/${encodeURIComponent(userName)}/playing-now`,
+      PlayingNowResponseSchema,
+      { revalidate: 30, tags: [cacheTagsLB.user(userName)] },
+    );
+    return result.payload.listens[0] ?? null;
+  } catch (err) {
+    if (err instanceof ListenBrainzError && err.status === 404) return null;
+    throw err;
+  }
+}
+
+const SearchUsersResponseSchema = z.object({
+  users: z.array(
+    z.object({
+      user_name: z.string(),
+    }),
+  ),
+});
+
+export async function searchUsers(query: string, limit = 10): Promise<string[]> {
+  if (!query.trim()) return [];
+  const params = new URLSearchParams({
+    search_term: query,
+    limit: String(limit),
+  });
+  const result = await lbFetch(
+    `/search/users?${params}`,
+    SearchUsersResponseSchema,
+    { revalidate: 300 },
+  );
+  return result.users.map((u) => u.user_name);
+}
+
+const SitewideStatsArtistsSchema = z.object({
+  payload: z.object({
+    artists: z.array(
+      z.object({
+        artist_name: z.string(),
+        artist_mbid: z.string().nullish(),
+        listen_count: z.number(),
+      }),
+    ),
+    range: z.string(),
+    from_ts: z.number().optional(),
+    to_ts: z.number().optional(),
+  }),
+});
+
+export async function getSitewideTopArtists(range = "week", count = 10) {
+  const params = new URLSearchParams({ range, count: String(count) });
+  const result = await lbFetch(
+    `/stats/sitewide/artists?${params}`,
+    SitewideStatsArtistsSchema,
+    { revalidate: 60 * 60 },
+  );
+  return result.payload.artists;
+}
+
+const TopRecordingForArtistSchema = z.object({
+  recording_mbid: z.string(),
+  recording_name: z.string(),
+  artist_name: z.string(),
+  artist_mbids: z.array(z.string()).optional(),
+  release_name: z.string().nullish(),
+  release_mbid: z.string().nullish(),
+  caa_id: z.union([z.number(), z.string()]).nullish(),
+  caa_release_mbid: z.string().nullish(),
+  total_listen_count: z.number().optional(),
+  total_user_count: z.number().optional(),
+});
+
+export type TopRecording = z.infer<typeof TopRecordingForArtistSchema>;
+
+export async function getTopRecordingsForArtist(
+  artistMbid: string,
+): Promise<TopRecording[]> {
+  try {
+    const result = await lbFetch(
+      `/popularity/top-recordings-for-artist/${encodeURIComponent(artistMbid)}`,
+      z.array(TopRecordingForArtistSchema),
+      { revalidate: 60 * 60 * 6 },
+    );
+    return result;
+  } catch {
+    return [];
+  }
+}
+
+const TopReleaseGroupForArtistSchema = z.object({
+  release_group_mbid: z.string(),
+  release_group_name: z.string(),
+  artist_name: z.string(),
+  artist_mbids: z.array(z.string()).optional(),
+  caa_id: z.union([z.number(), z.string()]).nullish(),
+  caa_release_mbid: z.string().nullish(),
+  total_listen_count: z.number().optional(),
+  total_user_count: z.number().optional(),
+});
+
+export type TopReleaseGroup = z.infer<typeof TopReleaseGroupForArtistSchema>;
+
+export async function getTopReleaseGroupsForArtist(
+  artistMbid: string,
+): Promise<TopReleaseGroup[]> {
+  try {
+    const result = await lbFetch(
+      `/popularity/top-release-groups-for-artist/${encodeURIComponent(artistMbid)}`,
+      z.array(TopReleaseGroupForArtistSchema),
+      { revalidate: 60 * 60 * 6 },
+    );
+    return result;
+  } catch {
+    return [];
+  }
+}
