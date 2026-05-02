@@ -128,6 +128,12 @@ function inThisWeek(r: FreshRelease, range: { startIso: string; endIso: string }
   return r.release_date >= range.startIso && r.release_date < range.endIso;
 }
 
+function isStudioRelease(r: FreshRelease): boolean {
+  // Match the default "studio" filter on /explore/fresh-releases — Albums + EPs.
+  const primary = r.release_group_primary_type;
+  return primary === "Album" || primary === "EP";
+}
+
 async function ThisWeekReleasesSection({ username }: { username: string }) {
   // Grab a 14-day window so we have enough material to filter to this calendar
   // week even on Sundays.
@@ -138,7 +144,9 @@ async function ThisWeekReleasesSection({ username }: { username: string }) {
     sort: "release_date",
   }).catch(() => [] as FreshRelease[]);
   const range = thisWeekRange();
-  const thisWeek = releases.filter((r) => inThisWeek(r, range));
+  const thisWeek = releases.filter(
+    (r) => inThisWeek(r, range) && isStudioRelease(r),
+  );
   if (thisWeek.length === 0) {
     return (
       <p className="text-muted-foreground text-sm">
