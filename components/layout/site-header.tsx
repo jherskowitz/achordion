@@ -17,10 +17,7 @@ export async function SiteHeader() {
     { href: "/radio", label: "Radio" },
   ];
   if (username) {
-    nav.push({
-      href: `/user/${encodeURIComponent(username)}/feed`,
-      label: "My feed",
-    });
+    nav.push({ href: "/feed", label: "My feed" });
     nav.push({
       href: `/user/${encodeURIComponent(username)}`,
       label: "My profile",

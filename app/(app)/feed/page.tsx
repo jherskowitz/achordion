@@ -9,11 +9,7 @@ import { FeedEventList } from "@/components/achordion/feed-event-list";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 
-export const metadata = { title: "Feed" };
-
-interface PageParams {
-  params: Promise<{ name: string }>;
-}
+export const metadata = { title: "My feed" };
 
 async function FeedBody({ name }: { name: string }) {
   const token = await getLbTokenForRequest();
@@ -62,12 +58,9 @@ function FeedSkeleton() {
   );
 }
 
-export default async function FeedPage({ params }: PageParams) {
-  const { name } = await params;
+export default async function FeedPage() {
   const session = await auth();
   const viewer = session?.user?.mbUsername ?? null;
-  const isOwnFeed =
-    !!viewer && viewer.toLowerCase() === name.toLowerCase();
 
   if (!viewer) {
     return (
@@ -89,39 +82,19 @@ export default async function FeedPage({ params }: PageParams) {
     );
   }
 
-  if (!isOwnFeed) {
-    return (
-      <PageShell className="pt-8">
-        <ComingSoon
-          title="That feed is private"
-          description={`Only ${name} can view their own ListenBrainz feed.`}
-          hint={
-            <Button
-              size="sm"
-              nativeButton={false}
-              render={<Link href={`/user/${encodeURIComponent(viewer)}/feed`} />}
-            >
-              Go to your feed
-            </Button>
-          }
-        />
-      </PageShell>
-    );
-  }
-
   return (
     <PageShell className="pt-8">
       <header className="mb-6">
-        <h2 className="text-sm font-semibold tracking-wide uppercase">
-          Your feed
-        </h2>
+        <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+          My feed
+        </h1>
         <p className="text-muted-foreground mt-1 text-sm">
           Recent activity from accounts you follow on ListenBrainz, plus
           system notifications.
         </p>
       </header>
       <Suspense fallback={<FeedSkeleton />}>
-        <FeedBody name={name} />
+        <FeedBody name={viewer} />
       </Suspense>
     </PageShell>
   );
