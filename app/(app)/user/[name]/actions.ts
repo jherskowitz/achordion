@@ -32,7 +32,8 @@ async function setFollow(
   if (!result.ok) {
     return {
       ok: false,
-      reason: `ListenBrainz returned ${result.status}.`,
+      reason:
+        result.message ?? `ListenBrainz returned ${result.status}.`,
     };
   }
   // Invalidate the viewer's following cache so the toggle flips on

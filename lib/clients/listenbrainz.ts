@@ -262,12 +262,26 @@ export async function getFollowers(userName: string): Promise<string[]> {
   }
 }
 
-export async function followUser(
+interface FollowResult {
+  ok: boolean;
+  status: number;
+  /** Server-provided message when present (used for error display). */
+  message?: string;
+  /**
+   * True for the "already following" / "not following" idempotency case
+   * — the desired end state already holds, so the UI should treat it as
+   * success.
+   */
+  noop?: boolean;
+}
+
+async function lbFollowMutation(
+  path: "follow" | "unfollow",
   target: string,
   token: string,
-): Promise<{ ok: boolean; status: number }> {
+): Promise<FollowResult> {
   const res = await fetch(
-    `${LB_BASE}/user/${encodeURIComponent(target)}/follow`,
+    `${LB_BASE}/user/${encodeURIComponent(target)}/${path}`,
     {
       method: "POST",
       headers: {
@@ -278,26 +292,45 @@ export async function followUser(
       cache: "no-store",
     },
   );
-  return { ok: res.ok, status: res.status };
+  let message: string | undefined;
+  let noop = false;
+  // LB returns JSON like {status: "ok"} on success, or {code, error} on failure.
+  try {
+    const body = (await res.json()) as { status?: string; error?: string };
+    if (body.error) {
+      message = body.error;
+      // Treat already-followed / not-followed as no-op success — the
+      // toggle's desired end state already holds.
+      if (
+        /already following/i.test(body.error) ||
+        /not following/i.test(body.error)
+      ) {
+        noop = true;
+      }
+    }
+  } catch {
+    // No-op — non-JSON body, just return based on status.
+  }
+  return {
+    ok: res.ok || noop,
+    status: res.status,
+    message,
+    noop,
+  };
+}
+
+export async function followUser(
+  target: string,
+  token: string,
+): Promise<FollowResult> {
+  return lbFollowMutation("follow", target, token);
 }
 
 export async function unfollowUser(
   target: string,
   token: string,
-): Promise<{ ok: boolean; status: number }> {
-  const res = await fetch(
-    `${LB_BASE}/user/${encodeURIComponent(target)}/follow`,
-    {
-      method: "DELETE",
-      headers: {
-        Authorization: `Token ${token}`,
-        "User-Agent": USER_AGENT,
-        Accept: "application/json",
-      },
-      cache: "no-store",
-    },
-  );
-  return { ok: res.ok, status: res.status };
+): Promise<FollowResult> {
+  return lbFollowMutation("unfollow", target, token);
 }
 
 // ─── User stats ─────────────────────────────────────────────────────
