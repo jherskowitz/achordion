@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { CoverArt } from "./cover-art";
 import { caaReleaseGroupUrl, caaReleaseUrl } from "@/lib/clients/coverart";
+import { parachordPlayTrack } from "@/lib/parachord";
+import { ParachordPlayButton } from "./parachord-button";
 
 interface TrackEntry {
   track_name: string;
@@ -37,7 +39,7 @@ export function TopTracksList({ tracks }: { tracks: TrackEntry[] }) {
         return (
           <li
             key={`${t.recording_mbid ?? t.track_name}-${i}`}
-            className="flex items-center gap-3 py-3"
+            className="group flex items-center gap-3 py-3"
           >
             <span className="text-muted-foreground w-5 shrink-0 text-xs tabular-nums">
               {i + 1}
@@ -73,6 +75,12 @@ export function TopTracksList({ tracks }: { tracks: TrackEntry[] }) {
                 )}
               </p>
             </div>
+            <ParachordPlayButton
+              href={parachordPlayTrack({
+                artist: t.artist_name,
+                title: t.track_name,
+              })}
+            />
             <span className="text-muted-foreground shrink-0 tabular-nums text-xs">
               {t.listen_count.toLocaleString()}
             </span>

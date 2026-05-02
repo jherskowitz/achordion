@@ -3,11 +3,14 @@ import { CoverArt } from "./cover-art";
 import { caaReleaseGroupUrl } from "@/lib/clients/coverart";
 import type { ReleaseGroupDetail } from "@/lib/clients/musicbrainz";
 import { formatArtistCredit } from "@/lib/clients/musicbrainz";
+import { ParachordCtaButton } from "./parachord-button";
+import { parachordImportPlaylist, type ParachordTrack } from "@/lib/parachord";
 
 interface AlbumHeaderProps {
   rg: ReleaseGroupDetail;
   totalListens?: number;
   totalListeners?: number;
+  parachordTracks?: ParachordTrack[];
 }
 
 function ArtistByline({
@@ -41,6 +44,7 @@ export function AlbumHeader({
   rg,
   totalListens,
   totalListeners,
+  parachordTracks,
 }: AlbumHeaderProps) {
   const credit = formatArtistCredit(rg["artist-credit"]);
   const year = rg["first-release-date"]?.slice(0, 4);
@@ -109,6 +113,18 @@ export function AlbumHeader({
                 {t.name}
               </span>
             ))}
+          </div>
+        )}
+        {parachordTracks && parachordTracks.length > 0 && (
+          <div className="mt-5">
+            <ParachordCtaButton
+              href={parachordImportPlaylist({
+                title: rg.title,
+                creator: credit.name,
+                tracks: parachordTracks,
+              })}
+              label="Play in Parachord"
+            />
           </div>
         )}
       </div>

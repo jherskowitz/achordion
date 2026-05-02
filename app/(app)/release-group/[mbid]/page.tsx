@@ -8,6 +8,7 @@ import {
   pickCanonicalRelease,
   type ReleaseDetail,
 } from "@/lib/clients/musicbrainz";
+import type { ParachordTrack } from "@/lib/parachord";
 import {
   getReleaseGroupListeners,
   getTopRecordingsForArtist,
@@ -67,12 +68,29 @@ async function AlbumBody({ mbid }: { mbid: string }) {
     ? await fetchListenCounts(release, credit.primaryArtistId)
     : new Map<string, number>();
 
+  const parachordTracks: ParachordTrack[] | undefined = release
+    ? release.media
+        ?.flatMap((m) => m.tracks ?? [])
+        .map((t): ParachordTrack => {
+          const trackArtist =
+            formatArtistCredit(t["artist-credit"]).name || credit.name;
+          const lengthMs = t.length ?? t.recording?.length;
+          return {
+            title: t.title,
+            artist: trackArtist,
+            album: rg.title,
+            ...(lengthMs ? { duration: Math.round(lengthMs / 1000) } : {}),
+          };
+        })
+    : undefined;
+
   return (
     <>
       <AlbumHeader
         rg={rg}
         totalListens={listeners?.total_listen_count}
         totalListeners={listeners?.total_user_count}
+        parachordTracks={parachordTracks}
       />
 
       <div className="grid gap-10 lg:grid-cols-[1fr_240px]">

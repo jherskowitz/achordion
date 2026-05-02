@@ -18,6 +18,8 @@ import { ArtistInfoSidebar } from "@/components/achordion/artist-info-sidebar";
 import { Biography } from "@/components/achordion/biography";
 import { Discography } from "@/components/achordion/discography";
 import { LbRadioSection } from "@/components/achordion/lb-radio-section";
+import { ParachordCtaButton } from "@/components/achordion/parachord-button";
+import { parachordOpenArtist } from "@/lib/parachord";
 import { SimilarArtists } from "@/components/achordion/similar-artists";
 import { TopTracksList } from "@/components/achordion/top-tracks-list";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -73,9 +75,16 @@ async function ArtistBody({ mbid }: { mbid: string }) {
         }
         breadcrumbs={[{ label: "Artists" }, { label: artist.name }]}
         actions={
-          <div className="text-muted-foreground space-y-1 text-right text-xs">
-            {lifeSpan && <p>{lifeSpan}</p>}
-            {artist.country && <p>{artist.country}</p>}
+          <div className="flex items-center gap-3 sm:flex-col sm:items-end">
+            <ParachordCtaButton
+              href={parachordOpenArtist(artist.name)}
+              label="Play in Parachord"
+              size="sm"
+            />
+            <div className="text-muted-foreground space-y-1 text-xs sm:text-right">
+              {lifeSpan && <p>{lifeSpan}</p>}
+              {artist.country && <p>{artist.country}</p>}
+            </div>
           </div>
         }
       />

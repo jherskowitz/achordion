@@ -3,6 +3,12 @@ import { ExternalLink, Radio } from "lucide-react";
 import type { LbRadioTrack } from "@/lib/clients/listenbrainz";
 import { CoverArt } from "./cover-art";
 import { caaReleaseUrl } from "@/lib/clients/coverart";
+import {
+  parachordImportPlaylist,
+  parachordPlayTrack,
+  type ParachordTrack,
+} from "@/lib/parachord";
+import { ParachordCtaButton, ParachordPlayButton } from "./parachord-button";
 
 interface LbRadioSectionProps {
   artistMbid: string;
@@ -49,9 +55,16 @@ export function LbRadioSection({
     );
   }
 
+  const parachordTracks: ParachordTrack[] = tracks.map((t) => ({
+    title: t.title,
+    artist: t.artistName,
+    ...(t.releaseName ? { album: t.releaseName } : {}),
+    ...(t.durationMs ? { duration: Math.round(t.durationMs / 1000) } : {}),
+  }));
+
   return (
     <div className="border-border/60 rounded-2xl border p-5">
-      <div className="mb-4 flex items-center justify-between gap-3">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <div className="bg-foreground/10 flex size-9 items-center justify-center rounded-full">
             <Radio className="size-4" />
@@ -65,15 +78,26 @@ export function LbRadioSection({
             </p>
           </div>
         </div>
-        <a
-          href={externalUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-xs"
-        >
-          Open in LB Radio
-          <ExternalLink className="size-3" />
-        </a>
+        <div className="flex items-center gap-3">
+          <ParachordCtaButton
+            href={parachordImportPlaylist({
+              title: `${artistName} Radio`,
+              creator: "Achordion · LB Radio",
+              tracks: parachordTracks,
+            })}
+            label="Play in Parachord"
+            size="sm"
+          />
+          <a
+            href={externalUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-xs"
+          >
+            Open in LB Radio
+            <ExternalLink className="size-3" />
+          </a>
+        </div>
       </div>
       <ol className="divide-border/60 divide-y">
         {tracks.slice(0, 12).map((t, i) => {
@@ -86,7 +110,7 @@ export function LbRadioSection({
           return (
             <li
               key={`${t.recordingMbid ?? t.title}-${i}`}
-              className="flex items-center gap-3 py-2.5"
+              className="group flex items-center gap-3 py-2.5"
             >
               <span className="text-muted-foreground w-5 shrink-0 text-xs tabular-nums">
                 {i + 1}
@@ -118,6 +142,12 @@ export function LbRadioSection({
                   )}
                 </p>
               </div>
+              <ParachordPlayButton
+                href={parachordPlayTrack({
+                  artist: t.artistName,
+                  title: t.title,
+                })}
+              />
             </li>
           );
         })}

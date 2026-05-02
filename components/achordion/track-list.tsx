@@ -1,5 +1,8 @@
 import Link from "next/link";
 import type { ReleaseDetail, Track } from "@/lib/clients/musicbrainz";
+import { formatArtistCredit } from "@/lib/clients/musicbrainz";
+import { parachordPlayTrack } from "@/lib/parachord";
+import { ParachordPlayButton } from "./parachord-button";
 
 function formatLength(ms?: number | null): string {
   if (!ms || ms <= 0) return "—";
@@ -18,13 +21,17 @@ interface TrackListProps {
 function TrackRow({
   track,
   listenCount,
+  fallbackArtist,
 }: {
   track: Track;
   listenCount?: number;
+  fallbackArtist: string;
 }) {
   const recordingMbid = track.recording?.id;
+  const trackArtist = formatArtistCredit(track["artist-credit"]).name;
+  const artist = trackArtist || fallbackArtist;
   return (
-    <li className="flex items-center gap-4 py-2.5">
+    <li className="group flex items-center gap-4 py-2.5">
       <span className="text-muted-foreground w-8 shrink-0 text-right text-xs tabular-nums">
         {track.number ?? track.position ?? ""}
       </span>
@@ -42,6 +49,9 @@ function TrackRow({
           )}
         </p>
       </div>
+      <ParachordPlayButton
+        href={parachordPlayTrack({ artist, title: track.title })}
+      />
       {listenCount !== undefined && (
         <span className="text-muted-foreground/80 shrink-0 tabular-nums text-xs">
           {listenCount.toLocaleString()}
@@ -64,6 +74,7 @@ export function TrackList({ release, listenCounts }: TrackListProps) {
     );
   }
   const showDiscHeading = media.length > 1;
+  const fallbackArtist = formatArtistCredit(release["artist-credit"]).name;
   return (
     <div className="border-border/60 rounded-xl border px-4">
       {media.map((medium, i) => (
@@ -79,6 +90,7 @@ export function TrackList({ release, listenCounts }: TrackListProps) {
               <TrackRow
                 key={track.id}
                 track={track}
+                fallbackArtist={fallbackArtist}
                 listenCount={
                   track.recording?.id
                     ? listenCounts?.get(track.recording.id)

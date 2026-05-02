@@ -2,6 +2,8 @@ import Link from "next/link";
 import { CoverArt } from "./cover-art";
 import { caaUrlFromListen } from "@/lib/clients/coverart";
 import type { Listen } from "@/lib/clients/listenbrainz";
+import { parachordPlayTrack } from "@/lib/parachord";
+import { ParachordPlayButton } from "./parachord-button";
 import { cn } from "@/lib/utils";
 
 function relativeTime(unixSeconds: number): string {
@@ -80,6 +82,12 @@ export function ScrobbleRow({
           )}
         </p>
       </div>
+      <ParachordPlayButton
+        href={parachordPlayTrack({
+          artist: meta.artist_name,
+          title: meta.track_name,
+        })}
+      />
       {showRelative && (
         <time
           dateTime={new Date(listen.listened_at * 1000).toISOString()}
