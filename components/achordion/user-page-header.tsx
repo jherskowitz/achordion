@@ -10,7 +10,6 @@ function userTabs(name: string): SectionTab[] {
     { href: `/user/${name}`, label: "Overview" },
     { href: `/user/${name}/listens`, label: "Listens" },
     { href: `/user/${name}/stats`, label: "Stats" },
-    { href: `/user/${name}/charts`, label: "Charts" },
     { href: `/user/${name}/playlists`, label: "Playlists" },
     { href: `/user/${name}/pins`, label: "Pins" },
     { href: `/user/${name}/taste`, label: "Taste" },

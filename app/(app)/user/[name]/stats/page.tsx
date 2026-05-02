@@ -1,5 +1,7 @@
 import { Suspense } from "react";
 import {
+  getDailyActivity,
+  getListeningActivity,
   getUserTopArtists,
   getUserTopReleaseGroups,
   getUserTopRecordings,
@@ -12,6 +14,8 @@ import { StatRangePicker } from "@/components/achordion/stat-range-picker";
 import { TopArtistsList } from "@/components/achordion/top-artists-list";
 import { TopAlbumsGrid } from "@/components/achordion/top-albums-grid";
 import { TopTracksList } from "@/components/achordion/top-tracks-list";
+import { ListeningActivityChart } from "@/components/achordion/listening-activity-chart";
+import { DailyHeatmap } from "@/components/achordion/daily-heatmap";
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface PageParams {
@@ -85,6 +89,36 @@ async function TracksSection({
   }
 }
 
+async function ActivitySection({
+  name,
+  range,
+}: {
+  name: string;
+  range: StatRange;
+}) {
+  try {
+    const buckets = await getListeningActivity(name, range);
+    return <ListeningActivityChart buckets={buckets} />;
+  } catch {
+    return null;
+  }
+}
+
+async function HeatmapSection({
+  name,
+  range,
+}: {
+  name: string;
+  range: StatRange;
+}) {
+  try {
+    const data = await getDailyActivity(name, range);
+    return <DailyHeatmap data={data} />;
+  } catch {
+    return null;
+  }
+}
+
 function ListSkeleton({ rows = 8 }: { rows?: number }) {
   return (
     <ol className="border-border/60 divide-border/60 divide-y rounded-xl border px-4">
@@ -127,32 +161,62 @@ export default async function StatsPage({ params, searchParams }: PageParams) {
         <StatRangePicker active={range} />
       </div>
 
-      <section className="mb-12">
-        <h3 className="mb-3 text-xs tracking-wide uppercase text-muted-foreground">
-          Artists
-        </h3>
-        <Suspense key={`artists-${range}`} fallback={<ListSkeleton />}>
-          <ArtistsSection name={name} range={range} />
-        </Suspense>
-      </section>
+      <div className="grid gap-10 lg:grid-cols-[1fr_320px]">
+        <div className="min-w-0 space-y-12">
+          <section>
+            <h3 className="mb-3 text-xs tracking-wide uppercase text-muted-foreground">
+              Artists
+            </h3>
+            <Suspense key={`artists-${range}`} fallback={<ListSkeleton />}>
+              <ArtistsSection name={name} range={range} />
+            </Suspense>
+          </section>
 
-      <section className="mb-12">
-        <h3 className="mb-3 text-xs tracking-wide uppercase text-muted-foreground">
-          Albums
-        </h3>
-        <Suspense key={`albums-${range}`} fallback={<GridSkeleton />}>
-          <AlbumsSection name={name} range={range} />
-        </Suspense>
-      </section>
+          <section>
+            <h3 className="mb-3 text-xs tracking-wide uppercase text-muted-foreground">
+              Albums
+            </h3>
+            <Suspense key={`albums-${range}`} fallback={<GridSkeleton />}>
+              <AlbumsSection name={name} range={range} />
+            </Suspense>
+          </section>
 
-      <section>
-        <h3 className="mb-3 text-xs tracking-wide uppercase text-muted-foreground">
-          Tracks
-        </h3>
-        <Suspense key={`tracks-${range}`} fallback={<ListSkeleton />}>
-          <TracksSection name={name} range={range} />
-        </Suspense>
-      </section>
+          <section>
+            <h3 className="mb-3 text-xs tracking-wide uppercase text-muted-foreground">
+              Tracks
+            </h3>
+            <Suspense key={`tracks-${range}`} fallback={<ListSkeleton />}>
+              <TracksSection name={name} range={range} />
+            </Suspense>
+          </section>
+        </div>
+
+        <aside className="space-y-8">
+          <section>
+            <h3 className="mb-3 text-xs tracking-wide uppercase text-muted-foreground">
+              Listening over time
+            </h3>
+            <Suspense
+              key={`activity-${range}`}
+              fallback={<Skeleton className="h-56 w-full rounded-xl" />}
+            >
+              <ActivitySection name={name} range={range} />
+            </Suspense>
+          </section>
+
+          <section>
+            <h3 className="mb-3 text-xs tracking-wide uppercase text-muted-foreground">
+              Daily heatmap
+            </h3>
+            <Suspense
+              key={`heatmap-${range}`}
+              fallback={<Skeleton className="h-40 w-full rounded-xl" />}
+            >
+              <HeatmapSection name={name} range={range} />
+            </Suspense>
+          </section>
+        </aside>
+      </div>
     </PageShell>
   );
 }
