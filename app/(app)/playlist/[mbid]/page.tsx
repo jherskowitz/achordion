@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ExternalLink, Users } from "lucide-react";
+import { Download, ExternalLink, Users } from "lucide-react";
 import {
   getPlaylist,
   type LbRadioTrack,
@@ -201,6 +201,16 @@ async function PlaylistBody({ mbid }: { mbid: string }) {
               >
                 Open on Spotify
                 <ExternalLink className="size-3" />
+              </a>
+            )}
+            {data.tracks.length > 0 && (
+              <a
+                href={`/api/playlist/${mbid}/xspf`}
+                download
+                className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-xs underline-offset-4 hover:underline"
+              >
+                <Download className="size-3" />
+                Download XSPF
               </a>
             )}
             <a
