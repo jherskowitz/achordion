@@ -1363,3 +1363,149 @@ export async function getTopReleaseGroupsForArtist(
     return [];
   }
 }
+
+// ---- Year in Music ----
+
+const YimArtistEntrySchema = z
+  .object({
+    artist_mbid: z.string().nullish(),
+    artist_name: z.string(),
+    listen_count: z.number(),
+  })
+  .passthrough();
+
+const YimRecordingEntrySchema = z
+  .object({
+    recording_mbid: z.string().nullish(),
+    track_name: z.string().optional(),
+    artist_name: z.string().optional(),
+    artist_mbids: z.array(z.string()).optional(),
+    release_name: z.string().nullish(),
+    release_mbid: z.string().nullish(),
+    listen_count: z.number(),
+    caa_id: z.union([z.number(), z.string()]).nullish(),
+    caa_release_mbid: z.string().nullish(),
+  })
+  .passthrough();
+
+const YimReleaseGroupEntrySchema = z
+  .object({
+    release_group_name: z.string(),
+    release_group_mbid: z.string().nullish(),
+    artist_name: z.string(),
+    artist_mbids: z.array(z.string()).optional(),
+    listen_count: z.number(),
+    caa_id: z.union([z.number(), z.string()]).nullish(),
+    caa_release_mbid: z.string().nullish(),
+  })
+  .passthrough();
+
+const YimNewReleaseSchema = z
+  .object({
+    artist_credit_name: z.string(),
+    artist_credit_mbids: z.array(z.string()).optional(),
+    title: z.string(),
+    release_group_mbid: z.string().nullish(),
+    caa_id: z.union([z.number(), z.string()]).nullish(),
+    caa_release_mbid: z.string().nullish(),
+  })
+  .passthrough();
+
+const YimTopGenreSchema = z
+  .object({
+    genre: z.string(),
+    genre_count: z.number(),
+    genre_count_percent: z.number(),
+  })
+  .passthrough();
+
+const YimListensPerDaySchema = z
+  .object({
+    from_ts: z.number(),
+    to_ts: z.number(),
+    listen_count: z.number(),
+    time_range: z.string(),
+  })
+  .passthrough();
+
+const YimArtistEvolutionSchema = z
+  .object({
+    artist_mbid: z.string().nullish(),
+    artist_name: z.string(),
+    listen_count: z.number(),
+    time_unit: z.string(),
+  })
+  .passthrough();
+
+// LB nests the JSPF playlist body directly here (not under a wrapping
+// `playlist:` key like /createdfor/ does). Keep it loose.
+const YimPlaylistSchema = z
+  .object({
+    title: z.string().optional(),
+    creator: z.string().optional(),
+    identifier: z.union([z.string(), z.array(z.string())]).optional(),
+    annotation: z.string().nullish(),
+    date: z.string().optional(),
+    extension: z.record(z.string(), z.unknown()).optional(),
+    track: z.array(z.unknown()).optional(),
+  })
+  .passthrough();
+
+const YearInMusicDataSchema = z
+  .object({
+    artist_evolution_activity: z.array(YimArtistEvolutionSchema).optional(),
+    day_of_week: z.string().optional(),
+    listens_per_day: z.array(YimListensPerDaySchema).optional(),
+    most_listened_year: z.record(z.string(), z.number()).optional(),
+    new_releases_of_top_artists: z.array(YimNewReleaseSchema).optional(),
+    "playlist-top-discoveries-for-year": YimPlaylistSchema.nullish(),
+    "playlist-top-missed-recordings-for-year": YimPlaylistSchema.nullish(),
+    similar_users: z.record(z.string(), z.number()).optional(),
+    top_artists: z.array(YimArtistEntrySchema).optional(),
+    top_genres: z.array(YimTopGenreSchema).optional(),
+    top_recordings: z.array(YimRecordingEntrySchema).optional(),
+    top_release_groups: z.array(YimReleaseGroupEntrySchema).optional(),
+    total_artists_count: z.number().optional(),
+    total_listen_count: z.number().optional(),
+    total_listening_time: z.number().optional(),
+    total_new_artists_discovered: z.number().optional(),
+    total_recordings_count: z.number().optional(),
+    total_release_groups_count: z.number().optional(),
+  })
+  .passthrough();
+
+const YearInMusicResponseSchema = z.object({
+  payload: z.object({
+    data: YearInMusicDataSchema,
+    user_id: z.string().optional(),
+  }),
+});
+
+export type YearInMusicData = z.infer<typeof YearInMusicDataSchema>;
+export type YimTopArtist = z.infer<typeof YimArtistEntrySchema>;
+export type YimTopRecording = z.infer<typeof YimRecordingEntrySchema>;
+export type YimTopReleaseGroup = z.infer<typeof YimReleaseGroupEntrySchema>;
+export type YimNewRelease = z.infer<typeof YimNewReleaseSchema>;
+export type YimTopGenre = z.infer<typeof YimTopGenreSchema>;
+export type YimListensPerDay = z.infer<typeof YimListensPerDaySchema>;
+export type YimArtistEvolution = z.infer<typeof YimArtistEvolutionSchema>;
+export type YimPlaylist = z.infer<typeof YimPlaylistSchema>;
+
+export async function getYearInMusic(
+  userName: string,
+  year: number,
+): Promise<YearInMusicData | null> {
+  try {
+    const result = await lbFetch(
+      `/stats/user/${encodeURIComponent(userName)}/year-in-music/${year}`,
+      YearInMusicResponseSchema,
+      {
+        revalidate: 60 * 60 * 12,
+        tags: [cacheTagsLB.userStats(userName)],
+      },
+    );
+    return result.payload.data;
+  } catch {
+    return null;
+  }
+}
