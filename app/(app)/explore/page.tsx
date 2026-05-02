@@ -192,9 +192,17 @@ async function RecommendationsSection({
   );
 }
 
-async function SimilarUsersSection({ username }: { username: string }) {
-  const users = await getSimilarUsers(username, 12).catch(() => []);
-  return <SimilarUsersList users={users} />;
+async function SimilarUsersSection({
+  username,
+  limit = 12,
+  layout = "grid",
+}: {
+  username: string;
+  limit?: number;
+  layout?: "grid" | "stack";
+}) {
+  const users = await getSimilarUsers(username, limit).catch(() => []);
+  return <SimilarUsersList users={users} layout={layout} />;
 }
 
 export default async function ExploreOverviewPage() {
@@ -219,70 +227,125 @@ export default async function ExploreOverviewPage() {
 
   return (
     <PageShell className="pt-8">
-      <div className="space-y-12">
-        <section>
-          <header className="mb-4 flex items-baseline justify-between">
-            <h2 className="text-sm font-semibold tracking-wide uppercase">
-              Weekly Jams
-            </h2>
-            <p className="text-muted-foreground/70 text-xs">
-              Tracks ListenBrainz thinks you&apos;ll dig.
-            </p>
-          </header>
-          <Suspense fallback={<TwoCardSkeleton />}>
-            <WeeklyAlgoSection
+      <div className="grid gap-10 lg:grid-cols-[1fr_280px]">
+        <div className="min-w-0 space-y-12">
+          <section>
+            <SectionHeader
+              title="Weekly Jams"
+              hint="Tracks ListenBrainz thinks you'll dig."
+              seeAllHref="/explore/weekly-jams"
+            />
+            <Suspense fallback={<TwoCardSkeleton />}>
+              <WeeklyAlgoSection
+                username={username}
+                algorithm="weekly-jams"
+                emptyMessage="No Weekly Jams playlist yet."
+              />
+            </Suspense>
+          </section>
+
+          <section>
+            <SectionHeader
+              title="Weekly Explorations"
+              hint="Stuff outside your usual orbit."
+              seeAllHref="/explore/weekly-exploration"
+            />
+            <Suspense fallback={<TwoCardSkeleton />}>
+              <WeeklyAlgoSection
+                username={username}
+                algorithm="weekly-exploration"
+                emptyMessage="No Weekly Exploration playlist yet."
+              />
+            </Suspense>
+          </section>
+
+          <section>
+            <SectionHeader
+              title="Recommended artists"
+              seeAllHref="/explore/recommended-artists"
+            />
+            <Suspense fallback={<GridSkeleton cols={4} rows={8} />}>
+              <RecommendationsSection
+                username={username}
+                variant="artists"
+              />
+            </Suspense>
+          </section>
+
+          <section>
+            <SectionHeader
+              title="Recommended tracks"
+              seeAllHref="/explore/recommended-tracks"
+            />
+            <Suspense fallback={<TrackListSkeleton rows={8} />}>
+              <RecommendationsSection username={username} variant="tracks" />
+            </Suspense>
+          </section>
+        </div>
+
+        <aside className="space-y-3 lg:sticky lg:top-20 lg:self-start">
+          <SectionHeader
+            title="Similar listeners"
+            seeAllHref="/explore/similar-users"
+          />
+          <Suspense fallback={<SidebarUserSkeleton rows={8} />}>
+            <SimilarUsersSection
               username={username}
-              algorithm="weekly-jams"
-              emptyMessage="No Weekly Jams playlist yet."
+              limit={10}
+              layout="stack"
             />
           </Suspense>
-        </section>
-
-        <section>
-          <header className="mb-4 flex items-baseline justify-between">
-            <h2 className="text-sm font-semibold tracking-wide uppercase">
-              Weekly Explorations
-            </h2>
-            <p className="text-muted-foreground/70 text-xs">
-              Stuff outside your usual orbit.
-            </p>
-          </header>
-          <Suspense fallback={<TwoCardSkeleton />}>
-            <WeeklyAlgoSection
-              username={username}
-              algorithm="weekly-exploration"
-              emptyMessage="No Weekly Exploration playlist yet."
-            />
-          </Suspense>
-        </section>
-
-        <section>
-          <h2 className="mb-4 text-sm font-semibold tracking-wide uppercase">
-            Recommended artists
-          </h2>
-          <Suspense fallback={<GridSkeleton cols={4} rows={8} />}>
-            <RecommendationsSection username={username} variant="artists" />
-          </Suspense>
-        </section>
-
-        <section>
-          <h2 className="mb-4 text-sm font-semibold tracking-wide uppercase">
-            Recommended tracks
-          </h2>
-          <Suspense fallback={<TrackListSkeleton rows={8} />}>
-            <RecommendationsSection username={username} variant="tracks" />
-          </Suspense>
-        </section>
-
-        <section>
-          <h2 className="mb-4 text-sm font-semibold tracking-wide uppercase">
-            Similar listeners
-          </h2>
-          <Suspense fallback={<GridSkeleton cols={3} rows={6} />}>
-            <SimilarUsersSection username={username} />
-          </Suspense>
-        </section>
+        </aside>
       </div>
     </PageShell>
+  );
+}
+
+function SectionHeader({
+  title,
+  hint,
+  seeAllHref,
+}: {
+  title: string;
+  hint?: string;
+  seeAllHref?: string;
+}) {
+  return (
+    <header className="mb-4 flex items-baseline justify-between gap-3">
+      <h2 className="text-sm font-semibold tracking-wide uppercase">
+        {title}
+      </h2>
+      <div className="flex items-baseline gap-3">
+        {hint && (
+          <p className="text-muted-foreground/70 hidden text-xs sm:block">
+            {hint}
+          </p>
+        )}
+        {seeAllHref && (
+          <Link
+            href={seeAllHref}
+            className="text-muted-foreground hover:text-foreground text-xs underline-offset-4 hover:underline"
+          >
+            See all →
+          </Link>
+        )}
+      </div>
+    </header>
+  );
+}
+
+function SidebarUserSkeleton({ rows = 8 }: { rows?: number }) {
+  return (
+    <ul className="space-y-1.5">
+      {Array.from({ length: rows }).map((_, i) => (
+        <li
+          key={i}
+          className="border-border/60 flex items-center gap-3 rounded-md border px-2 py-1.5"
+        >
+          <Skeleton className="size-7 rounded-full" />
+          <Skeleton className="h-3.5 w-24" />
+        </li>
+      ))}
+    </ul>
   );
 }
