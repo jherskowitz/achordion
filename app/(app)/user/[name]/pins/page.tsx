@@ -1,18 +1,104 @@
+import { Suspense } from "react";
+import { getUserPins } from "@/lib/clients/listenbrainz";
+import { PinnedTrackCard } from "@/components/achordion/pinned-track-card";
 import { PageShell } from "@/components/achordion/page-shell";
 import { ComingSoon } from "@/components/achordion/coming-soon";
+import { Skeleton } from "@/components/ui/skeleton";
 
-export default async function PinsPage({
-  params,
-}: {
+interface PageParams {
   params: Promise<{ name: string }>;
-}) {
+}
+
+async function PinsHistory({ name }: { name: string }) {
+  let pins;
+  try {
+    pins = await getUserPins(name, 50);
+  } catch (err) {
+    return (
+      <ComingSoon
+        title="Couldn't load pins"
+        description={err instanceof Error ? err.message : ""}
+      />
+    );
+  }
+
+  if (pins.length === 0) {
+    return (
+      <ComingSoon
+        title="No pins yet"
+        description={`${name} hasn't pinned a recording.`}
+      />
+    );
+  }
+
+  const now = Math.floor(Date.now() / 1000);
+  const active = pins.filter((p) => p.pinned_until > now);
+  const past = pins.filter((p) => p.pinned_until <= now);
+
+  return (
+    <div className="space-y-10">
+      {active.length > 0 && (
+        <section>
+          <h3 className="text-muted-foreground mb-3 text-xs tracking-wide uppercase">
+            Currently pinned
+          </h3>
+          <div className="space-y-3">
+            {active.map((p) => (
+              <PinnedTrackCard key={p.row_id} pin={p} />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {past.length > 0 && (
+        <section>
+          <h3 className="text-muted-foreground mb-3 text-xs tracking-wide uppercase">
+            Past pins
+            <span className="text-muted-foreground/60 ml-2 text-xs normal-case tracking-normal">
+              {past.length}
+            </span>
+          </h3>
+          <div className="space-y-3">
+            {past.map((p) => (
+              <PinnedTrackCard key={p.row_id} pin={p} />
+            ))}
+          </div>
+        </section>
+      )}
+    </div>
+  );
+}
+
+function Fallback() {
+  return (
+    <div className="space-y-3">
+      {Array.from({ length: 4 }).map((_, i) => (
+        <div
+          key={i}
+          className="border-border/60 flex gap-4 rounded-2xl border p-4"
+        >
+          <Skeleton className="size-20 shrink-0 rounded-md" />
+          <div className="flex-1 space-y-2">
+            <Skeleton className="h-3 w-24" />
+            <Skeleton className="h-5 w-2/3" />
+            <Skeleton className="h-4 w-1/2" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export default async function PinsPage({ params }: PageParams) {
   const { name } = await params;
   return (
     <PageShell className="pt-8">
-      <ComingSoon
-        title="Pins"
-        description={`Recordings ${name} has pinned to the top of their profile.`}
-      />
+      <h2 className="mb-6 text-sm font-semibold tracking-wide uppercase">
+        Pins
+      </h2>
+      <Suspense fallback={<Fallback />}>
+        <PinsHistory name={name} />
+      </Suspense>
     </PageShell>
   );
 }

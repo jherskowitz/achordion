@@ -214,6 +214,110 @@ export async function getTopRecordingsForArtist(
   }
 }
 
+// ─── Pinned recordings ─────────────────────────────────────────────
+
+const PinnedTrackMetaSchema = z
+  .object({
+    track_name: z.string(),
+    artist_name: z.string(),
+    release_name: z.string().nullish(),
+    additional_info: z
+      .object({
+        recording_mbid: z.string().optional(),
+        recording_msid: z.string().optional(),
+        release_mbid: z.string().optional(),
+        artist_mbids: z.array(z.string()).optional(),
+      })
+      .partial()
+      .passthrough()
+      .optional(),
+    mbid_mapping: z
+      .object({
+        recording_mbid: z.string().optional(),
+        release_mbid: z.string().optional(),
+        artist_mbids: z.array(z.string()).optional(),
+        caa_id: z.union([z.number(), z.string()]).optional(),
+        caa_release_mbid: z.string().optional(),
+      })
+      .partial()
+      .passthrough()
+      .optional(),
+  })
+  .passthrough();
+
+const PinnedRecordingSchema = z.object({
+  blurb_content: z.string().nullish(),
+  created: z.number(),
+  pinned_until: z.number(),
+  recording_mbid: z.string().nullish(),
+  recording_msid: z.string().nullish(),
+  row_id: z.number(),
+  track_metadata: PinnedTrackMetaSchema,
+});
+
+export type PinnedRecording = z.infer<typeof PinnedRecordingSchema>;
+
+const PinsResponseSchema = z.object({
+  count: z.number().optional(),
+  offset: z.number().optional(),
+  total_count: z.number().optional(),
+  user_name: z.string().optional(),
+  pinned_recordings: z.array(PinnedRecordingSchema),
+});
+
+const CurrentPinResponseSchema = z.object({
+  pinned_recording: PinnedRecordingSchema.nullish(),
+});
+
+/**
+ * The user's currently-active pin (pinned_until > now).
+ * Returns null when the user has no active pin.
+ */
+export async function getCurrentPin(
+  userName: string,
+): Promise<PinnedRecording | null> {
+  try {
+    const result = await lbFetch(
+      `/${encodeURIComponent(userName)}/pins/current-pin`,
+      CurrentPinResponseSchema,
+      { revalidate: 60 * 5, tags: [`lb:user:${userName}:pin`] },
+    );
+    return result.pinned_recording ?? null;
+  } catch (err) {
+    if (
+      err instanceof ListenBrainzError &&
+      (err.status === 204 || err.status === 404)
+    ) {
+      return null;
+    }
+    throw err;
+  }
+}
+
+/** Full pin history for a user, newest first. */
+export async function getUserPins(
+  userName: string,
+  count = 25,
+): Promise<PinnedRecording[]> {
+  try {
+    const params = new URLSearchParams({ count: String(count) });
+    const result = await lbFetch(
+      `/${encodeURIComponent(userName)}/pins?${params}`,
+      PinsResponseSchema,
+      { revalidate: 60 * 5, tags: [`lb:user:${userName}:pins`] },
+    );
+    return result.pinned_recordings;
+  } catch (err) {
+    if (
+      err instanceof ListenBrainzError &&
+      (err.status === 204 || err.status === 404)
+    ) {
+      return [];
+    }
+    throw err;
+  }
+}
+
 // ─── Social: follow / unfollow ──────────────────────────────────────
 
 const FollowingSchema = z.object({
