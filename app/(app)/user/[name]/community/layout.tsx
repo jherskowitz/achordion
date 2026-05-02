@@ -15,7 +15,9 @@ export default async function CommunityLayout({ children, params }: LayoutProps)
   ];
   return (
     <PageShell className="pt-6">
-      <SectionTabs tabs={tabs} className="mb-6" />
+      {/* Drop the full-width divider; the per-tab underline alone reads
+          as "sub-tabs" against the page header above. */}
+      <SectionTabs tabs={tabs} className="mb-6 border-b-0" />
       {children}
     </PageShell>
   );
