@@ -106,12 +106,13 @@ export function AlbumHeader({
         {tags.length > 0 && (
           <div className="mt-4 flex flex-wrap gap-1.5">
             {tags.map((t) => (
-              <span
+              <Link
                 key={t.name}
-                className="bg-muted text-muted-foreground rounded-full px-2.5 py-0.5 text-xs"
+                href={`/tag/${encodeURIComponent(t.name)}`}
+                className="bg-muted text-muted-foreground hover:bg-foreground/15 hover:text-foreground rounded-full px-2.5 py-0.5 text-xs transition-colors"
               >
                 {t.name}
-              </span>
+              </Link>
             ))}
           </div>
         )}

@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
   bucketDiscography,
@@ -101,12 +102,13 @@ async function ArtistBody({ mbid }: { mbid: string }) {
       {tags.length > 0 && (
         <div className="-mt-2 flex flex-wrap gap-1.5 pb-4">
           {tags.map((t) => (
-            <span
+            <Link
               key={t.name}
-              className="bg-muted text-muted-foreground rounded-full px-2.5 py-0.5 text-xs"
+              href={`/tag/${encodeURIComponent(t.name)}`}
+              className="bg-muted text-muted-foreground hover:bg-foreground/15 hover:text-foreground rounded-full px-2.5 py-0.5 text-xs transition-colors"
             >
               {t.name}
-            </span>
+            </Link>
           ))}
         </div>
       )}
@@ -170,11 +172,7 @@ async function LbRadioBlock({
   const tracks = await getLbRadio(`artist:(${mbid})`, "easy");
   return (
     <div className="my-6">
-      <LbRadioSection
-        artistMbid={mbid}
-        artistName={artistName}
-        tracks={tracks}
-      />
+      <LbRadioSection seedLabel={artistName} tracks={tracks} />
     </div>
   );
 }

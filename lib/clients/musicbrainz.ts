@@ -538,3 +538,45 @@ export async function searchReleaseGroups(query: string, limit = 8) {
   );
   return result["release-groups"];
 }
+
+// ─── Tag-based discovery ────────────────────────────────────────────
+
+function quoteTag(tag: string): string {
+  // Escape internal quotes and wrap in quotes — MB lucene needs this for
+  // multi-word tags like "hip hop" or "synth pop".
+  return `"${tag.replace(/"/g, '\\"')}"`;
+}
+
+export async function getArtistsByTag(tag: string, limit = 24) {
+  if (!tag.trim()) return [];
+  const params = new URLSearchParams({
+    query: `tag:${quoteTag(tag)}`,
+    limit: String(limit),
+  });
+  const result = await mbFetch(
+    `/artist?${params}`,
+    ArtistSearchSchema,
+    {
+      revalidate: 60 * 60 * 24,
+      tags: [`mb:tag:${tag.toLowerCase()}:artists`],
+    },
+  );
+  return result.artists;
+}
+
+export async function getReleaseGroupsByTag(tag: string, limit = 24) {
+  if (!tag.trim()) return [];
+  const params = new URLSearchParams({
+    query: `tag:${quoteTag(tag)} AND primarytype:Album`,
+    limit: String(limit),
+  });
+  const result = await mbFetch(
+    `/release-group?${params}`,
+    ReleaseGroupSearchSchema,
+    {
+      revalidate: 60 * 60 * 24,
+      tags: [`mb:tag:${tag.toLowerCase()}:release-groups`],
+    },
+  );
+  return result["release-groups"];
+}

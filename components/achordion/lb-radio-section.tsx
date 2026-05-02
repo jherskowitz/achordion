@@ -12,13 +12,13 @@ import { PlayOverNumberCell } from "./parachord-button";
 import { cn } from "@/lib/utils";
 
 interface LbRadioSectionProps {
-  artistMbid: string;
-  artistName: string;
+  /** Used in the heading ("{seedLabel} Radio") and Parachord fallback title. */
+  seedLabel: string;
   tracks: LbRadioTrack[] | null;
 }
 
 export function LbRadioSection({
-  artistName,
+  seedLabel,
   tracks,
 }: LbRadioSectionProps) {
   const [expanded, setExpanded] = useState(false);
@@ -44,7 +44,7 @@ export function LbRadioSection({
           </div>
           <div className="min-w-0">
             <h2 className="text-sm font-semibold tracking-wide uppercase">
-              {artistName} Radio
+              {seedLabel} Radio
             </h2>
             <p className="text-muted-foreground/80 text-xs">
               {tracks.length} tracks · LB Radio
@@ -54,7 +54,7 @@ export function LbRadioSection({
         <OpenInParachordButton
           tracks={parachordTracks}
           fallback={{
-            title: `${artistName} Radio`,
+            title: `${seedLabel} Radio`,
             creator: "Achordion · LB Radio",
           }}
         />
