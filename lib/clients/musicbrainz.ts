@@ -172,7 +172,20 @@ export type ArtistExternalLink = {
   url: string;
 };
 
-export function partitionArtistRelations(detail: ArtistDetail): {
+/**
+ * MB returns the same `relations` shape on artists, release-groups, and
+ * other entities — accept any input with that field rather than tying
+ * the helper to ArtistDetail. Zod's union of two passthrough schemas
+ * widens member fields to `unknown` after a `"x" in y` narrow, so we
+ * cast the matched URL relation to its concrete shape (the runtime
+ * `"url" in rel` check makes this safe).
+ */
+type MbRelation = NonNullable<ArtistDetail["relations"]>[number];
+type MbUrlRelation = z.infer<typeof UrlRelationSchema>;
+
+export function partitionArtistRelations(detail: {
+  relations?: MbRelation[];
+}): {
   members: ArtistMember[];
   memberOf: ArtistMember[];
   collaborators: ArtistMember[];
@@ -185,7 +198,8 @@ export function partitionArtistRelations(detail: ArtistDetail): {
 
   for (const rel of detail.relations ?? []) {
     if ("url" in rel) {
-      urls.push({ type: rel.type, url: rel.url.resource });
+      const urlRel = rel as MbUrlRelation;
+      urls.push({ type: urlRel.type, url: urlRel.url.resource });
       continue;
     }
     if (!("artist" in rel) || !rel.artist?.id || !rel.artist?.name) continue;
