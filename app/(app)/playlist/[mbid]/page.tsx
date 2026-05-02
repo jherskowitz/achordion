@@ -2,16 +2,14 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Download, ExternalLink, Users } from "lucide-react";
-import {
-  getPlaylist,
-  type LbRadioTrack,
-} from "@/lib/clients/listenbrainz";
+import { getPlaylist } from "@/lib/clients/listenbrainz";
 import { caaReleaseUrl } from "@/lib/clients/coverart";
 import { parachordPlayTrack, type ParachordTrack } from "@/lib/parachord";
 import { PageShell } from "@/components/achordion/page-shell";
 import { CoverArt } from "@/components/achordion/cover-art";
 import { OpenInParachordButton } from "@/components/achordion/open-in-parachord-button";
 import { PlayOverNumberCell } from "@/components/achordion/parachord-button";
+import { PlaylistCoverMosaic } from "@/components/achordion/playlist-cover-mosaic";
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface PageProps {
@@ -44,61 +42,6 @@ function algorithmLabel(source: string): string {
     .join(" ");
 }
 
-function CoverQuad({ tracks }: { tracks: LbRadioTrack[] }) {
-  // Pick up to 4 unique album covers from the first ~12 tracks.
-  const covers: string[] = [];
-  const seen = new Set<string>();
-  for (const t of tracks.slice(0, 12)) {
-    let url: string | null = null;
-    if (t.caaReleaseMbid && t.caaId) {
-      url = `https://archive.org/download/mbid-${t.caaReleaseMbid}/mbid-${t.caaReleaseMbid}-${t.caaId}_thumb500.jpg`;
-    } else if (t.releaseMbid) {
-      url = caaReleaseUrl(t.releaseMbid, 500);
-    }
-    if (url && !seen.has(url)) {
-      seen.add(url);
-      covers.push(url);
-      if (covers.length === 4) break;
-    }
-  }
-  if (covers.length === 0) {
-    return (
-      <CoverArt
-        src={null}
-        alt="Playlist"
-        size={500}
-        className="aspect-square h-auto w-full max-w-[280px] sm:max-w-none"
-        rounded="md"
-      />
-    );
-  }
-  if (covers.length < 4) {
-    return (
-      <CoverArt
-        src={covers[0]}
-        alt="Playlist cover"
-        size={500}
-        className="aspect-square h-auto w-full max-w-[280px] sm:max-w-none"
-        rounded="md"
-      />
-    );
-  }
-  return (
-    <div className="grid aspect-square w-full max-w-[280px] grid-cols-2 gap-0.5 overflow-hidden rounded-md sm:max-w-none">
-      {covers.map((url) => (
-        <CoverArt
-          key={url}
-          src={url}
-          alt="Playlist cover"
-          size={250}
-          className="aspect-square h-auto w-full"
-          rounded="none"
-        />
-      ))}
-    </div>
-  );
-}
-
 async function PlaylistBody({ mbid }: { mbid: string }) {
   const data = await getPlaylist(mbid);
   if (!data) notFound();
@@ -119,7 +62,11 @@ async function PlaylistBody({ mbid }: { mbid: string }) {
   return (
     <>
       <header className="mt-8 mb-10 grid gap-6 sm:grid-cols-[200px_1fr] sm:gap-8">
-        <CoverQuad tracks={data.tracks} />
+        <PlaylistCoverMosaic
+          tracks={data.tracks}
+          alt={data.title}
+          className="aspect-square w-full max-w-[280px] sm:max-w-none"
+        />
         <div className="flex min-w-0 flex-col justify-end">
           <p className="text-muted-foreground text-xs tracking-wide uppercase">
             Playlist

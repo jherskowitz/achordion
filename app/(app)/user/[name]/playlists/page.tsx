@@ -1,5 +1,11 @@
 import { Suspense } from "react";
-import { getUserPlaylists } from "@/lib/clients/listenbrainz";
+import {
+  getPlaylist,
+  getUserPlaylists,
+  playlistMbidFromIdentifier,
+  type LbPlaylistSummary,
+  type LbRadioTrack,
+} from "@/lib/clients/listenbrainz";
 import { PageShell } from "@/components/achordion/page-shell";
 import { PlaylistCard } from "@/components/achordion/playlist-card";
 import { ComingSoon } from "@/components/achordion/coming-soon";
@@ -7,6 +13,41 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 interface PageParams {
   params: Promise<{ name: string }>;
+}
+
+async function CardWithCovers({
+  entry,
+  hideCreatorIfMatches,
+}: {
+  entry: LbPlaylistSummary;
+  hideCreatorIfMatches?: string;
+}) {
+  const mbid = playlistMbidFromIdentifier(entry.playlist.identifier);
+  let tracks: LbRadioTrack[] = [];
+  if (mbid) {
+    const detail = await getPlaylist(mbid).catch(() => null);
+    if (detail) tracks = detail.tracks;
+  }
+  return (
+    <PlaylistCard
+      entry={entry}
+      hideCreatorIfMatches={hideCreatorIfMatches}
+      tracks={tracks}
+    />
+  );
+}
+
+function CardSkeleton() {
+  return (
+    <div className="border-border/60 flex gap-3 rounded-xl border px-4 py-3">
+      <Skeleton className="size-16 shrink-0 rounded-md" />
+      <div className="min-w-0 flex-1 space-y-2">
+        <Skeleton className="h-4 w-2/3" />
+        <Skeleton className="h-3 w-1/2" />
+        <Skeleton className="h-3 w-full" />
+      </div>
+    </div>
+  );
 }
 
 async function PlaylistsList({ name }: { name: string }) {
@@ -36,7 +77,12 @@ async function PlaylistsList({ name }: { name: string }) {
       <ul className="grid grid-cols-1 gap-3 md:grid-cols-2">
         {page.playlists.map((entry) => (
           <li key={entry.playlist.identifier}>
-            <PlaylistCard entry={entry} hideCreatorIfMatches={name} />
+            <Suspense fallback={<CardSkeleton />}>
+              <CardWithCovers
+                entry={entry}
+                hideCreatorIfMatches={name}
+              />
+            </Suspense>
           </li>
         ))}
       </ul>
@@ -49,17 +95,12 @@ async function PlaylistsList({ name }: { name: string }) {
   );
 }
 
-function Fallback() {
+function ListShellFallback() {
   return (
     <ul className="grid grid-cols-1 gap-3 md:grid-cols-2">
       {Array.from({ length: 8 }).map((_, i) => (
-        <li
-          key={i}
-          className="border-border/60 space-y-2 rounded-xl border px-4 py-3"
-        >
-          <Skeleton className="h-4 w-2/3" />
-          <Skeleton className="h-3 w-1/2" />
-          <Skeleton className="h-3 w-full" />
+        <li key={i}>
+          <CardSkeleton />
         </li>
       ))}
     </ul>
@@ -73,7 +114,7 @@ export default async function PlaylistsPage({ params }: PageParams) {
       <h2 className="mb-6 text-sm font-semibold tracking-wide uppercase">
         Playlists
       </h2>
-      <Suspense fallback={<Fallback />}>
+      <Suspense fallback={<ListShellFallback />}>
         <PlaylistsList name={name} />
       </Suspense>
     </PageShell>

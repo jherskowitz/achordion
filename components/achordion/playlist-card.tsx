@@ -3,7 +3,9 @@ import { Lock, Sparkles, Users } from "lucide-react";
 import {
   playlistMbidFromIdentifier,
   type LbPlaylistSummary,
+  type LbRadioTrack,
 } from "@/lib/clients/listenbrainz";
+import { PlaylistCoverMosaic } from "./playlist-cover-mosaic";
 
 const JSPF_PLAYLIST_KEY = "https://musicbrainz.org/doc/jspf#playlist";
 
@@ -30,9 +32,12 @@ export function PlaylistCard({
   entry,
   /** Hide the creator byline when we already know whose page we're on. */
   hideCreatorIfMatches,
+  /** Tracks for the cover mosaic. When omitted, no mosaic renders. */
+  tracks,
 }: {
   entry: LbPlaylistSummary;
   hideCreatorIfMatches?: string;
+  tracks?: LbRadioTrack[];
 }) {
   const p = entry.playlist;
   const ext = p.extension?.[JSPF_PLAYLIST_KEY];
@@ -45,9 +50,10 @@ export function PlaylistCard({
     creator.toLowerCase() !== (hideCreatorIfMatches ?? "").toLowerCase();
   const dateStr =
     formatDate(ext?.last_modified_at) ?? formatDate(p.date) ?? null;
+  const showMosaic = tracks !== undefined;
 
-  const inner = (
-    <>
+  const body = (
+    <div className="min-w-0 flex-1">
       <div className="flex items-baseline justify-between gap-2">
         <h3 className="text-foreground truncate text-base font-medium">
           {p.title}
@@ -90,17 +96,27 @@ export function PlaylistCard({
           {p.annotation}
         </p>
       )}
-    </>
+    </div>
   );
 
+  const inner = showMosaic ? (
+    <div className="flex gap-3">
+      <PlaylistCoverMosaic tracks={tracks} size={64} alt={p.title} />
+      {body}
+    </div>
+  ) : (
+    body
+  );
+
+  const cardClass =
+    "border-border/60 hover:border-foreground/30 hover:bg-muted/30 block rounded-xl border px-4 py-3 transition-colors";
+  const cardClassStatic = "border-border/60 rounded-xl border px-4 py-3";
+
   return mbid ? (
-    <Link
-      href={`/playlist/${mbid}`}
-      className="border-border/60 hover:border-foreground/30 hover:bg-muted/30 block rounded-xl border px-4 py-3 transition-colors"
-    >
+    <Link href={`/playlist/${mbid}`} className={cardClass}>
       {inner}
     </Link>
   ) : (
-    <div className="border-border/60 rounded-xl border px-4 py-3">{inner}</div>
+    <div className={cardClassStatic}>{inner}</div>
   );
 }
