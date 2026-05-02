@@ -70,12 +70,51 @@ async function mbFetch<T>(
   });
 }
 
+const AreaSchema = z
+  .object({
+    id: z.string(),
+    name: z.string(),
+    "sort-name": z.string().optional(),
+    "iso-3166-1-codes": z.array(z.string()).optional(),
+  })
+  .partial()
+  .passthrough();
+
+const ArtistRelationSchema = z
+  .object({
+    type: z.string(),
+    direction: z.enum(["forward", "backward"]).optional(),
+    begin: z.string().nullish(),
+    end: z.string().nullish(),
+    ended: z.boolean().nullish(),
+    attributes: z.array(z.string()).optional(),
+    artist: z
+      .object({
+        id: z.string(),
+        name: z.string(),
+        "sort-name": z.string().optional(),
+        disambiguation: z.string().optional(),
+      })
+      .partial()
+      .passthrough(),
+  })
+  .passthrough();
+
+const UrlRelationSchema = z
+  .object({
+    type: z.string(),
+    url: z.object({ resource: z.string() }).passthrough(),
+  })
+  .passthrough();
+
 const ArtistSchema = z.object({
   id: z.string(),
   name: z.string(),
   "sort-name": z.string().optional(),
   type: z.string().nullish(),
   country: z.string().nullish(),
+  area: AreaSchema.nullish(),
+  "begin-area": AreaSchema.nullish(),
   "life-span": z
     .object({
       begin: z.string().nullish(),
@@ -88,16 +127,200 @@ const ArtistSchema = z.object({
   tags: z
     .array(z.object({ name: z.string(), count: z.number() }))
     .optional(),
+  genres: z
+    .array(z.object({ name: z.string(), count: z.number() }))
+    .optional(),
+  aliases: z
+    .array(
+      z
+        .object({
+          name: z.string(),
+          locale: z.string().nullish(),
+          primary: z.boolean().nullish(),
+          type: z.string().nullish(),
+        })
+        .passthrough(),
+    )
+    .optional(),
+  rating: z
+    .object({
+      value: z.number().nullish(),
+      "votes-count": z.number().optional(),
+    })
+    .partial()
+    .nullish(),
 });
 
 export type Artist = z.infer<typeof ArtistSchema>;
 
-export async function getArtist(mbid: string): Promise<Artist> {
+const ArtistDetailSchema = ArtistSchema.extend({
+  relations: z.array(z.union([ArtistRelationSchema, UrlRelationSchema])).optional(),
+});
+
+export type ArtistDetail = z.infer<typeof ArtistDetailSchema>;
+
+export type ArtistMember = {
+  artist: { id: string; name: string };
+  attributes?: string[];
+  begin?: string | null;
+  end?: string | null;
+  ended?: boolean | null;
+};
+
+export type ArtistExternalLink = {
+  type: string;
+  url: string;
+};
+
+export function partitionArtistRelations(detail: ArtistDetail): {
+  members: ArtistMember[];
+  memberOf: ArtistMember[];
+  collaborators: ArtistMember[];
+  urls: ArtistExternalLink[];
+} {
+  const members: ArtistMember[] = [];
+  const memberOf: ArtistMember[] = [];
+  const collaborators: ArtistMember[] = [];
+  const urls: ArtistExternalLink[] = [];
+
+  for (const rel of detail.relations ?? []) {
+    if ("url" in rel) {
+      urls.push({ type: rel.type, url: rel.url.resource });
+      continue;
+    }
+    if (!("artist" in rel) || !rel.artist?.id || !rel.artist?.name) continue;
+    const entry: ArtistMember = {
+      artist: { id: rel.artist.id, name: rel.artist.name },
+      attributes: rel.attributes,
+      begin: rel.begin,
+      end: rel.end,
+      ended: rel.ended,
+    };
+    if (rel.type === "member of band") {
+      // backward = "X is a member of this artist" → bandmember of THIS group
+      // forward = "this artist is a member of X" → THIS artist's parent groups
+      if (rel.direction === "backward") members.push(entry);
+      else memberOf.push(entry);
+    } else if (rel.type === "collaboration") {
+      collaborators.push(entry);
+    }
+  }
+
+  return { members, memberOf, collaborators, urls };
+}
+
+export async function getArtist(mbid: string): Promise<ArtistDetail> {
   return mbFetch(
-    `/artist/${encodeURIComponent(mbid)}?inc=tags`,
-    ArtistSchema,
+    `/artist/${encodeURIComponent(mbid)}?inc=tags+genres+aliases+ratings+artist-rels+url-rels`,
+    ArtistDetailSchema,
     { tags: [cacheTagsMB.artist(mbid)] },
   );
+}
+
+const ReleaseGroupSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  "primary-type": z.string().nullish(),
+  "secondary-types": z.array(z.string()).optional(),
+  "first-release-date": z.string().nullish(),
+  disambiguation: z.string().nullish(),
+});
+
+export type ReleaseGroup = z.infer<typeof ReleaseGroupSchema>;
+
+const ArtistReleaseGroupsSchema = z.object({
+  "release-group-count": z.number().optional(),
+  "release-groups": z.array(ReleaseGroupSchema),
+});
+
+/**
+ * Fetch ALL release groups for an artist by paging through MB's browse endpoint.
+ * Caps out at 500 to avoid pathological cases (very prolific artists).
+ */
+export async function getArtistReleaseGroups(
+  mbid: string,
+): Promise<ReleaseGroup[]> {
+  const PAGE = 100;
+  const MAX = 500;
+  const all: ReleaseGroup[] = [];
+  let offset = 0;
+  while (offset < MAX) {
+    const params = new URLSearchParams({
+      artist: mbid,
+      limit: String(PAGE),
+      offset: String(offset),
+    });
+    const result = await mbFetch(
+      `/release-group?${params}`,
+      ArtistReleaseGroupsSchema,
+      {
+        revalidate: 60 * 60 * 24,
+        tags: [cacheTagsMB.artist(mbid), `mb:artist:${mbid}:rgs`],
+      },
+    );
+    all.push(...result["release-groups"]);
+    if (result["release-groups"].length < PAGE) break;
+    offset += PAGE;
+  }
+  return all;
+}
+
+export type DiscographyBucket = {
+  type: string;
+  releaseGroups: ReleaseGroup[];
+};
+
+const PRIMARY_ORDER = ["Album", "EP", "Single", "Broadcast", "Other"] as const;
+
+/**
+ * Group an artist's release groups into Albums / EPs / Singles / etc.
+ * Filters out clearly non-official secondary types like "Demo", and sorts
+ * within each bucket by first-release-date (newest first).
+ */
+export function bucketDiscography(
+  groups: ReleaseGroup[],
+): DiscographyBucket[] {
+  const EXCLUDED_SECONDARY = new Set(["Demo"]);
+  const filtered = groups.filter((g) => {
+    if (!g["primary-type"]) return false;
+    return !(g["secondary-types"] ?? []).some((s) =>
+      EXCLUDED_SECONDARY.has(s),
+    );
+  });
+
+  const byType = new Map<string, ReleaseGroup[]>();
+  for (const g of filtered) {
+    const primary = g["primary-type"]!;
+    const secondaries = g["secondary-types"] ?? [];
+    // Compilations/live albums get their own bucket so they don't drown out studio releases
+    let bucket = primary;
+    if (secondaries.includes("Compilation")) bucket = "Compilation";
+    else if (secondaries.includes("Live")) bucket = "Live";
+    else if (secondaries.includes("Soundtrack")) bucket = "Soundtrack";
+    else if (secondaries.includes("Remix")) bucket = "Remix";
+    if (!byType.has(bucket)) byType.set(bucket, []);
+    byType.get(bucket)!.push(g);
+  }
+
+  for (const items of byType.values()) {
+    items.sort((a, b) => {
+      const da = a["first-release-date"] ?? "";
+      const db = b["first-release-date"] ?? "";
+      return db.localeCompare(da);
+    });
+  }
+
+  const orderedKeys = [
+    ...PRIMARY_ORDER.filter((k) => byType.has(k)),
+    ...Array.from(byType.keys()).filter(
+      (k) => !PRIMARY_ORDER.includes(k as (typeof PRIMARY_ORDER)[number]),
+    ),
+  ];
+
+  return orderedKeys.map((type) => ({
+    type,
+    releaseGroups: byType.get(type)!,
+  }));
 }
 
 const ArtistSearchSchema = z.object({

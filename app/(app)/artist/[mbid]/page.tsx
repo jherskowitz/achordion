@@ -1,45 +1,45 @@
-import Link from "next/link";
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
-import { getArtist } from "@/lib/clients/musicbrainz";
 import {
-  getTopRecordingsForArtist,
-  getTopReleaseGroupsForArtist,
-} from "@/lib/clients/listenbrainz";
-import { caaReleaseGroupUrl } from "@/lib/clients/coverart";
-import { CoverArt } from "@/components/achordion/cover-art";
+  bucketDiscography,
+  getArtist,
+  getArtistReleaseGroups,
+} from "@/lib/clients/musicbrainz";
+import { getTopRecordingsForArtist } from "@/lib/clients/listenbrainz";
 import { PageShell } from "@/components/achordion/page-shell";
 import { PageHeader } from "@/components/achordion/page-header";
+import { ArtistInfoSidebar } from "@/components/achordion/artist-info-sidebar";
+import { Discography } from "@/components/achordion/discography";
+import { TopTracksList } from "@/components/achordion/top-tracks-list";
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface PageParams {
   params: Promise<{ mbid: string }>;
 }
 
-function formatLifeSpan(begin?: string | null, end?: string | null, ended?: boolean | null) {
-  if (!begin && !end) return null;
-  if (begin && end) return `${begin} – ${end}`;
-  if (begin && ended) return `${begin} – present`;
-  if (begin) return `since ${begin}`;
-  return null;
-}
-
-async function ArtistMeta({ mbid }: { mbid: string }) {
+async function ArtistBody({ mbid }: { mbid: string }) {
   let artist;
   try {
     artist = await getArtist(mbid);
   } catch {
     notFound();
   }
-  const lifeSpan = formatLifeSpan(
-    artist["life-span"]?.begin,
-    artist["life-span"]?.end,
-    artist["life-span"]?.ended,
-  );
-  const tags = (artist.tags ?? [])
+
+  const tags = (artist.genres?.length ? artist.genres : artist.tags ?? [])
     .filter((t) => t.count > 0)
     .sort((a, b) => b.count - a.count)
     .slice(0, 8);
+
+  const lifeSpan = (() => {
+    const begin = artist["life-span"]?.begin;
+    const end = artist["life-span"]?.end;
+    const ended = artist["life-span"]?.ended;
+    if (!begin && !end) return null;
+    if (begin && end) return `${begin} – ${end}`;
+    if (begin && ended) return `${begin} – present`;
+    if (begin) return `since ${begin}`;
+    return null;
+  })();
 
   return (
     <>
@@ -69,94 +69,72 @@ async function ArtistMeta({ mbid }: { mbid: string }) {
           ))}
         </div>
       )}
+
+      <div className="mt-8 grid gap-10 lg:grid-cols-[1fr_240px]">
+        <div className="min-w-0 space-y-12">
+          <section>
+            <h2 className="mb-6 text-sm font-semibold tracking-wide uppercase">
+              Discography
+            </h2>
+            <Suspense fallback={<DiscographySkeleton />}>
+              <DiscographySection mbid={mbid} />
+            </Suspense>
+          </section>
+
+          <section>
+            <h2 className="mb-4 text-sm font-semibold tracking-wide uppercase">
+              Popular tracks
+            </h2>
+            <Suspense fallback={<ListSkeleton />}>
+              <TopTracksSection mbid={mbid} />
+            </Suspense>
+          </section>
+        </div>
+        <ArtistInfoSidebar artist={artist} />
+      </div>
     </>
   );
 }
 
-async function TopAlbums({ mbid }: { mbid: string }) {
-  const items = await getTopReleaseGroupsForArtist(mbid);
-  if (items.length === 0) {
-    return (
-      <p className="text-muted-foreground text-sm">No popular albums yet.</p>
-    );
-  }
-  return (
-    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
-      {items.slice(0, 12).map((rg) => (
-        <Link
-          key={rg.release_group_mbid}
-          href={`/release-group/${rg.release_group_mbid}`}
-          className="group min-w-0"
-        >
-          <CoverArt
-            src={caaReleaseGroupUrl(rg.release_group_mbid, 250)}
-            alt={rg.release_group_name}
-            size={240}
-            className="aspect-square h-auto w-full transition-opacity group-hover:opacity-90"
-            rounded="md"
-          />
-          <p className="mt-2 truncate text-sm font-medium">
-            {rg.release_group_name}
-          </p>
-          {rg.total_listen_count !== undefined && (
-            <p className="text-muted-foreground text-xs">
-              {rg.total_listen_count.toLocaleString()} listens
-            </p>
-          )}
-        </Link>
-      ))}
-    </div>
-  );
+async function DiscographySection({ mbid }: { mbid: string }) {
+  const groups = await getArtistReleaseGroups(mbid);
+  const buckets = bucketDiscography(groups);
+  return <Discography buckets={buckets} />;
 }
 
-async function TopTracks({ mbid }: { mbid: string }) {
+async function TopTracksSection({ mbid }: { mbid: string }) {
   const items = await getTopRecordingsForArtist(mbid);
-  if (items.length === 0) {
-    return (
-      <p className="text-muted-foreground text-sm">No popular tracks yet.</p>
-    );
-  }
   return (
-    <ol className="border-border/60 divide-border/60 divide-y rounded-xl border px-4">
-      {items.slice(0, 10).map((r, i) => (
-        <li
-          key={r.recording_mbid}
-          className="flex items-center gap-3 py-3"
-        >
-          <span className="text-muted-foreground w-5 shrink-0 text-xs tabular-nums">
-            {i + 1}
-          </span>
-          <div className="min-w-0 flex-1">
-            <Link
-              href={`/recording/${r.recording_mbid}`}
-              className="block truncate text-sm font-medium hover:underline"
-            >
-              {r.recording_name}
-            </Link>
-            {r.release_name && (
-              <p className="text-muted-foreground truncate text-xs">
-                {r.release_name}
-              </p>
-            )}
-          </div>
-          {r.total_listen_count !== undefined && (
-            <span className="text-muted-foreground shrink-0 text-xs tabular-nums">
-              {r.total_listen_count.toLocaleString()}
-            </span>
-          )}
-        </li>
-      ))}
-    </ol>
+    <TopTracksList
+      tracks={items.slice(0, 10).map((r) => ({
+        track_name: r.recording_name,
+        recording_mbid: r.recording_mbid,
+        artist_name: r.artist_name,
+        artist_mbids: r.artist_mbids,
+        release_name: r.release_name,
+        release_mbid: r.release_mbid,
+        listen_count: r.total_listen_count ?? 0,
+        caa_id: r.caa_id,
+        caa_release_mbid: r.caa_release_mbid,
+      }))}
+    />
   );
 }
 
-function GridSkeleton() {
+function DiscographySkeleton() {
   return (
-    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
-      {Array.from({ length: 6 }).map((_, i) => (
-        <div key={i} className="space-y-2">
-          <Skeleton className="aspect-square w-full rounded-md" />
-          <Skeleton className="h-3.5 w-3/4" />
+    <div className="space-y-12">
+      {Array.from({ length: 2 }).map((_, i) => (
+        <div key={i}>
+          <Skeleton className="mb-4 h-3 w-20" />
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+            {Array.from({ length: 5 }).map((_, j) => (
+              <div key={j} className="space-y-2">
+                <Skeleton className="aspect-square w-full rounded-md" />
+                <Skeleton className="h-3 w-3/4" />
+              </div>
+            ))}
+          </div>
         </div>
       ))}
     </div>
@@ -169,6 +147,7 @@ function ListSkeleton() {
       {Array.from({ length: 6 }).map((_, i) => (
         <li key={i} className="flex items-center gap-3 py-3">
           <Skeleton className="size-4" />
+          <Skeleton className="size-10 rounded-md" />
           <Skeleton className="h-4 flex-1" />
         </li>
       ))}
@@ -189,26 +168,8 @@ export default async function ArtistPage({ params }: PageParams) {
           </div>
         }
       >
-        <ArtistMeta mbid={mbid} />
+        <ArtistBody mbid={mbid} />
       </Suspense>
-
-      <section className="mt-10">
-        <h2 className="mb-4 text-sm font-semibold tracking-wide uppercase">
-          Popular tracks
-        </h2>
-        <Suspense fallback={<ListSkeleton />}>
-          <TopTracks mbid={mbid} />
-        </Suspense>
-      </section>
-
-      <section className="mt-10">
-        <h2 className="mb-4 text-sm font-semibold tracking-wide uppercase">
-          Popular albums
-        </h2>
-        <Suspense fallback={<GridSkeleton />}>
-          <TopAlbums mbid={mbid} />
-        </Suspense>
-      </section>
     </PageShell>
   );
 }

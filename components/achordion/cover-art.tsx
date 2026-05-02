@@ -10,6 +10,10 @@ interface CoverArtProps {
   rounded?: "none" | "sm" | "md";
 }
 
+// Caller's className already governs size — skip the fixed-pixel inline
+// style so it can stretch to fill its container.
+const SIZED_BY_CLASS = /\b(w-|h-|size-|aspect-)/;
+
 export function CoverArt({
   src,
   alt,
@@ -19,6 +23,10 @@ export function CoverArt({
 }: CoverArtProps) {
   const radius =
     rounded === "none" ? "" : rounded === "sm" ? "rounded-md" : "rounded-lg";
+  const sizeStyle =
+    className && SIZED_BY_CLASS.test(className)
+      ? undefined
+      : { width: size, height: size };
   if (!src) {
     return (
       <div
@@ -27,7 +35,7 @@ export function CoverArt({
           radius,
           className,
         )}
-        style={{ width: size, height: size }}
+        style={sizeStyle}
         aria-label={alt}
       >
         <Disc3 className="size-1/2" />
@@ -42,7 +50,7 @@ export function CoverArt({
       height={size}
       unoptimized
       className={cn("bg-muted shrink-0 object-cover", radius, className)}
-      style={{ width: size, height: size }}
+      style={sizeStyle}
     />
   );
 }
