@@ -7,6 +7,7 @@ import {
   partitionArtistRelations,
 } from "@/lib/clients/musicbrainz";
 import {
+  getArtistListeners,
   getLbRadio,
   getSimilarArtists,
   getTopRecordingsForArtist,
@@ -44,6 +45,11 @@ async function ArtistBody({ mbid }: { mbid: string }) {
     notFound();
   }
 
+  // Listener counts are best-effort — most artists have them, but the
+  // endpoint can 204/404 for niche/new artists. Fetch in parallel with
+  // the rest of the page so it doesn't block first paint.
+  const listenersPromise = getArtistListeners(mbid).catch(() => null);
+
   const { urls } = partitionArtistRelations(artist);
   const bioSource = findBioSource(urls);
 
@@ -52,16 +58,9 @@ async function ArtistBody({ mbid }: { mbid: string }) {
     .sort((a, b) => b.count - a.count)
     .slice(0, 8);
 
-  const lifeSpan = (() => {
-    const begin = artist["life-span"]?.begin;
-    const end = artist["life-span"]?.end;
-    const ended = artist["life-span"]?.ended;
-    if (!begin && !end) return null;
-    if (begin && end) return `${begin} – ${end}`;
-    if (begin && ended) return `${begin} – present`;
-    if (begin) return `since ${begin}`;
-    return null;
-  })();
+  const listeners = await listenersPromise;
+  const totalListens = listeners?.total_listen_count;
+  const totalListeners = listeners?.total_user_count;
 
   return (
     <>
@@ -73,10 +72,30 @@ async function ArtistBody({ mbid }: { mbid: string }) {
         }
         breadcrumbs={[{ label: "Artists" }, { label: artist.name }]}
         actions={
-          <div className="text-muted-foreground space-y-1 text-right text-xs">
-            {lifeSpan && <p>{lifeSpan}</p>}
-            {artist.country && <p>{artist.country}</p>}
-          </div>
+          totalListens !== undefined || totalListeners !== undefined ? (
+            <div className="text-right">
+              {totalListens !== undefined && (
+                <>
+                  <p className="text-foreground text-2xl font-semibold tabular-nums">
+                    {totalListens.toLocaleString()}
+                  </p>
+                  <p className="text-muted-foreground text-xs tracking-wide uppercase">
+                    listens
+                  </p>
+                </>
+              )}
+              {totalListeners !== undefined && (
+                <>
+                  <p className="text-foreground mt-3 text-lg font-semibold tabular-nums">
+                    {totalListeners.toLocaleString()}
+                  </p>
+                  <p className="text-muted-foreground text-xs tracking-wide uppercase">
+                    listeners
+                  </p>
+                </>
+              )}
+            </div>
+          ) : undefined
         }
       />
       {tags.length > 0 && (
