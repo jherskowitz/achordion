@@ -466,6 +466,88 @@ const ArtistListenersSchema = z.object({
 
 export type ArtistListeners = z.infer<typeof ArtistListenersSchema>["payload"];
 
+// ─── Fresh releases ─────────────────────────────────────────────────
+
+const FreshReleaseSchema = z.object({
+  release_name: z.string(),
+  artist_credit_name: z.string(),
+  artist_mbids: z.array(z.string()).optional(),
+  release_mbid: z.string(),
+  release_group_mbid: z.string().nullish(),
+  release_group_primary_type: z.string().nullish(),
+  release_group_secondary_type: z.string().nullish(),
+  release_date: z.string(),
+  caa_id: z.union([z.number(), z.string()]).nullish(),
+  caa_release_mbid: z.string().nullish(),
+  listen_count: z.number().optional(),
+  confidence: z.number().optional(),
+  release_tags: z.array(z.string()).optional(),
+});
+
+export type FreshRelease = z.infer<typeof FreshReleaseSchema>;
+
+const FreshReleasesSchema = z.object({
+  payload: z.object({
+    releases: z.array(FreshReleaseSchema),
+    total_count: z.number().optional(),
+  }),
+});
+
+export interface FreshReleasesOptions {
+  days?: number;
+  sort?: "release_date" | "confidence" | "artist_credit_name";
+  past?: boolean;
+  future?: boolean;
+}
+
+function freshParams(opts?: FreshReleasesOptions): string {
+  const params = new URLSearchParams();
+  if (opts?.days) params.set("days", String(opts.days));
+  if (opts?.sort) params.set("sort", opts.sort);
+  if (opts?.past !== undefined) params.set("past", String(opts.past));
+  if (opts?.future !== undefined) params.set("future", String(opts.future));
+  const qs = params.toString();
+  return qs ? `?${qs}` : "";
+}
+
+/** Sitewide fresh releases — global firehose for the past N days. */
+export async function getFreshReleases(
+  opts?: FreshReleasesOptions,
+): Promise<FreshRelease[]> {
+  const result = await lbFetch(
+    `/explore/fresh-releases/${freshParams(opts)}`,
+    FreshReleasesSchema,
+    { revalidate: 60 * 30, tags: ["lb:fresh-releases"] },
+  );
+  return result.payload.releases;
+}
+
+/** Per-user fresh releases — filtered to artists the user has listened to. */
+export async function getUserFreshReleases(
+  userName: string,
+  opts?: FreshReleasesOptions,
+): Promise<FreshRelease[]> {
+  try {
+    const result = await lbFetch(
+      `/user/${encodeURIComponent(userName)}/fresh_releases${freshParams(opts)}`,
+      FreshReleasesSchema,
+      {
+        revalidate: 60 * 30,
+        tags: [`lb:user:${userName}:fresh-releases`],
+      },
+    );
+    return result.payload.releases;
+  } catch (err) {
+    if (
+      err instanceof ListenBrainzError &&
+      (err.status === 204 || err.status === 404)
+    ) {
+      return [];
+    }
+    throw err;
+  }
+}
+
 // ─── LB Radio ───────────────────────────────────────────────────────
 
 const LbRadioTrackSchema = z
