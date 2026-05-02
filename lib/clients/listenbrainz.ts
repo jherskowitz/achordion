@@ -1161,9 +1161,18 @@ export interface LbRadioTrack {
   caaReleaseMbid: string | null;
 }
 
-function extractMbid(url: string | undefined | null, kind: "artist" | "recording" | "release"): string | null {
-  if (!url) return null;
-  const m = url.match(new RegExp(`/${kind}/([0-9a-f-]{36})`));
+const MBID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function extractMbid(
+  value: string | undefined | null,
+  kind: "artist" | "recording" | "release",
+): string | null {
+  if (!value) return null;
+  // LB sometimes hands back bare UUIDs (e.g. artist_identifiers) and
+  // sometimes full musicbrainz.org URLs (recording/release identifier).
+  // Support both rather than silently returning null on the bare form.
+  if (MBID_RE.test(value)) return value.toLowerCase();
+  const m = value.match(new RegExp(`/${kind}/([0-9a-f-]{36})`));
   return m?.[1] ?? null;
 }
 
