@@ -5,7 +5,7 @@ import {
   saveLbTokenAction,
   type SaveLbTokenState,
 } from "@/app/(app)/settings/actions";
-import { Check, AlertCircle } from "lucide-react";
+import { Check, AlertCircle, ExternalLink } from "lucide-react";
 
 const initial: SaveLbTokenState = { status: "idle" };
 
@@ -14,9 +14,20 @@ export function LbTokenForm({ hasToken }: { hasToken: boolean }) {
 
   return (
     <form action={formAction} className="space-y-3">
-      <label htmlFor="lb-token" className="block text-sm font-medium">
-        ListenBrainz user token
-      </label>
+      <div className="flex items-baseline justify-between gap-2">
+        <label htmlFor="lb-token" className="block text-sm font-medium">
+          ListenBrainz user token
+        </label>
+        <a
+          href="https://listenbrainz.org/profile/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs underline-offset-4 hover:underline"
+        >
+          Get my token
+          <ExternalLink className="size-3" />
+        </a>
+      </div>
       <div className="flex flex-col gap-2 sm:flex-row">
         <input
           id="lb-token"
