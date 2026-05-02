@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { Pin, UserPlus, Bell } from "lucide-react";
+import { Pin, Play, UserPlus, Bell } from "lucide-react";
 import { CoverArt } from "./cover-art";
 import { caaUrlFromListen } from "@/lib/clients/coverart";
+import { parachordPlayTrack } from "@/lib/parachord";
 import type { FeedEvent } from "@/lib/clients/listenbrainz";
 
 function relativeTime(unixSeconds: number): string {
@@ -107,7 +108,23 @@ function PinEvent({ event }: { event: FeedEvent }) {
           </span>
         </p>
         <div className="mt-2 flex items-start gap-3">
-          <CoverArt src={cover} alt={trackName} size={48} />
+          <a
+            href={parachordPlayTrack({
+              artist: artistName,
+              title: trackName,
+            })}
+            aria-label={`Play "${trackName}" by ${artistName} in Parachord`}
+            title={`Play in Parachord`}
+            className="group/cover relative shrink-0 overflow-hidden rounded-md"
+          >
+            <CoverArt src={cover} alt={trackName} size={48} />
+            <span
+              aria-hidden
+              className="absolute inset-0 flex items-center justify-center bg-black/55 opacity-0 transition-opacity group-hover/cover:opacity-100"
+            >
+              <Play className="size-4 fill-white text-white" />
+            </span>
+          </a>
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-medium">
               {recordingMbid ? (
