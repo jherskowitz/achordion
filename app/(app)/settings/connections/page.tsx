@@ -4,6 +4,7 @@ import { Check, ExternalLink } from "lucide-react";
 import { auth } from "@/auth";
 import { hasUserLbToken } from "@/lib/lb-token";
 import { LbTokenForm } from "@/components/achordion/lb-token-form";
+import { LbClientMarketplace } from "@/components/achordion/lb-client-marketplace";
 import { MusicServicesCard } from "@/components/achordion/music-services-card";
 import { clearLbTokenAction } from "../actions";
 
@@ -95,6 +96,8 @@ export default async function ConnectionsPage() {
       </section>
 
       <MusicServicesCard />
+
+      <LbClientMarketplace />
     </div>
   );
 }
