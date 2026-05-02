@@ -1,14 +1,11 @@
 import Link from "next/link";
-import { ExternalLink, Radio } from "lucide-react";
+import { Radio } from "lucide-react";
 import type { LbRadioTrack } from "@/lib/clients/listenbrainz";
 import { CoverArt } from "./cover-art";
 import { caaReleaseUrl } from "@/lib/clients/coverart";
-import {
-  parachordImportPlaylist,
-  parachordPlayTrack,
-  type ParachordTrack,
-} from "@/lib/parachord";
-import { ParachordCtaButton, ParachordPlayButton } from "./parachord-button";
+import { parachordPlayTrack, type ParachordTrack } from "@/lib/parachord";
+import { OpenInParachordButton } from "./open-in-parachord-button";
+import { ParachordPlayButton } from "./parachord-button";
 
 interface LbRadioSectionProps {
   artistMbid: string;
@@ -16,44 +13,14 @@ interface LbRadioSectionProps {
   tracks: LbRadioTrack[] | null;
 }
 
-const LB_RADIO_BASE = "https://listenbrainz.org/explore/lb-radio/";
-
 export function LbRadioSection({
-  artistMbid,
   artistName,
   tracks,
 }: LbRadioSectionProps) {
-  const externalUrl = `${LB_RADIO_BASE}?prompt=${encodeURIComponent(`artist:(${artistMbid})`)}&mode=easy`;
-
-  if (!tracks || tracks.length === 0) {
-    return (
-      <div className="border-border/60 from-card/50 to-card/20 flex flex-col gap-3 rounded-2xl border bg-gradient-to-br p-5 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
-        <div className="flex items-start gap-4">
-          <div className="bg-foreground/10 flex size-10 shrink-0 items-center justify-center rounded-full">
-            <Radio className="size-5" />
-          </div>
-          <div>
-            <h2 className="text-base font-semibold tracking-tight">
-              {artistName} Radio
-            </h2>
-            <p className="text-muted-foreground mt-1 text-sm leading-6">
-              Generate a continuous radio session seeded from{" "}
-              {artistName}&apos;s sound on ListenBrainz.
-            </p>
-          </div>
-        </div>
-        <a
-          href={externalUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="bg-primary text-primary-foreground inline-flex h-9 shrink-0 items-center gap-2 self-start rounded-lg px-4 text-sm font-medium hover:opacity-90 sm:self-auto"
-        >
-          Open in LB Radio
-          <ExternalLink className="size-3.5" />
-        </a>
-      </div>
-    );
-  }
+  // No token / fetch failure → don't render the section. There's nothing
+  // to queue into Parachord without a tracklist, and the section is
+  // intentionally Parachord-only now.
+  if (!tracks || tracks.length === 0) return null;
 
   const parachordTracks: ParachordTrack[] = tracks.map((t) => ({
     title: t.title,
@@ -78,26 +45,13 @@ export function LbRadioSection({
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-3">
-          <ParachordCtaButton
-            href={parachordImportPlaylist({
-              title: `${artistName} Radio`,
-              creator: "Achordion · LB Radio",
-              tracks: parachordTracks,
-            })}
-            label="Play in Parachord"
-            size="sm"
-          />
-          <a
-            href={externalUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-xs"
-          >
-            Open in LB Radio
-            <ExternalLink className="size-3" />
-          </a>
-        </div>
+        <OpenInParachordButton
+          tracks={parachordTracks}
+          fallback={{
+            title: `${artistName} Radio`,
+            creator: "Achordion · LB Radio",
+          }}
+        />
       </div>
       <ol className="divide-border/60 divide-y">
         {tracks.slice(0, 12).map((t, i) => {
