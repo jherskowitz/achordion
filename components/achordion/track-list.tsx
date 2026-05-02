@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { ReleaseDetail, Track } from "@/lib/clients/musicbrainz";
 import { formatArtistCredit } from "@/lib/clients/musicbrainz";
 import { parachordPlayTrack } from "@/lib/parachord";
-import { ParachordPlayButton } from "./parachord-button";
+import { PlayOverNumberCell } from "./parachord-button";
 
 function formatLength(ms?: number | null): string {
   if (!ms || ms <= 0) return "—";
@@ -32,9 +32,12 @@ function TrackRow({
   const artist = trackArtist || fallbackArtist;
   return (
     <li className="group flex items-center gap-4 py-2.5">
-      <span className="text-muted-foreground w-8 shrink-0 text-right text-xs tabular-nums">
-        {track.number ?? track.position ?? ""}
-      </span>
+      <PlayOverNumberCell
+        number={track.number ?? track.position ?? ""}
+        href={parachordPlayTrack({ artist, title: track.title })}
+        align="right"
+        className="w-8"
+      />
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium">
           {recordingMbid ? (
@@ -49,9 +52,6 @@ function TrackRow({
           )}
         </p>
       </div>
-      <ParachordPlayButton
-        href={parachordPlayTrack({ artist, title: track.title })}
-      />
       {listenCount !== undefined && (
         <span className="text-muted-foreground/80 shrink-0 tabular-nums text-xs">
           {listenCount.toLocaleString()}

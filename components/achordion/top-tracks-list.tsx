@@ -2,7 +2,7 @@ import Link from "next/link";
 import { CoverArt } from "./cover-art";
 import { caaReleaseGroupUrl, caaReleaseUrl } from "@/lib/clients/coverart";
 import { parachordPlayTrack } from "@/lib/parachord";
-import { ParachordPlayButton } from "./parachord-button";
+import { PlayOverNumberCell } from "./parachord-button";
 
 interface TrackEntry {
   track_name: string;
@@ -41,9 +41,14 @@ export function TopTracksList({ tracks }: { tracks: TrackEntry[] }) {
             key={`${t.recording_mbid ?? t.track_name}-${i}`}
             className="group flex items-center gap-3 py-3"
           >
-            <span className="text-muted-foreground w-5 shrink-0 text-xs tabular-nums">
-              {i + 1}
-            </span>
+            <PlayOverNumberCell
+              number={i + 1}
+              href={parachordPlayTrack({
+                artist: t.artist_name,
+                title: t.track_name,
+              })}
+              className="w-5"
+            />
             <CoverArt
               src={coverFor(t)}
               alt={t.release_name ?? t.track_name}
@@ -75,12 +80,6 @@ export function TopTracksList({ tracks }: { tracks: TrackEntry[] }) {
                 )}
               </p>
             </div>
-            <ParachordPlayButton
-              href={parachordPlayTrack({
-                artist: t.artist_name,
-                title: t.track_name,
-              })}
-            />
             <span className="text-muted-foreground shrink-0 tabular-nums text-xs">
               {t.listen_count.toLocaleString()}
             </span>

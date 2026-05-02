@@ -5,7 +5,7 @@ import { CoverArt } from "./cover-art";
 import { caaReleaseUrl } from "@/lib/clients/coverart";
 import { parachordPlayTrack, type ParachordTrack } from "@/lib/parachord";
 import { OpenInParachordButton } from "./open-in-parachord-button";
-import { ParachordPlayButton } from "./parachord-button";
+import { PlayOverNumberCell } from "./parachord-button";
 
 interface LbRadioSectionProps {
   artistMbid: string;
@@ -66,9 +66,14 @@ export function LbRadioSection({
               key={`${t.recordingMbid ?? t.title}-${i}`}
               className="group flex items-center gap-3 py-2.5"
             >
-              <span className="text-muted-foreground w-5 shrink-0 text-xs tabular-nums">
-                {i + 1}
-              </span>
+              <PlayOverNumberCell
+                number={i + 1}
+                href={parachordPlayTrack({
+                  artist: t.artistName,
+                  title: t.title,
+                })}
+                className="w-5"
+              />
               <CoverArt src={cover} alt={t.releaseName ?? t.title} size={40} />
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium">
@@ -96,12 +101,6 @@ export function LbRadioSection({
                   )}
                 </p>
               </div>
-              <ParachordPlayButton
-                href={parachordPlayTrack({
-                  artist: t.artistName,
-                  title: t.title,
-                })}
-              />
             </li>
           );
         })}
