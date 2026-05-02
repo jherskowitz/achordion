@@ -4,17 +4,30 @@ import {
   bucketDiscography,
   getArtist,
   getArtistReleaseGroups,
+  partitionArtistRelations,
 } from "@/lib/clients/musicbrainz";
 import { getTopRecordingsForArtist } from "@/lib/clients/listenbrainz";
+import { findBioSource, getBiography } from "@/lib/clients/wikipedia";
 import { PageShell } from "@/components/achordion/page-shell";
 import { PageHeader } from "@/components/achordion/page-header";
 import { ArtistInfoSidebar } from "@/components/achordion/artist-info-sidebar";
+import { Biography } from "@/components/achordion/biography";
 import { Discography } from "@/components/achordion/discography";
 import { TopTracksList } from "@/components/achordion/top-tracks-list";
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface PageParams {
   params: Promise<{ mbid: string }>;
+}
+
+async function BiographySection({
+  source,
+}: {
+  source: ReturnType<typeof findBioSource> & object;
+}) {
+  const bio = await getBiography(source);
+  if (!bio) return null;
+  return <Biography bio={bio} />;
 }
 
 async function ArtistBody({ mbid }: { mbid: string }) {
@@ -24,6 +37,9 @@ async function ArtistBody({ mbid }: { mbid: string }) {
   } catch {
     notFound();
   }
+
+  const { urls } = partitionArtistRelations(artist);
+  const bioSource = findBioSource(urls);
 
   const tags = (artist.genres?.length ? artist.genres : artist.tags ?? [])
     .filter((t) => t.count > 0)
@@ -68,6 +84,12 @@ async function ArtistBody({ mbid }: { mbid: string }) {
             </span>
           ))}
         </div>
+      )}
+
+      {bioSource && (
+        <Suspense fallback={<Skeleton className="mb-6 h-32 w-full rounded-xl" />}>
+          <BiographySection source={bioSource} />
+        </Suspense>
       )}
 
       <div className="mt-8 grid gap-10 lg:grid-cols-[1fr_240px]">

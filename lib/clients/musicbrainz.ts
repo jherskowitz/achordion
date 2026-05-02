@@ -270,36 +270,43 @@ export type DiscographyBucket = {
   releaseGroups: ReleaseGroup[];
 };
 
-const PRIMARY_ORDER = ["Album", "EP", "Single", "Broadcast", "Other"] as const;
+const STUDIO_TYPES = ["Album", "EP", "Single"] as const;
+type StudioType = (typeof STUDIO_TYPES)[number];
 
 /**
- * Group an artist's release groups into Albums / EPs / Singles / etc.
- * Filters out clearly non-official secondary types like "Demo", and sorts
- * within each bucket by first-release-date (newest first).
+ * Bucket an artist's release groups into Albums / EPs / Singles.
+ * Studio releases only — anything tagged as a Compilation, Live, Remix,
+ * Soundtrack, Demo, Mixtape/Street, Audio drama, or Spokenword secondary
+ * type is filtered out.
  */
 export function bucketDiscography(
   groups: ReleaseGroup[],
 ): DiscographyBucket[] {
-  const EXCLUDED_SECONDARY = new Set(["Demo"]);
-  const filtered = groups.filter((g) => {
-    if (!g["primary-type"]) return false;
+  const NON_STUDIO_SECONDARY = new Set([
+    "Compilation",
+    "Live",
+    "Remix",
+    "Soundtrack",
+    "Demo",
+    "Mixtape/Street",
+    "Audio drama",
+    "Spokenword",
+    "Interview",
+    "DJ-mix",
+  ]);
+  const studio = groups.filter((g) => {
+    const primary = g["primary-type"];
+    if (!primary || !STUDIO_TYPES.includes(primary as StudioType)) return false;
     return !(g["secondary-types"] ?? []).some((s) =>
-      EXCLUDED_SECONDARY.has(s),
+      NON_STUDIO_SECONDARY.has(s),
     );
   });
 
-  const byType = new Map<string, ReleaseGroup[]>();
-  for (const g of filtered) {
-    const primary = g["primary-type"]!;
-    const secondaries = g["secondary-types"] ?? [];
-    // Compilations/live albums get their own bucket so they don't drown out studio releases
-    let bucket = primary;
-    if (secondaries.includes("Compilation")) bucket = "Compilation";
-    else if (secondaries.includes("Live")) bucket = "Live";
-    else if (secondaries.includes("Soundtrack")) bucket = "Soundtrack";
-    else if (secondaries.includes("Remix")) bucket = "Remix";
-    if (!byType.has(bucket)) byType.set(bucket, []);
-    byType.get(bucket)!.push(g);
+  const byType = new Map<StudioType, ReleaseGroup[]>();
+  for (const g of studio) {
+    const primary = g["primary-type"] as StudioType;
+    if (!byType.has(primary)) byType.set(primary, []);
+    byType.get(primary)!.push(g);
   }
 
   for (const items of byType.values()) {
@@ -310,14 +317,7 @@ export function bucketDiscography(
     });
   }
 
-  const orderedKeys = [
-    ...PRIMARY_ORDER.filter((k) => byType.has(k)),
-    ...Array.from(byType.keys()).filter(
-      (k) => !PRIMARY_ORDER.includes(k as (typeof PRIMARY_ORDER)[number]),
-    ),
-  ];
-
-  return orderedKeys.map((type) => ({
+  return STUDIO_TYPES.filter((t) => byType.has(t)).map((type) => ({
     type,
     releaseGroups: byType.get(type)!,
   }));
