@@ -35,49 +35,40 @@ export function SimilarUsersList({
           <li
             key={u.user_name}
             className={cn(
-              "border-border/60 hover:border-foreground/30 hover:bg-muted/30 group flex flex-col rounded-xl border transition-colors",
+              "border-border/60 hover:border-foreground/30 hover:bg-muted/30 group flex items-center gap-3 rounded-xl border transition-colors",
               layout === "stack" ? "px-2.5 py-1.5" : "px-3 py-2.5",
             )}
           >
-            <div className="flex items-center gap-3">
+            <Avatar className={layout === "stack" ? "size-7" : "size-9"}>
+              <AvatarFallback
+                className={layout === "stack" ? "text-xs" : "text-sm"}
+              >
+                {u.user_name.slice(0, 1).toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
+            <div className="min-w-0 flex-1">
               <Link
                 href={`/user/${encodeURIComponent(u.user_name)}`}
-                className="flex min-w-0 flex-1 items-center gap-3"
+                className="block min-w-0"
               >
-                <Avatar
-                  className={layout === "stack" ? "size-7" : "size-9"}
-                >
-                  <AvatarFallback
-                    className={layout === "stack" ? "text-xs" : "text-sm"}
-                  >
-                    {u.user_name.slice(0, 1).toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium">
-                    {u.user_name}
-                  </p>
-                  <div className="bg-muted mt-1 h-0.5 w-full overflow-hidden rounded-full">
-                    <div
-                      className="bg-foreground/60 h-full"
-                      style={{ width: `${pct}%` }}
-                    />
-                  </div>
+                <p className="truncate text-sm font-medium">{u.user_name}</p>
+                <div className="bg-muted mt-1 h-0.5 w-full overflow-hidden rounded-full">
+                  <div
+                    className="bg-foreground/60 h-full"
+                    style={{ width: `${pct}%` }}
+                  />
                 </div>
               </Link>
-              <span className="text-muted-foreground/70 shrink-0 tabular-nums text-xs">
-                {pct}%
-              </span>
+              <Suspense fallback={null}>
+                <OnAirIndicator
+                  username={u.user_name}
+                  className="mt-1.5"
+                />
+              </Suspense>
             </div>
-            <Suspense fallback={null}>
-              <OnAirIndicator
-                username={u.user_name}
-                className={cn(
-                  "mt-1.5",
-                  layout === "stack" ? "max-w-full" : "",
-                )}
-              />
-            </Suspense>
+            <span className="text-muted-foreground/70 shrink-0 self-start tabular-nums text-xs">
+              {pct}%
+            </span>
           </li>
         );
       })}

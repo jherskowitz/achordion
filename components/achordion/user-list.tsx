@@ -22,22 +22,24 @@ export function UserList({
       {users.map((name) => (
         <li
           key={name}
-          className="border-border/60 hover:border-foreground/30 hover:bg-muted/30 flex flex-col rounded-xl border px-3 py-2.5 transition-colors"
+          className="border-border/60 hover:border-foreground/30 hover:bg-muted/30 flex items-center gap-3 rounded-xl border px-3 py-2.5 transition-colors"
         >
-          <Link
-            href={`/user/${encodeURIComponent(name)}`}
-            className="flex items-center gap-3"
-          >
-            <Avatar className="size-9">
-              <AvatarFallback className="text-sm">
-                {name.slice(0, 1).toUpperCase()}
-              </AvatarFallback>
-            </Avatar>
-            <span className="truncate text-sm font-medium">{name}</span>
-          </Link>
-          <Suspense fallback={null}>
-            <OnAirIndicator username={name} className="mt-1.5" />
-          </Suspense>
+          <Avatar className="size-9">
+            <AvatarFallback className="text-sm">
+              {name.slice(0, 1).toUpperCase()}
+            </AvatarFallback>
+          </Avatar>
+          <div className="min-w-0 flex-1">
+            <Link
+              href={`/user/${encodeURIComponent(name)}`}
+              className="block truncate text-sm font-medium"
+            >
+              {name}
+            </Link>
+            <Suspense fallback={null}>
+              <OnAirIndicator username={name} className="mt-1" />
+            </Suspense>
+          </div>
         </li>
       ))}
     </ul>

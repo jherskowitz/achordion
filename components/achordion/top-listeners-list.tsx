@@ -42,9 +42,11 @@ export function TopListenersList({ listeners }: { listeners: ListenerEntry[] }) 
               </div>
             </Link>
             <Suspense fallback={null}>
+              {/* Indent past the rank-number column so the now-playing
+                  line lines up under the username, not the row edge. */}
               <OnAirIndicator
                 username={l.user_name}
-                className="mt-1"
+                className="mt-1 ml-7"
               />
             </Suspense>
           </li>
