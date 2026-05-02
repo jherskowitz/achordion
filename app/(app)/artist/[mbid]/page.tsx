@@ -73,26 +73,26 @@ async function ArtistBody({ mbid }: { mbid: string }) {
         breadcrumbs={[{ label: "Artists" }, { label: artist.name }]}
         actions={
           totalListens !== undefined || totalListeners !== undefined ? (
-            <div className="text-right">
+            <div className="flex items-baseline gap-6 text-right">
               {totalListens !== undefined && (
-                <>
+                <div>
                   <p className="text-foreground text-2xl font-semibold tabular-nums">
                     {totalListens.toLocaleString()}
                   </p>
                   <p className="text-muted-foreground text-xs tracking-wide uppercase">
                     listens
                   </p>
-                </>
+                </div>
               )}
               {totalListeners !== undefined && (
-                <>
-                  <p className="text-foreground mt-3 text-lg font-semibold tabular-nums">
+                <div>
+                  <p className="text-foreground text-2xl font-semibold tabular-nums">
                     {totalListeners.toLocaleString()}
                   </p>
                   <p className="text-muted-foreground text-xs tracking-wide uppercase">
                     listeners
                   </p>
-                </>
+                </div>
               )}
             </div>
           ) : undefined
