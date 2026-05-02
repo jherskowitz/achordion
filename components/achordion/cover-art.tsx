@@ -1,3 +1,6 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import { Disc3 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -14,6 +17,33 @@ interface CoverArtProps {
 // style so it can stretch to fill its container.
 const SIZED_BY_CLASS = /\b(w-|h-|size-|aspect-)/;
 
+function Placeholder({
+  alt,
+  radius,
+  className,
+  sizeStyle,
+}: {
+  alt: string;
+  radius: string;
+  className?: string;
+  sizeStyle?: { width: number; height: number };
+}) {
+  return (
+    <div
+      className={cn(
+        "bg-muted text-muted-foreground/60 flex shrink-0 items-center justify-center",
+        radius,
+        className,
+      )}
+      style={sizeStyle}
+      aria-label={alt}
+      role="img"
+    >
+      <Disc3 className="size-1/2" />
+    </div>
+  );
+}
+
 export function CoverArt({
   src,
   alt,
@@ -27,21 +57,26 @@ export function CoverArt({
     className && SIZED_BY_CLASS.test(className)
       ? undefined
       : { width: size, height: size };
-  if (!src) {
+
+  const [errored, setErrored] = useState(false);
+
+  // Reset error state when the image source changes (e.g. user switches
+  // album editions or a parent revalidates cache).
+  useEffect(() => {
+    setErrored(false);
+  }, [src]);
+
+  if (!src || errored) {
     return (
-      <div
-        className={cn(
-          "bg-muted text-muted-foreground/60 flex shrink-0 items-center justify-center",
-          radius,
-          className,
-        )}
-        style={sizeStyle}
-        aria-label={alt}
-      >
-        <Disc3 className="size-1/2" />
-      </div>
+      <Placeholder
+        alt={alt}
+        radius={radius}
+        className={className}
+        sizeStyle={sizeStyle}
+      />
     );
   }
+
   return (
     <Image
       src={src}
@@ -49,6 +84,7 @@ export function CoverArt({
       width={size}
       height={size}
       unoptimized
+      onError={() => setErrored(true)}
       className={cn("bg-muted shrink-0 object-cover", radius, className)}
       style={sizeStyle}
     />
