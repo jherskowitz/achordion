@@ -15,11 +15,18 @@ interface LbRadioSectionProps {
   /** Used in the heading ("{seedLabel} Radio") and Parachord fallback title. */
   seedLabel: string;
   tracks: LbRadioTrack[] | null;
+  /**
+   * Optional LB Radio endpoint URL. When supplied, Parachord uses it as
+   * a refill source — the station extends itself rather than ending
+   * after the initial pool runs out.
+   */
+  refillUrl?: string;
 }
 
 export function LbRadioSection({
   seedLabel,
   tracks,
+  refillUrl,
 }: LbRadioSectionProps) {
   const [expanded, setExpanded] = useState(false);
 
@@ -52,11 +59,10 @@ export function LbRadioSection({
           </div>
         </div>
         <OpenInParachordButton
+          kind="radio"
           tracks={parachordTracks}
-          fallback={{
-            title: `${seedLabel} Radio`,
-            creator: "Achordion · LB Radio",
-          }}
+          refill={refillUrl}
+          title={`${seedLabel} Radio`}
         />
         <button
           type="button"

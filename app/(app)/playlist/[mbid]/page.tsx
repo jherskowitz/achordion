@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import Link from "next/link";
+import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { Download, ExternalLink, Users } from "lucide-react";
 import { getPlaylist } from "@/lib/clients/listenbrainz";
@@ -42,9 +43,36 @@ function algorithmLabel(source: string): string {
     .join(" ");
 }
 
+/**
+ * Build a public absolute URL for a request-relative path. Reads the
+ * forwarded host/proto from the incoming request so deployments behind
+ * proxies (Vercel, Cloudflare, etc.) get the right origin. Returns
+ * `null` when the request resolves to loopback/private — Parachord's
+ * SSRF guard would reject those URLs anyway, so we'd rather fall back
+ * to inline tracks than send a URL that fails on the other side.
+ */
+async function publicUrl(path: string): Promise<string | null> {
+  const h = await headers();
+  const host = h.get("x-forwarded-host") ?? h.get("host");
+  if (!host) return null;
+  const lower = host.toLowerCase();
+  if (
+    lower === "localhost" ||
+    lower.startsWith("localhost:") ||
+    lower.startsWith("127.") ||
+    lower.startsWith("0.0.0.0") ||
+    lower.startsWith("[::1]")
+  ) {
+    return null;
+  }
+  const proto = h.get("x-forwarded-proto") ?? "https";
+  return `${proto}://${host}${path}`;
+}
+
 async function PlaylistBody({ mbid }: { mbid: string }) {
   const data = await getPlaylist(mbid);
   if (!data) notFound();
+  const xspfUrl = await publicUrl(`/api/playlist/${mbid}/xspf`);
 
   const dateStr = formatDate(data.date);
   const totalDurationMs = data.tracks.reduce(
@@ -131,12 +159,16 @@ async function PlaylistBody({ mbid }: { mbid: string }) {
           )}
           <div className="mt-5 flex flex-wrap items-center gap-3">
             {data.tracks.length > 0 && (
+              // Hand Parachord the public XSPF URL when one is available
+              // (production deploy with a real host) so it can fetch the
+              // canonical playlist content. Falls back to inline tracks
+              // when running locally or behind loopback.
               <OpenInParachordButton
+                kind="playlist"
                 tracks={parachordTracks}
-                fallback={{
-                  title: data.title,
-                  creator: data.creator ?? "ListenBrainz",
-                }}
+                url={xspfUrl ?? undefined}
+                title={data.title}
+                creator={data.creator ?? "ListenBrainz"}
               />
             )}
             {data.externalUrls?.spotify && (

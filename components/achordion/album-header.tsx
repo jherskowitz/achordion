@@ -4,7 +4,7 @@ import { caaReleaseGroupUrl } from "@/lib/clients/coverart";
 import type { ReleaseGroupDetail } from "@/lib/clients/musicbrainz";
 import { formatArtistCredit } from "@/lib/clients/musicbrainz";
 import { ParachordCtaButton } from "./parachord-button";
-import { parachordImportPlaylist, type ParachordTrack } from "@/lib/parachord";
+import { parachordPlayAlbum, type ParachordTrack } from "@/lib/parachord";
 
 interface AlbumHeaderProps {
   rg: ReleaseGroupDetail;
@@ -116,13 +116,19 @@ export function AlbumHeader({
             ))}
           </div>
         )}
-        {parachordTracks && parachordTracks.length > 0 && (
+        {/* Prefer the MBID — Parachord picks the best resolver. Fall back
+            to title+artist or an inline tracklist if needed. */}
+        {(rg.id || (parachordTracks && parachordTracks.length > 0)) && (
           <div className="mt-5">
             <ParachordCtaButton
-              href={parachordImportPlaylist({
-                title: rg.title,
-                creator: credit.name,
-                tracks: parachordTracks,
+              href={parachordPlayAlbum({
+                ...(rg.id
+                  ? { mbid: rg.id }
+                  : {
+                      artist: credit.name,
+                      title: rg.title,
+                      tracks: parachordTracks,
+                    }),
               })}
               label="Play in Parachord"
             />

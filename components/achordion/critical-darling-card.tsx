@@ -4,7 +4,7 @@ import { CoverArt } from "./cover-art";
 import { ParachordCtaButton } from "./parachord-button";
 import { searchReleaseGroups } from "@/lib/clients/musicbrainz";
 import { caaReleaseGroupUrl } from "@/lib/clients/coverart";
-import { parachordOpenAlbum } from "@/lib/parachord";
+import { parachordPlayAlbum } from "@/lib/parachord";
 import type { CriticsPickAlbum } from "@/lib/clients/critical-darlings";
 
 /**
@@ -35,7 +35,11 @@ export async function CriticalDarlingCard({
 }) {
   const { mbid, coverUrl } = await resolveCover(album);
   const albumHref = mbid ? `/release-group/${mbid}` : null;
-  const parachordHref = parachordOpenAlbum(album.artist, album.title);
+  // Prefer the resolved MBID — Parachord picks the best resolver.
+  // Fall back to artist+title when MB search didn't find a match.
+  const parachordHref = parachordPlayAlbum(
+    mbid ? { mbid } : { artist: album.artist, title: album.title },
+  );
 
   const cover = (
     <CoverArt
