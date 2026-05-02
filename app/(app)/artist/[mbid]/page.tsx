@@ -18,8 +18,6 @@ import { ArtistInfoSidebar } from "@/components/achordion/artist-info-sidebar";
 import { Biography } from "@/components/achordion/biography";
 import { Discography } from "@/components/achordion/discography";
 import { LbRadioSection } from "@/components/achordion/lb-radio-section";
-import { ParachordCtaButton } from "@/components/achordion/parachord-button";
-import { parachordOpenArtist } from "@/lib/parachord";
 import { SimilarArtists } from "@/components/achordion/similar-artists";
 import { TopTracksList } from "@/components/achordion/top-tracks-list";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -75,16 +73,9 @@ async function ArtistBody({ mbid }: { mbid: string }) {
         }
         breadcrumbs={[{ label: "Artists" }, { label: artist.name }]}
         actions={
-          <div className="flex items-center gap-3 sm:flex-col sm:items-end">
-            <ParachordCtaButton
-              href={parachordOpenArtist(artist.name)}
-              label="Play in Parachord"
-              size="sm"
-            />
-            <div className="text-muted-foreground space-y-1 text-xs sm:text-right">
-              {lifeSpan && <p>{lifeSpan}</p>}
-              {artist.country && <p>{artist.country}</p>}
-            </div>
+          <div className="text-muted-foreground space-y-1 text-right text-xs">
+            {lifeSpan && <p>{lifeSpan}</p>}
+            {artist.country && <p>{artist.country}</p>}
           </div>
         }
       />
@@ -107,14 +98,14 @@ async function ArtistBody({ mbid }: { mbid: string }) {
         </Suspense>
       )}
 
-      <Suspense
-        fallback={<Skeleton className="my-6 h-24 w-full rounded-2xl" />}
-      >
-        <LbRadioBlock mbid={mbid} artistName={artist.name} />
-      </Suspense>
-
       <div className="mt-8 grid gap-10 lg:grid-cols-[1fr_240px]">
         <div className="min-w-0 space-y-12">
+          <Suspense
+            fallback={<Skeleton className="h-24 w-full rounded-2xl" />}
+          >
+            <LbRadioBlock mbid={mbid} artistName={artist.name} />
+          </Suspense>
+
           <section>
             <h2 className="mb-4 text-sm font-semibold tracking-wide uppercase">
               Popular tracks

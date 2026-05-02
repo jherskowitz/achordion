@@ -45,7 +45,7 @@ type Status = "idle" | "busy" | "success" | "error";
 export function OpenInParachordButton({
   tracks,
   fallback,
-  label = "Open in Parachord",
+  label = "Play in Parachord",
   className,
 }: OpenInParachordButtonProps) {
   const [status, setStatus] = useState<Status>("idle");
