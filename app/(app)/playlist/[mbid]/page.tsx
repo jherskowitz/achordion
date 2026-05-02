@@ -287,12 +287,12 @@ async function PlaylistBody({ mbid }: { mbid: string }) {
                         {t.releaseMbid ? (
                           <Link
                             href={`/release/${t.releaseMbid}`}
-                            className="hover:text-foreground"
+                            className="hover:text-foreground italic"
                           >
                             {t.releaseName}
                           </Link>
                         ) : (
-                          t.releaseName
+                          <em>{t.releaseName}</em>
                         )}
                       </>
                     )}

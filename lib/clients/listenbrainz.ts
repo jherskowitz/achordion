@@ -941,12 +941,19 @@ function jspfTrackToLbRadioTrack(
     : t.identifier
       ? [t.identifier]
       : [];
+  // LB Radio tracks carry release_identifier; LB user-playlist tracks
+  // don't, but they include caa_release_mbid in additional_metadata.
+  // Either is a valid release MBID for our linking purposes.
+  const releaseMbid =
+    extractMbid(ext?.release_identifier, "release") ??
+    ext?.additional_metadata?.caa_release_mbid ??
+    null;
   return {
     title: t.title,
     artistName: t.creator ?? "",
     artistMbid: extractMbid(ext?.artist_identifiers?.[0], "artist"),
     recordingMbid: extractMbid(idArr[0], "recording"),
-    releaseMbid: extractMbid(ext?.release_identifier, "release"),
+    releaseMbid,
     releaseName: t.album ?? null,
     durationMs: t.duration ?? null,
     caaId: ext?.additional_metadata?.caa_id ?? null,
