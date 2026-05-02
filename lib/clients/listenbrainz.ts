@@ -312,6 +312,46 @@ export async function getUserPlaylists(
   }
 }
 
+/**
+ * Algorithmically-generated playlists that LB created *for* this user
+ * (Weekly Jams, Weekly Explorations, Top Discoveries of YYYY, etc.).
+ * Same JSPF envelope as getUserPlaylists.
+ */
+export async function getCreatedForPlaylists(
+  name: string,
+  count = 25,
+  offset = 0,
+): Promise<UserPlaylistsPage> {
+  try {
+    const params = new URLSearchParams({
+      count: String(count),
+      offset: String(offset),
+    });
+    const result = await lbFetch(
+      `/user/${encodeURIComponent(name)}/playlists/createdfor?${params}`,
+      UserPlaylistsResponseSchema,
+      {
+        revalidate: 60 * 5,
+        tags: [`lb:user:${name}:createdfor`],
+      },
+    );
+    return {
+      playlists: result.playlists,
+      total: result.playlist_count ?? result.playlists.length,
+      offset: result.offset ?? offset,
+      count: result.count,
+    };
+  } catch (err) {
+    if (
+      err instanceof ListenBrainzError &&
+      (err.status === 204 || err.status === 404)
+    ) {
+      return { playlists: [], total: 0, offset: 0, count };
+    }
+    throw err;
+  }
+}
+
 /** Extract the MBID from a LB playlist identifier URL. */
 export function playlistMbidFromIdentifier(
   identifier: string | undefined | null,
@@ -403,6 +443,187 @@ export async function getUserPins(
       { revalidate: 60 * 5, tags: [`lb:user:${userName}:pins`] },
     );
     return result.pinned_recordings;
+  } catch (err) {
+    if (
+      err instanceof ListenBrainzError &&
+      (err.status === 204 || err.status === 404)
+    ) {
+      return [];
+    }
+    throw err;
+  }
+}
+
+// ─── Recommendations ────────────────────────────────────────────────
+
+const CfRecommendationSchema = z.object({
+  payload: z.object({
+    count: z.number().optional(),
+    entity: z.string().optional(),
+    last_updated: z.number().optional(),
+    mbids: z.array(
+      z.object({
+        recording_mbid: z.string(),
+        score: z.number().optional(),
+        latest_listened_at: z.string().nullish(),
+      }),
+    ),
+  }),
+});
+
+export interface RecommendedRecordingMbid {
+  recording_mbid: string;
+  score: number;
+  latest_listened_at: string | null;
+}
+
+export async function getRecommendedRecordings(
+  userName: string,
+  count = 25,
+  artistType: "top" | "similar" | "raw" = "raw",
+): Promise<RecommendedRecordingMbid[]> {
+  try {
+    const params = new URLSearchParams({
+      count: String(count),
+      artist_type: artistType,
+    });
+    const result = await lbFetch(
+      `/cf/recommendation/user/${encodeURIComponent(userName)}/recording?${params}`,
+      CfRecommendationSchema,
+      {
+        revalidate: 60 * 60,
+        tags: [`lb:user:${userName}:cf-recordings`],
+      },
+    );
+    return result.payload.mbids.map((m) => ({
+      recording_mbid: m.recording_mbid,
+      score: m.score ?? 0,
+      latest_listened_at: m.latest_listened_at ?? null,
+    }));
+  } catch (err) {
+    if (
+      err instanceof ListenBrainzError &&
+      (err.status === 204 || err.status === 404)
+    ) {
+      return [];
+    }
+    throw err;
+  }
+}
+
+const RecordingMetadataEntrySchema = z.object({
+  artist: z
+    .object({
+      artist_credit_id: z.number().optional(),
+      name: z.string().optional(),
+      artists: z
+        .array(
+          z
+            .object({
+              artist_mbid: z.string(),
+              name: z.string(),
+              join_phrase: z.string().optional(),
+            })
+            .partial()
+            .passthrough(),
+        )
+        .optional(),
+    })
+    .partial()
+    .passthrough()
+    .optional(),
+  recording: z
+    .object({
+      name: z.string().optional(),
+      length: z.number().optional(),
+      first_release_date: z.string().optional(),
+    })
+    .partial()
+    .passthrough()
+    .optional(),
+  release: z
+    .object({
+      name: z.string().optional(),
+      mbid: z.string().optional(),
+      caa_id: z.union([z.number(), z.string()]).optional(),
+      caa_release_mbid: z.string().optional(),
+      release_group_mbid: z.string().optional(),
+    })
+    .partial()
+    .passthrough()
+    .optional(),
+});
+
+export type RecordingMetadata = z.infer<typeof RecordingMetadataEntrySchema>;
+
+export async function getRecordingMetadata(
+  recordingMbids: string[],
+): Promise<Map<string, RecordingMetadata>> {
+  const out = new Map<string, RecordingMetadata>();
+  if (recordingMbids.length === 0) return out;
+  const chunks: string[][] = [];
+  for (let i = 0; i < recordingMbids.length; i += 50) {
+    chunks.push(recordingMbids.slice(i, i + 50));
+  }
+  await Promise.all(
+    chunks.map(async (chunk) => {
+      try {
+        const params = new URLSearchParams({
+          recording_mbids: chunk.join(","),
+          inc: "artist+release",
+        });
+        const res = await fetch(`${LB_BASE}/metadata/recording/?${params}`, {
+          headers: {
+            "User-Agent": USER_AGENT,
+            Accept: "application/json",
+          },
+          next: {
+            revalidate: 60 * 60 * 6,
+            tags: ["lb:metadata:recording"],
+          },
+        });
+        if (!res.ok) return;
+        const json = (await res.json()) as Record<string, unknown>;
+        for (const [mbid, raw] of Object.entries(json)) {
+          const parsed = RecordingMetadataEntrySchema.safeParse(raw);
+          if (parsed.success) out.set(mbid, parsed.data);
+        }
+      } catch {
+        // Best-effort — leave the chunk un-enriched.
+      }
+    }),
+  );
+  return out;
+}
+
+const SimilarUserSchema = z.object({
+  user_name: z.string(),
+  similarity: z.number(),
+});
+
+const SimilarUsersResponseSchema = z.object({
+  payload: z.array(SimilarUserSchema),
+});
+
+export type SimilarUser = z.infer<typeof SimilarUserSchema>;
+
+export async function getSimilarUsers(
+  userName: string,
+  limit = 12,
+): Promise<SimilarUser[]> {
+  try {
+    const result = await lbFetch(
+      `/user/${encodeURIComponent(userName)}/similar-users`,
+      SimilarUsersResponseSchema,
+      {
+        revalidate: 60 * 60,
+        tags: [`lb:user:${userName}:similar-users`],
+      },
+    );
+    return result.payload
+      .slice()
+      .sort((a, b) => b.similarity - a.similarity)
+      .slice(0, limit);
   } catch (err) {
     if (
       err instanceof ListenBrainzError &&
