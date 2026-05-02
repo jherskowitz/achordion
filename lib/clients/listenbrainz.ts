@@ -265,33 +265,22 @@ const PinsResponseSchema = z.object({
   pinned_recordings: z.array(PinnedRecordingSchema),
 });
 
-const CurrentPinResponseSchema = z.object({
-  pinned_recording: PinnedRecordingSchema.nullish(),
-});
-
 /**
  * The user's currently-active pin (pinned_until > now).
- * Returns null when the user has no active pin.
+ *
+ * LB ships a /pins/current-pin endpoint, but it 404s even for users with
+ * a real active pin (verified against jherskowitz, who has an unexpired
+ * pin in /pins). Derive the active pin from /pins?count=1 instead — same
+ * data, one request, actually works.
  */
 export async function getCurrentPin(
   userName: string,
 ): Promise<PinnedRecording | null> {
-  try {
-    const result = await lbFetch(
-      `/${encodeURIComponent(userName)}/pins/current-pin`,
-      CurrentPinResponseSchema,
-      { revalidate: 60 * 5, tags: [`lb:user:${userName}:pin`] },
-    );
-    return result.pinned_recording ?? null;
-  } catch (err) {
-    if (
-      err instanceof ListenBrainzError &&
-      (err.status === 204 || err.status === 404)
-    ) {
-      return null;
-    }
-    throw err;
-  }
+  const recent = await getUserPins(userName, 1);
+  const latest = recent[0];
+  if (!latest) return null;
+  const now = Math.floor(Date.now() / 1000);
+  return latest.pinned_until > now ? latest : null;
 }
 
 /** Full pin history for a user, newest first. */
