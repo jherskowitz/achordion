@@ -1,4 +1,6 @@
+import { Suspense } from "react";
 import Link from "next/link";
+import { OnAirIndicator } from "./on-air-indicator";
 
 interface ListenerEntry {
   user_name: string;
@@ -13,10 +15,13 @@ export function TopListenersList({ listeners }: { listeners: ListenerEntry[] }) 
       {listeners.slice(0, 10).map((l, i) => {
         const pct = Math.round((l.listen_count / max) * 100);
         return (
-          <li key={l.user_name} className="text-sm">
+          <li
+            key={l.user_name}
+            className="hover:bg-muted/40 -mx-2 rounded-md px-2 py-1.5 text-sm"
+          >
             <Link
               href={`/user/${encodeURIComponent(l.user_name)}`}
-              className="hover:bg-muted/40 -mx-2 block rounded-md px-2 py-1.5"
+              className="block"
             >
               <div className="flex items-center justify-between">
                 <span className="truncate">
@@ -36,6 +41,12 @@ export function TopListenersList({ listeners }: { listeners: ListenerEntry[] }) 
                 />
               </div>
             </Link>
+            <Suspense fallback={null}>
+              <OnAirIndicator
+                username={l.user_name}
+                className="mt-1"
+              />
+            </Suspense>
           </li>
         );
       })}

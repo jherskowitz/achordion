@@ -2,11 +2,9 @@ import Link from "next/link";
 import { Suspense } from "react";
 import {
   getRecentListens,
-  getPlayingNow,
   getCurrentPin,
 } from "@/lib/clients/listenbrainz";
 import { LiveScrobbleList } from "@/components/achordion/live-scrobble-list";
-import { NowPlayingPill } from "@/components/achordion/now-playing-pill";
 import { PinnedTrackCard } from "@/components/achordion/pinned-track-card";
 import { PageShell } from "@/components/achordion/page-shell";
 import { ComingSoon } from "@/components/achordion/coming-soon";
@@ -25,16 +23,6 @@ async function PinnedSection({ name }: { name: string }) {
     const pin = await getCurrentPin(name);
     if (!pin) return null;
     return <PinnedTrackCard pin={pin} variant="hero" />;
-  } catch {
-    return null;
-  }
-}
-
-async function NowPlayingSection({ name }: { name: string }) {
-  try {
-    const playing = await getPlayingNow(name);
-    if (!playing) return null;
-    return <NowPlayingPill listen={playing} username={name} />;
   } catch {
     return null;
   }
@@ -102,9 +90,6 @@ export default async function UserOverviewPage({ params }: PageParams) {
           </Suspense>
         </div>
         <aside className="space-y-4">
-          <Suspense fallback={null}>
-            <NowPlayingSection name={name} />
-          </Suspense>
           <Suspense fallback={<WeeklyStatsSidebarSkeleton />}>
             <WeeklyStatsSidebar name={name} />
           </Suspense>

@@ -114,16 +114,29 @@ export async function getRecentListens(
   return result.payload.listens;
 }
 
+// LB's /playing-now response omits `listened_at` for the currently-
+// playing item (it isn't a finalised scrobble yet) and adds a
+// `playing_now: true` flag. Reuse ListenSchema's track_metadata but
+// make listened_at optional and accept the extra flag.
+const PlayingNowListenSchema = ListenSchema.extend({
+  listened_at: z.number().optional(),
+  playing_now: z.boolean().optional(),
+});
+
+export type PlayingNowListen = z.infer<typeof PlayingNowListenSchema>;
+
 const PlayingNowResponseSchema = z.object({
   payload: z.object({
     count: z.number(),
     user_id: z.string().optional(),
-    listens: z.array(ListenSchema),
+    listens: z.array(PlayingNowListenSchema),
     playing_now: z.boolean().optional(),
   }),
 });
 
-export async function getPlayingNow(userName: string): Promise<Listen | null> {
+export async function getPlayingNow(
+  userName: string,
+): Promise<PlayingNowListen | null> {
   try {
     const result = await lbFetch(
       `/user/${encodeURIComponent(userName)}/playing-now`,

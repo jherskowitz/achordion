@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { Radio } from "lucide-react";
+import { auth } from "@/auth";
 import { CoverArt } from "./cover-art";
 import { caaUrlFromListen } from "@/lib/clients/coverart";
 import { parachordListenAlong } from "@/lib/parachord";
-import type { Listen } from "@/lib/clients/listenbrainz";
+import type { PlayingNowListen } from "@/lib/clients/listenbrainz";
 
-export function NowPlayingPill({
+export async function NowPlayingPill({
   listen,
   /**
    * The user this listen belongs to, used to construct the
@@ -15,9 +16,13 @@ export function NowPlayingPill({
    */
   username,
 }: {
-  listen: Listen;
+  listen: PlayingNowListen;
   username?: string;
 }) {
+  const session = await auth().catch(() => null);
+  const isOwnUser =
+    !!username &&
+    session?.user?.mbUsername?.toLowerCase() === username.toLowerCase();
   const meta = listen.track_metadata;
   const cover = caaUrlFromListen(meta, 250);
   const artistMbid =
@@ -48,7 +53,7 @@ export function NowPlayingPill({
           )}
         </p>
       </div>
-      {username && (
+      {username && !isOwnUser && (
         <a
           href={parachordListenAlong({
             service: "listenbrainz",

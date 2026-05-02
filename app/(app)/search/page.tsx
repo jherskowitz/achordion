@@ -4,6 +4,7 @@ import { searchUsers } from "@/lib/clients/listenbrainz";
 import { searchArtists, searchReleaseGroups } from "@/lib/clients/musicbrainz";
 import { caaReleaseGroupUrl } from "@/lib/clients/coverart";
 import { CoverArt } from "@/components/achordion/cover-art";
+import { OnAirIndicator } from "@/components/achordion/on-air-indicator";
 import { PageShell } from "@/components/achordion/page-shell";
 import { PageHeader } from "@/components/achordion/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -20,16 +21,19 @@ async function UserResults({ q }: { q: string }) {
   return (
     <ul className="space-y-1">
       {users.map((name) => (
-        <li key={name}>
+        <li key={name} className="hover:bg-muted/50 rounded-md px-2 py-2">
           <Link
             href={`/user/${encodeURIComponent(name)}`}
-            className="hover:bg-muted/50 flex items-center gap-3 rounded-md px-2 py-2 text-sm"
+            className="flex items-center gap-3 text-sm"
           >
             <span className="bg-muted flex size-8 items-center justify-center rounded-full text-xs font-medium">
               {name.slice(0, 1).toUpperCase()}
             </span>
             {name}
           </Link>
+          <Suspense fallback={null}>
+            <OnAirIndicator username={name} className="mt-1 ml-11" />
+          </Suspense>
         </li>
       ))}
     </ul>

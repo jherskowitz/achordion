@@ -1,8 +1,10 @@
+import { Suspense } from "react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { auth } from "@/auth";
 import { getFollowing } from "@/lib/clients/listenbrainz";
 import { getLbTokenForRequest } from "@/lib/lb-token";
 import { FollowToggle } from "./follow-toggle";
+import { OnAirIndicator } from "./on-air-indicator";
 import { SectionTabs, type SectionTab } from "./section-tabs";
 
 function userTabs(name: string): SectionTab[] {
@@ -60,6 +62,13 @@ export async function UserPageHeader({ name }: { name: string }) {
             <h1 className="truncate text-3xl font-semibold tracking-tight sm:text-4xl">
               {name}
             </h1>
+            <Suspense fallback={null}>
+              <OnAirIndicator
+                username={name}
+                size="default"
+                className="mt-2"
+              />
+            </Suspense>
           </div>
           {viewer && !isOwnProfile && (
             <FollowToggle

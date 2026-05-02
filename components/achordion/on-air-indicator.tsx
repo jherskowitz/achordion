@@ -1,4 +1,5 @@
 import { Radio } from "lucide-react";
+import { auth } from "@/auth";
 import { getPlayingNow } from "@/lib/clients/listenbrainz";
 import { parachordListenAlong } from "@/lib/parachord";
 import { cn } from "@/lib/utils";
@@ -27,15 +28,18 @@ export async function OnAirIndicator({
   size = "compact",
   className,
 }: OnAirIndicatorProps) {
-  let playing;
-  try {
-    playing = await getPlayingNow(username);
-  } catch {
-    return null;
-  }
+  // Fetch playing-now and the viewer's session in parallel — we need
+  // the viewer to know whether to hide the listen-along button (a user
+  // listening along to themselves is a loop).
+  const [playing, session] = await Promise.all([
+    getPlayingNow(username).catch(() => null),
+    auth().catch(() => null),
+  ]);
   if (!playing) return null;
 
   const meta = playing.track_metadata;
+  const isOwnUser =
+    session?.user?.mbUsername?.toLowerCase() === username.toLowerCase();
   const listenAlongHref = parachordListenAlong({
     service: "listenbrainz",
     user: username,
@@ -61,14 +65,16 @@ export async function OnAirIndicator({
           <span className="text-foreground font-medium">{meta.track_name}</span>
           <span className="text-muted-foreground"> — {meta.artist_name}</span>
         </span>
-        <a
-          href={listenAlongHref}
-          title={`Listen along with ${username} in Parachord`}
-          className="bg-primary text-primary-foreground inline-flex h-6 shrink-0 items-center gap-1 rounded-full px-2 text-[10px] font-medium transition-opacity hover:opacity-90"
-        >
-          <Radio className="size-2.5" />
-          Listen along
-        </a>
+        {!isOwnUser && (
+          <a
+            href={listenAlongHref}
+            title={`Listen along with ${username} in Parachord`}
+            className="bg-primary text-primary-foreground inline-flex h-6 shrink-0 items-center gap-1 rounded-full px-2 text-[10px] font-medium transition-opacity hover:opacity-90"
+          >
+            <Radio className="size-2.5" />
+            Listen along
+          </a>
+        )}
       </div>
     );
   }
@@ -86,14 +92,16 @@ export async function OnAirIndicator({
         <span className="text-foreground/90">{meta.track_name}</span>
         <span className="text-muted-foreground"> — {meta.artist_name}</span>
       </span>
-      <a
-        href={listenAlongHref}
-        title={`Listen along with ${username} in Parachord`}
-        aria-label={`Listen along with ${username} in Parachord`}
-        className="bg-primary/90 text-primary-foreground hover:bg-primary inline-flex size-4 shrink-0 items-center justify-center rounded-full transition-colors"
-      >
-        <Radio className="size-2.5" />
-      </a>
+      {!isOwnUser && (
+        <a
+          href={listenAlongHref}
+          title={`Listen along with ${username} in Parachord`}
+          aria-label={`Listen along with ${username} in Parachord`}
+          className="bg-primary/90 text-primary-foreground hover:bg-primary inline-flex size-4 shrink-0 items-center justify-center rounded-full transition-colors"
+        >
+          <Radio className="size-2.5" />
+        </a>
+      )}
     </div>
   );
 }
