@@ -7,8 +7,6 @@ const EXPLORE_TABS: SectionTab[] = [
   { href: "/explore/lb-radio", label: "LB Radio" },
   { href: "/explore/similar-users", label: "Similar users" },
   { href: "/explore/year-in-music", label: "Year in Music" },
-  { href: "/explore/huesound", label: "Huesound" },
-  { href: "/explore/cover-art-collage", label: "Cover art collage" },
 ];
 
 export default function ExploreLayout({ children }: { children: ReactNode }) {
