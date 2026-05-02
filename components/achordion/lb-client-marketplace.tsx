@@ -36,6 +36,20 @@ const CLIENTS: LbClient[] = [
     url: "https://github.com/kawaiiDango/pano-scrobbler",
   },
   {
+    name: "Marvis Pro",
+    platforms: ["iOS", "iPadOS"],
+    blurb:
+      "Third-party Apple Music client for iOS / iPadOS with built-in Last.fm + ListenBrainz scrobbling — one of the few realistic Apple Music scrobble paths on iOS.",
+    url: "https://apps.apple.com/app/marvis-pro/id1447768809",
+  },
+  {
+    name: "NepTunes",
+    platforms: ["Mac"],
+    blurb:
+      "Mac menu-bar app that scrobbles Apple Music and Spotify to ListenBrainz, Last.fm, and Libre.fm via system Now Playing APIs.",
+    url: "https://neptunes.app",
+  },
+  {
     name: "Web Scrobbler",
     platforms: ["Browser"],
     blurb:
