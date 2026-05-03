@@ -55,6 +55,12 @@ export function FilterPills<T extends string>({
             role="tab"
             aria-selected={isActive}
             scroll={false}
+            // Parachord's browser extension tags <a> elements with
+            // `data-parachord-btn` after SSR but before hydration —
+            // when that fails to round-trip, React skips wiring the
+            // navigation handler and pill clicks become no-ops. Same
+            // suppressHydrationWarning trick we use on layout chrome.
+            suppressHydrationWarning
             className={cn(
               "flex h-7 items-center justify-center rounded-md px-3 text-xs font-medium transition-colors",
               isActive
