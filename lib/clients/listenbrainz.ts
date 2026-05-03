@@ -1540,15 +1540,20 @@ export async function getPlaylist(mbid: string): Promise<PlaylistDetail | null> 
 }
 
 /**
- * Edit a playlist's visibility.
+ * Edit a playlist's metadata (title, description, visibility,
+ * collaborators).
  *
  * LB exposes `POST /1/playlist/edit/{mbid}` accepting a partial JSPF
- * body. The handler reads `extension["jspf#playlist"].public` (and a
- * few other fields) and applies whichever are present. There's a
- * known sharp edge: the `collaborators` field is rebuilt from
- * whatever the body contains — sending an extension object without
- * `collaborators` can clear them. To stay safe we re-send the
- * existing collaborators list alongside the flipped `public` flag.
+ * body — the handler reads each field with a `try/except KeyError`,
+ * so any field omitted from the body is left alone. Two sharp edges:
+ *
+ *   1. The `collaborators` list is rebuilt from whatever the body
+ *      contains. If you send an `extension` object without
+ *      `collaborators`, LB defaults it to `[]` and silently clears
+ *      the existing list. We always pass the current collaborators
+ *      through to be safe.
+ *   2. `annotation` of `null` is treated as "no change". To clear
+ *      the description you send `""`.
  *
  * Returns `{ ok: true }` on 200, `{ ok: false, status, message }`
  * otherwise. 403 = not the owner; 401 = bad/missing token.
@@ -1556,22 +1561,33 @@ export async function getPlaylist(mbid: string): Promise<PlaylistDetail | null> 
  * Source: github.com/metabrainz/listenbrainz-server  →
  *   listenbrainz/webserver/views/playlist_api.py::edit_playlist
  */
-export async function setPlaylistVisibility(
+export interface PlaylistEditFields {
+  title?: string;
+  /** Pass `""` to clear the description; `undefined` to leave it. */
+  annotation?: string;
+  isPublic?: boolean;
+  /** Required when sending any extension change — see note above. */
+  collaborators?: string[];
+}
+
+export async function editPlaylist(
   mbid: string,
-  isPublic: boolean,
-  collaborators: string[],
+  fields: PlaylistEditFields,
   token: string,
 ): Promise<{ ok: boolean; status: number; message?: string }> {
-  const body = {
-    playlist: {
-      extension: {
-        "https://musicbrainz.org/doc/jspf#playlist": {
-          public: isPublic,
-          collaborators,
-        },
-      },
-    },
-  };
+  const body: { playlist: Record<string, unknown> } = { playlist: {} };
+  if (fields.title !== undefined) body.playlist.title = fields.title;
+  if (fields.annotation !== undefined)
+    body.playlist.annotation = fields.annotation;
+  if (fields.isPublic !== undefined || fields.collaborators !== undefined) {
+    const ext: Record<string, unknown> = {};
+    if (fields.isPublic !== undefined) ext.public = fields.isPublic;
+    if (fields.collaborators !== undefined)
+      ext.collaborators = fields.collaborators;
+    body.playlist.extension = {
+      "https://musicbrainz.org/doc/jspf#playlist": ext,
+    };
+  }
   const res = await fetch(
     `${LB_BASE}/playlist/edit/${encodeURIComponent(mbid)}`,
     {
@@ -1594,6 +1610,16 @@ export async function setPlaylistVisibility(
     // Non-JSON body — fall back to status.
   }
   return { ok: res.ok, status: res.status, message };
+}
+
+/** Convenience wrapper for the visibility-only toggle. */
+export function setPlaylistVisibility(
+  mbid: string,
+  isPublic: boolean,
+  collaborators: string[],
+  token: string,
+) {
+  return editPlaylist(mbid, { isPublic, collaborators }, token);
 }
 
 // ─── Similar artists (LB Labs) ──────────────────────────────────────

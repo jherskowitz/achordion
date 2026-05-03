@@ -19,6 +19,7 @@ import { CoverArt } from "@/components/achordion/cover-art";
 import { OpenInParachordButton } from "@/components/achordion/open-in-parachord-button";
 import { PlayOverNumberCell } from "@/components/achordion/parachord-button";
 import { PlaylistCoverMosaic } from "@/components/achordion/playlist-cover-mosaic";
+import { PlaylistEditButton } from "@/components/achordion/playlist-edit-modal";
 import { PlaylistVisibilityToggle } from "@/components/achordion/playlist-visibility-toggle";
 import { IconTooltip } from "@/components/ui/icon-tooltip";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -211,6 +212,17 @@ async function PlaylistBody({ mbid }: { mbid: string }) {
                   {data.isPublic ? "Public" : "Private"}
                 </span>
               </IconTooltip>
+            )}
+            {isOwner && (
+              <PlaylistEditButton
+                mbid={mbid}
+                initial={{
+                  title: data.title,
+                  annotation: data.annotation ?? "",
+                  isPublic: data.isPublic,
+                  collaborators: data.collaborators,
+                }}
+              />
             )}
           </div>
           {data.annotation && stripHtml(data.annotation) && (
