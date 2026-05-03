@@ -1047,9 +1047,99 @@ const RecordingPopularityResponseSchema = z.array(
     .passthrough(),
 );
 
+const ReleaseGroupPopularityResponseSchema = z.array(
+  z
+    .object({
+      release_group_mbid: z.string(),
+      total_listen_count: z.number().optional(),
+      total_user_count: z.number().optional(),
+    })
+    .passthrough(),
+);
+
+const ArtistPopularityResponseSchema = z.array(
+  z
+    .object({
+      artist_mbid: z.string(),
+      total_listen_count: z.number().optional(),
+      total_user_count: z.number().optional(),
+    })
+    .passthrough(),
+);
+
 export interface RecordingPopularity {
   totalListenCount: number;
   totalUserCount: number;
+}
+
+/**
+ * Batch popularity lookup for an array of MBIDs of any of three
+ * entity kinds. LB's `/popularity/{recording,release-group,artist}`
+ * endpoints all accept the same shape — a single POST with an
+ * mbids array — and return rows of total_listen_count /
+ * total_user_count per item. We use this to sort search results by
+ * popularity in one network round-trip per kind instead of N.
+ *
+ * Returns a Map<mbid, total_listen_count>; missing entries imply
+ * "no listens recorded" → effectively rank-zero in the sort. Failed
+ * fetches return an empty Map so callers fall back to MB's natural
+ * search order.
+ */
+async function fetchPopularityBatch(
+  kind: "recording" | "release-group" | "artist",
+  mbids: string[],
+): Promise<Map<string, number>> {
+  if (mbids.length === 0) return new Map();
+  const bodyKey =
+    kind === "recording"
+      ? "recording_mbids"
+      : kind === "release-group"
+        ? "release_group_mbids"
+        : "artist_mbids";
+  const idKey = `${kind === "release-group" ? "release_group" : kind}_mbid`;
+  try {
+    const res = await fetch(`${LB_BASE}/popularity/${kind}`, {
+      method: "POST",
+      headers: {
+        "User-Agent": USER_AGENT,
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ [bodyKey]: mbids }),
+      // Short cache — popularity drifts slowly enough that a 6h
+      // window is fine, and the cache key is per-mbid-list so
+      // common queries get re-served quickly.
+      next: { revalidate: 60 * 60 * 6 },
+    });
+    if (!res.ok) return new Map();
+    const json = await res.json();
+    const schema =
+      kind === "recording"
+        ? RecordingPopularityResponseSchema
+        : kind === "release-group"
+          ? ReleaseGroupPopularityResponseSchema
+          : ArtistPopularityResponseSchema;
+    const parsed = schema.safeParse(json);
+    if (!parsed.success) return new Map();
+    const out = new Map<string, number>();
+    for (const row of parsed.data) {
+      const id = (row as Record<string, unknown>)[idKey] as string;
+      out.set(id, row.total_listen_count ?? 0);
+    }
+    return out;
+  } catch {
+    return new Map();
+  }
+}
+
+export function getRecordingPopularityBatch(mbids: string[]) {
+  return fetchPopularityBatch("recording", mbids);
+}
+export function getReleaseGroupPopularityBatch(mbids: string[]) {
+  return fetchPopularityBatch("release-group", mbids);
+}
+export function getArtistPopularityBatch(mbids: string[]) {
+  return fetchPopularityBatch("artist", mbids);
 }
 
 export async function getRecordingPopularity(

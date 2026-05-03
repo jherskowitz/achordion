@@ -643,6 +643,7 @@ const ReleaseGroupSearchSchema = z.object({
         .array(
           z.object({
             name: z.string(),
+            joinphrase: z.string().optional(),
             artist: z.object({ id: z.string(), name: z.string() }),
           }),
         )
@@ -673,6 +674,7 @@ const RecordingSearchSchema = z.object({
         .array(
           z.object({
             name: z.string(),
+            joinphrase: z.string().optional(),
             artist: z.object({ id: z.string(), name: z.string() }),
           }),
         )
