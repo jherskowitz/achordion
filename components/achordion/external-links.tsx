@@ -1,9 +1,6 @@
 import type { ArtistExternalLink } from "@/lib/clients/musicbrainz";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { IconTooltip } from "@/components/ui/icon-tooltip";
+import { AddSourcesButton } from "./add-sources-button";
 
 /**
  * Curated set of "useful" url-rel types that appear on artist /
@@ -210,7 +207,15 @@ function faviconUrl(url: string): string {
   }
 }
 
-export function ExternalLinks({ links }: { links: ArtistExternalLink[] }) {
+export function ExternalLinks({
+  links,
+  addSources,
+}: {
+  links: ArtistExternalLink[];
+  /** When provided, append a "+" tile linking to the MB
+   *  `edit-relationships` page so users can add more URLs. */
+  addSources?: { mbEntity: "artist" | "release-group" | "recording" | "release"; mbid: string };
+}) {
   // Dedupe by URL and bias preferred service rels to the front.
   const deduped = Array.from(
     new Map(links.map((l) => [l.url, l])).values(),
@@ -224,7 +229,7 @@ export function ExternalLinks({ links }: { links: ArtistExternalLink[] }) {
     })
     .slice(0, 12);
 
-  if (sorted.length === 0) return null;
+  if (sorted.length === 0 && !addSources) return null;
 
   return (
     <ul className="flex flex-wrap gap-2" role="list">
@@ -232,32 +237,38 @@ export function ExternalLinks({ links }: { links: ArtistExternalLink[] }) {
         const label = tooltipLabel(link);
         const src = faviconUrl(link.url);
         return (
+          // CSS-only IconTooltip — pure styling sibling, no Radix
+          // slot chain, no hydration round-trip. See
+          // components/ui/icon-tooltip.tsx for the rationale.
           <li key={link.url}>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <a
-                  href={link.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label={label}
-                  className="border-border/60 hover:border-foreground/40 hover:bg-muted/40 group inline-flex size-9 items-center justify-center rounded-md border transition-colors"
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={src}
-                    alt=""
-                    width={16}
-                    height={16}
-                    loading="lazy"
-                    className="size-4 opacity-80 transition-opacity group-hover:opacity-100"
-                  />
-                </a>
-              </TooltipTrigger>
-              <TooltipContent>{label}</TooltipContent>
-            </Tooltip>
+            <IconTooltip label={label}>
+              <a
+                href={link.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={label}
+                suppressHydrationWarning
+                className="border-border/60 hover:border-foreground/40 hover:bg-muted/40 inline-flex size-9 items-center justify-center rounded-md border transition-colors"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={src}
+                  alt=""
+                  width={16}
+                  height={16}
+                  loading="lazy"
+                  className="size-4 opacity-80 hover:opacity-100"
+                />
+              </a>
+            </IconTooltip>
           </li>
         );
       })}
+      {addSources && (
+        <li>
+          <AddSourcesButton {...addSources} />
+        </li>
+      )}
     </ul>
   );
 }

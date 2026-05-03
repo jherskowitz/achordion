@@ -1,9 +1,6 @@
 import { getOdesliLinks } from "@/lib/clients/odesli";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { IconTooltip } from "@/components/ui/icon-tooltip";
+import { AddSourcesButton } from "./add-sources-button";
 
 /**
  * Server component that takes a streaming URL we have for the entity
@@ -50,21 +47,29 @@ function favicon(host: string): string {
 interface OdesliLinksProps {
   /** Service URL to seed Odesli with — typically the first MB streaming url-rel. */
   seedUrl?: string | null;
+  /** When provided, append a "+" tile linking to the recording's MB
+   *  edit-relationships page so users can wire up additional URLs. */
+  recordingMbid?: string | null;
 }
 
-export async function OdesliLinks({ seedUrl }: OdesliLinksProps) {
-  if (!seedUrl) return null;
-  const data = await getOdesliLinks(seedUrl);
-  if (!data) return null;
+export async function OdesliLinks({
+  seedUrl,
+  recordingMbid,
+}: OdesliLinksProps) {
+  const data = seedUrl ? await getOdesliLinks(seedUrl) : null;
 
   // Build the row of platform icons from Odesli, in preferred order.
   const items: { url: string; label: string; host: string }[] = [];
-  for (const p of PLATFORM_ORDER) {
-    const link = data.linksByPlatform[p.key];
-    if (link?.url) items.push({ url: link.url, label: p.label, host: p.host });
+  if (data) {
+    for (const p of PLATFORM_ORDER) {
+      const link = data.linksByPlatform[p.key];
+      if (link?.url) items.push({ url: link.url, label: p.label, host: p.host });
+    }
   }
 
-  if (items.length === 0) return null;
+  // Render nothing if Odesli has nothing AND we have no MBID for the
+  // "Add sources" affordance — no signal to show.
+  if (items.length === 0 && !recordingMbid) return null;
 
   return (
     <ul className="flex flex-wrap items-center gap-2" role="list">
@@ -76,12 +81,17 @@ export async function OdesliLinks({ seedUrl }: OdesliLinksProps) {
           host={it.host}
         />
       ))}
-      {data.pageUrl && (
+      {data?.pageUrl && (
         <FaviconLink
           url={data.pageUrl}
           label="All services (song.link)"
           host="song.link"
         />
+      )}
+      {recordingMbid && (
+        <li>
+          <AddSourcesButton mbEntity="recording" mbid={recordingMbid} />
+        </li>
       )}
     </ul>
   );
@@ -98,28 +108,26 @@ function FaviconLink({
 }) {
   return (
     <li>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <a
-            href={url}
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label={label}
-            className="border-border/60 hover:border-foreground/40 hover:bg-muted/40 group inline-flex size-9 items-center justify-center rounded-md border transition-colors"
-          >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={favicon(host)}
-              alt=""
-              width={16}
-              height={16}
-              loading="lazy"
-              className="size-4 opacity-80 transition-opacity group-hover:opacity-100"
-            />
-          </a>
-        </TooltipTrigger>
-        <TooltipContent>{label}</TooltipContent>
-      </Tooltip>
+      <IconTooltip label={label}>
+        <a
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label={label}
+          suppressHydrationWarning
+          className="border-border/60 hover:border-foreground/40 hover:bg-muted/40 inline-flex size-9 items-center justify-center rounded-md border transition-colors"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={favicon(host)}
+            alt=""
+            width={16}
+            height={16}
+            loading="lazy"
+            className="size-4 opacity-80 hover:opacity-100"
+          />
+        </a>
+      </IconTooltip>
     </li>
   );
 }

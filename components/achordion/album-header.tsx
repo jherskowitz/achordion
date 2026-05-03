@@ -145,8 +145,14 @@ export function AlbumHeader({
               })}
               label="Play in Parachord"
             />
-            {streamingLinks && streamingLinks.length > 0 && (
-              <ExternalLinks links={streamingLinks} />
+            {/* Always show the row when we have an MBID — empty
+                streaming list still gets the "+" affordance so users
+                can seed Spotify / Apple etc. on MB. */}
+            {rg.id && (
+              <ExternalLinks
+                links={streamingLinks ?? []}
+                addSources={{ mbEntity: "release-group", mbid: rg.id }}
+              />
             )}
           </div>
         )}

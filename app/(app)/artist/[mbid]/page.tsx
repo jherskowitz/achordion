@@ -149,7 +149,13 @@ async function ArtistBody({
           ) : undefined
         }
         afterTitle={
-          streaming.length > 0 ? <ExternalLinks links={streaming} /> : null
+          /* Always render the streaming row so the "+ Add sources"
+             tile is reachable even when MB has zero streaming rels
+             on file for this artist. */
+          <ExternalLinks
+            links={streaming}
+            addSources={{ mbEntity: "artist", mbid: artist.id }}
+          />
         }
       />
       {tags.length > 0 && (

@@ -229,7 +229,10 @@ async function RecordingBody({ mbid }: { mbid: string }) {
                 label={`Play in Parachord`}
               />
               <Suspense fallback={null}>
-                <OdesliLinks seedUrl={odesliSeed} />
+                <OdesliLinks
+                  seedUrl={odesliSeed}
+                  recordingMbid={recording.id}
+                />
               </Suspense>
             </div>
           </section>
