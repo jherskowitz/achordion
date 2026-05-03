@@ -3,10 +3,10 @@
  *
  * Each country code maps to a different national feed:
  *   - `ca` → !earshot (https://www.earshot-online.com) — Canada's NCRA
+ *   - `us` → NACC 200 (https://naccchart.com/charts/) — US college chart
  *
- * Only Canada is wired today. NACC (US, ex-CMJ) and others are coming
- * soon — when added, drop them in here and the country picker on the
- * charts page picks them up automatically.
+ * NACC publishes a paid Top 200; we surface only the publicly-visible
+ * Top 30 with attribution + a link back to naccchart.com.
  */
 
 export interface CollegeChartsCountry {
@@ -24,6 +24,12 @@ export const COLLEGE_CHARTS_COUNTRIES: CollegeChartsCountry[] = [
     name: "Canada",
     flag: "🇨🇦",
     source: "!earshot weekly Top 50",
+  },
+  {
+    code: "us",
+    name: "United States",
+    flag: "🇺🇸",
+    source: "NACC weekly Top 30 (public chart)",
   },
 ];
 

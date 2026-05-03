@@ -8,6 +8,7 @@ import {
   getCollegeChartsCountry,
 } from "@/lib/college-charts-countries";
 import { getEarshotTop50 } from "@/lib/clients/earshot";
+import { getNaccTop30 } from "@/lib/clients/nacc";
 import { CollegeChartsAlbumsGrid } from "@/components/achordion/college-charts-list";
 
 export const metadata = { title: "College radio charts" };
@@ -28,7 +29,6 @@ function chartsHref(next: { country?: string }) {
 }
 
 async function ChartsBody({ country }: { country: string }) {
-  // Only Canada is wired today; future country codes branch here.
   if (country === "ca") {
     const items = await getEarshotTop50();
     if (items === null) {
@@ -39,6 +39,35 @@ async function ChartsBody({ country }: { country: string }) {
       );
     }
     return <CollegeChartsAlbumsGrid items={items} />;
+  }
+  if (country === "us") {
+    const chart = await getNaccTop30();
+    if (chart === null || chart.items.length === 0) {
+      return (
+        <p className="text-muted-foreground text-sm">
+          NACC didn&apos;t return a chart. Try again in a minute.
+        </p>
+      );
+    }
+    return (
+      <>
+        {chart.weekEnding && (
+          <p className="text-muted-foreground/70 mb-4 text-xs tracking-wide uppercase">
+            {chart.weekEnding}
+            {" · "}
+            <Link
+              href="https://naccchart.com/charts/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-foreground underline-offset-4 hover:underline"
+            >
+              full Top 200 at NACC →
+            </Link>
+          </p>
+        )}
+        <CollegeChartsAlbumsGrid items={chart.items} />
+      </>
+    );
   }
   return (
     <p className="text-muted-foreground text-sm">
