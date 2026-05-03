@@ -3,13 +3,46 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 /**
  * DiceBear style — `shapes` gives abstract geometric avatars that look
  * deliberate rather than auto-generated. Stable per seed, so the same
- * username always renders the same shapes/colours across renders. Easy
- * to swap to a different style if the visual mix changes.
+ * username always renders the same shapes/colours across renders.
+ *
+ * Palette is locked to Parachord's brand colours so avatars sit in the
+ * same family as the rest of the design system:
+ *  - Backgrounds cycle through a primary purple, a lighter purple, the
+ *    accent surface, plus dark neutrals so dark-mode users get
+ *    near-black backgrounds and light-mode users get the lavenders.
+ *  - Shape fills cycle through deep purple, white, and mid neutrals so
+ *    every combination has enough contrast against its background.
+ *
+ * DiceBear picks one entry from each comma-separated list deterministi-
+ * cally by seed, so the look is varied but always Parachord-coloured.
  */
 const DICEBEAR_BASE = "https://api.dicebear.com/9.x/shapes/svg";
 
+const BG_COLORS = [
+  "7c3aed", // Parachord primary purple
+  "a78bfa", // dark-mode primary
+  "ede9fe", // accent surface
+  "c4b5fd", // mid lavender
+  "1e1e1e", // dark bg
+  "f3f4f6", // light inset
+].join(",");
+
+const SHAPE_COLORS = [
+  "6d28d9", // primary hover (deep purple)
+  "ffffff",
+  "111827", // text-primary
+  "9ca3af", // text-tertiary
+].join(",");
+
 function generatedAvatarUrl(username: string): string {
-  return `${DICEBEAR_BASE}?seed=${encodeURIComponent(username.toLowerCase())}`;
+  const params = new URLSearchParams({
+    seed: username.toLowerCase(),
+    backgroundColor: BG_COLORS,
+    shape1Color: SHAPE_COLORS,
+    shape2Color: SHAPE_COLORS,
+    shape3Color: SHAPE_COLORS,
+  });
+  return `${DICEBEAR_BASE}?${params}`;
 }
 
 interface UserAvatarProps {
