@@ -4,7 +4,6 @@ import { Check, ExternalLink, Sparkles } from "lucide-react";
 import { auth } from "@/auth";
 import { hasUserLbToken } from "@/lib/lb-token";
 import { LbTokenForm } from "@/components/achordion/lb-token-form";
-import { LbClientMarketplace } from "@/components/achordion/lb-client-marketplace";
 import { MusicServicesCard } from "@/components/achordion/music-services-card";
 import { PageShell } from "@/components/achordion/page-shell";
 import { clearLbTokenAction } from "../settings/actions";
@@ -185,9 +184,19 @@ function Step2Services() {
         <div className="mt-5">
           <MusicServicesCard />
         </div>
+        <p className="text-muted-foreground/70 mt-4 text-xs leading-5">
+          Using a different scrobbler? Plenty of third-party LB clients
+          exist (Pano Scrobbler, Web Scrobbler, Multi-Scrobbler, etc.) —
+          you&apos;ll find the full list in{" "}
+          <Link
+            href="/settings/connections"
+            className="text-foreground underline-offset-4 hover:underline"
+          >
+            Settings → Connections
+          </Link>{" "}
+          after onboarding.
+        </p>
       </div>
-
-      <LbClientMarketplace />
 
       <div className="flex items-center justify-between">
         <Link
