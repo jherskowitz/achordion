@@ -36,6 +36,11 @@ interface PlaylistCoverMosaicProps {
  * back to a single cover or the disc-icon placeholder when there are
  * fewer than 4 distinct cover sources.
  */
+// When the caller controls dimensions via Tailwind (w-/h-/size-/aspect-),
+// drop the fixed-pixel style so the mosaic fills its container — same
+// pattern CoverArt uses.
+const SIZED_BY_CLASS = /\b(w-|h-|size-|aspect-)/;
+
 export function PlaylistCoverMosaic({
   tracks,
   size = 64,
@@ -43,7 +48,8 @@ export function PlaylistCoverMosaic({
   alt = "Playlist cover",
 }: PlaylistCoverMosaicProps) {
   const covers = uniqueCovers(tracks, 4);
-  const sizeStyle = { width: size, height: size };
+  const sizedByClass = !!className && SIZED_BY_CLASS.test(className);
+  const sizeStyle = sizedByClass ? undefined : { width: size, height: size };
 
   if (covers.length === 0) {
     return (

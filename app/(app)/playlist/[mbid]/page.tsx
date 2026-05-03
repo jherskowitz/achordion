@@ -90,11 +90,11 @@ async function PlaylistBody({ mbid }: { mbid: string }) {
 
   return (
     <>
-      <header className="mt-8 mb-10 grid gap-6 sm:grid-cols-[200px_1fr] sm:gap-8">
+      <header className="mt-8 mb-10 grid gap-6 sm:grid-cols-[240px_1fr] sm:gap-8">
         <PlaylistCoverMosaic
           tracks={data.tracks}
           alt={data.title}
-          className="aspect-square w-full max-w-[280px] sm:max-w-none"
+          className="aspect-square w-full max-w-[320px] sm:max-w-none"
         />
         <div className="flex min-w-0 flex-col justify-end">
           <p className="text-muted-foreground text-xs tracking-wide uppercase">
