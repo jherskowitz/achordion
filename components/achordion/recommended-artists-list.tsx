@@ -19,17 +19,24 @@ interface ArtistAggregate {
  * LB doesn't ship a per-artist recommendation endpoint, but artists with
  * the most recommended-tracks (and the highest top score) are a
  * reasonable proxy. We sort by count desc, score desc as tiebreaker.
+ *
+ * `excludeMbids` is a set of artist MBIDs the caller wants kept out
+ * of the result — typically the user's top all-time artists, so the
+ * "recommended" rail surfaces artists they haven't already listened
+ * to a lot.
  */
 function aggregateArtists(
   recordings: RecommendedRecordingMbid[],
   metadata: Map<string, RecordingMetadata>,
   limit: number,
+  excludeMbids: Set<string>,
 ): ArtistAggregate[] {
   const byMbid = new Map<string, ArtistAggregate>();
   for (const r of recordings) {
     const meta = metadata.get(r.recording_mbid);
     const a = meta?.artist?.artists?.[0];
     if (!a?.artist_mbid || !a.name) continue;
+    if (excludeMbids.has(a.artist_mbid)) continue;
     const existing = byMbid.get(a.artist_mbid);
     if (existing) {
       existing.count += 1;
@@ -52,12 +59,21 @@ export function RecommendedArtistsList({
   recordings,
   metadata,
   limit = 12,
+  excludeMbids,
 }: {
   recordings: RecommendedRecordingMbid[];
   metadata: Map<string, RecordingMetadata>;
   limit?: number;
+  /** Artist MBIDs to keep out of the result (typically top all-time
+   *  artists — "recommended" should mean new, not familiar). */
+  excludeMbids?: Set<string>;
 }) {
-  const artists = aggregateArtists(recordings, metadata, limit);
+  const artists = aggregateArtists(
+    recordings,
+    metadata,
+    limit,
+    excludeMbids ?? new Set(),
+  );
   if (artists.length === 0) {
     return (
       <p className="text-muted-foreground py-8 text-center text-sm">

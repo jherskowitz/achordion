@@ -5,20 +5,43 @@ import {
   getRecommendedRecordings,
   getRecordingMetadata,
 } from "@/lib/clients/listenbrainz";
-import { PageShell } from "@/components/achordion/page-shell";
+import { buildExcludedRecordingSet } from "@/lib/exclude-listened";
+import { thresholdFromFamiliarity } from "@/lib/familiarity";
+import type { ParachordTrack } from "@/lib/parachord";
+import { Breadcrumbs } from "@/components/achordion/breadcrumbs";
 import { ExploreTrackList } from "@/components/achordion/explore-track-list";
+import { FamiliaritySlider } from "@/components/achordion/familiarity-slider";
+import { OpenInParachordButton } from "@/components/achordion/open-in-parachord-button";
+import { PageShell } from "@/components/achordion/page-shell";
 import { ComingSoon } from "@/components/achordion/coming-soon";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 
 export const metadata = { title: "Recommended tracks" };
 
-async function Body({ username }: { username: string }) {
-  const recordings = await getRecommendedRecordings(
-    username,
-    50,
-    "raw",
-  ).catch(() => []);
+interface PageProps {
+  searchParams: Promise<{ familiarity?: string }>;
+}
+
+function parseFamiliarity(raw: string | undefined): number {
+  if (!raw) return 50;
+  const n = parseInt(raw, 10);
+  if (!Number.isFinite(n)) return 50;
+  return Math.max(0, Math.min(100, n));
+}
+
+async function Body({
+  username,
+  familiarity,
+}: {
+  username: string;
+  familiarity: number;
+}) {
+  const threshold = thresholdFromFamiliarity(familiarity);
+  const [recordings, exclude] = await Promise.all([
+    getRecommendedRecordings(username, 200, "raw").catch(() => []),
+    buildExcludedRecordingSet(username, threshold),
+  ]);
   if (recordings.length === 0) {
     return (
       <ComingSoon
@@ -30,7 +53,50 @@ async function Body({ username }: { username: string }) {
   const metadata = await getRecordingMetadata(
     recordings.map((r) => r.recording_mbid),
   );
-  return <ExploreTrackList recordings={recordings} metadata={metadata} />;
+  // Hide anything LB knows the user has heard, at any non-zero
+  // slider value. `latest_listened_at` is the only reliable signal
+  // for "I've heard this exact recommendation" — the rec and the
+  // user's listen history can use different MBIDs for the same
+  // conceptual track, so MBID-based filters miss those. The
+  // listen-count `exclude` set is kept as belt-and-braces for the
+  // graduated-strictness UX.
+  const filtered = recordings.filter((r) => {
+    if (familiarity === 0) return true;
+    if (r.latest_listened_at !== null) return false;
+    if (exclude.has(r.recording_mbid)) return false;
+    return true;
+  });
+  const top = filtered.slice(0, 50);
+  const parachordTracks: ParachordTrack[] = top
+    .map((r) => {
+      const m = metadata.get(r.recording_mbid);
+      const title = m?.recording?.name;
+      const artist = m?.artist?.name;
+      if (!title || !artist) return null;
+      const length = m?.recording?.length;
+      return {
+        title,
+        artist,
+        ...(m?.release?.name ? { album: m.release.name } : {}),
+        ...(length ? { duration: Math.round(length / 1000) } : {}),
+      } as ParachordTrack;
+    })
+    .filter((t): t is ParachordTrack => t !== null);
+
+  return (
+    <>
+      {parachordTracks.length > 0 && (
+        <div className="mb-3 flex justify-end">
+          <OpenInParachordButton
+            kind="playlist"
+            tracks={parachordTracks}
+            label="Play all"
+          />
+        </div>
+      )}
+      <ExploreTrackList recordings={top} metadata={metadata} />
+    </>
+  );
 }
 
 function Fallback() {
@@ -50,9 +116,14 @@ function Fallback() {
   );
 }
 
-export default async function RecommendedTracksPage() {
+export default async function RecommendedTracksPage({
+  searchParams,
+}: PageProps) {
+  const sp = await searchParams;
+  const familiarity = parseFamiliarity(sp.familiarity);
   const session = await auth();
   const username = session?.user?.mbUsername ?? null;
+
   if (!username) {
     return (
       <PageShell className="pt-8">
@@ -70,8 +141,26 @@ export default async function RecommendedTracksPage() {
   }
   return (
     <PageShell className="pt-8">
-      <Suspense fallback={<Fallback />}>
-        <Body username={username} />
+      <Breadcrumbs
+        items={[
+          { label: "Explore", href: "/explore" },
+          { label: "Recommended tracks" },
+        ]}
+      />
+      <h1 className="mt-2 mb-6 text-2xl font-semibold tracking-tight">
+        Recommended tracks
+      </h1>
+      <FamiliaritySlider
+        initial={familiarity}
+        param="familiarity"
+        label="Recommendation settings"
+        kind="track"
+      />
+      <Suspense
+        key={`${thresholdFromFamiliarity(familiarity) ?? "off"}`}
+        fallback={<Fallback />}
+      >
+        <Body username={username} familiarity={familiarity} />
       </Suspense>
     </PageShell>
   );

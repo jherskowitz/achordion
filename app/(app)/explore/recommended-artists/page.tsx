@@ -5,6 +5,10 @@ import {
   getRecommendedRecordings,
   getRecordingMetadata,
 } from "@/lib/clients/listenbrainz";
+import { buildExcludedArtistSet } from "@/lib/exclude-listened";
+import { thresholdFromFamiliarity } from "@/lib/familiarity";
+import { Breadcrumbs } from "@/components/achordion/breadcrumbs";
+import { FamiliaritySlider } from "@/components/achordion/familiarity-slider";
 import { PageShell } from "@/components/achordion/page-shell";
 import { RecommendedArtistsList } from "@/components/achordion/recommended-artists-list";
 import { ComingSoon } from "@/components/achordion/coming-soon";
@@ -13,12 +17,29 @@ import { Button } from "@/components/ui/button";
 
 export const metadata = { title: "Recommended artists" };
 
-async function Body({ username }: { username: string }) {
-  const recordings = await getRecommendedRecordings(
-    username,
-    100,
-    "raw",
-  ).catch(() => []);
+interface PageProps {
+  searchParams: Promise<{ familiarity?: string }>;
+}
+
+function parseFamiliarity(raw: string | undefined): number {
+  if (!raw) return 50;
+  const n = parseInt(raw, 10);
+  if (!Number.isFinite(n)) return 50;
+  return Math.max(0, Math.min(100, n));
+}
+
+async function Body({
+  username,
+  familiarity,
+}: {
+  username: string;
+  familiarity: number;
+}) {
+  const threshold = thresholdFromFamiliarity(familiarity);
+  const [recordings, exclude] = await Promise.all([
+    getRecommendedRecordings(username, 200, "raw").catch(() => []),
+    buildExcludedArtistSet(username, threshold),
+  ]);
   if (recordings.length === 0) {
     return (
       <ComingSoon
@@ -35,6 +56,7 @@ async function Body({ username }: { username: string }) {
       recordings={recordings}
       metadata={metadata}
       limit={48}
+      excludeMbids={exclude}
     />
   );
 }
@@ -55,9 +77,14 @@ function Fallback() {
   );
 }
 
-export default async function RecommendedArtistsPage() {
+export default async function RecommendedArtistsPage({
+  searchParams,
+}: PageProps) {
+  const sp = await searchParams;
+  const familiarity = parseFamiliarity(sp.familiarity);
   const session = await auth();
   const username = session?.user?.mbUsername ?? null;
+
   if (!username) {
     return (
       <PageShell className="pt-8">
@@ -75,8 +102,28 @@ export default async function RecommendedArtistsPage() {
   }
   return (
     <PageShell className="pt-8">
-      <Suspense fallback={<Fallback />}>
-        <Body username={username} />
+      <Breadcrumbs
+        items={[
+          { label: "Explore", href: "/explore" },
+          { label: "Recommended artists" },
+        ]}
+      />
+      <h1 className="mt-2 mb-6 text-2xl font-semibold tracking-tight">
+        Recommended artists
+      </h1>
+      <FamiliaritySlider
+        initial={familiarity}
+        param="familiarity"
+        label="Recommendation settings"
+      />
+      {/* Suspense keyed on the resolved threshold (not the raw slider
+          value) so within-bucket nudges don't trigger pointless
+          skeleton flashes. */}
+      <Suspense
+        key={`${thresholdFromFamiliarity(familiarity) ?? "off"}`}
+        fallback={<Fallback />}
+      >
+        <Body username={username} familiarity={familiarity} />
       </Suspense>
     </PageShell>
   );
