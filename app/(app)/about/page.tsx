@@ -1,8 +1,45 @@
+import Link from "next/link";
+import { ExternalLink, Heart } from "lucide-react";
 import { PageShell } from "@/components/achordion/page-shell";
 import { PageHeader } from "@/components/achordion/page-header";
-import { ComingSoon } from "@/components/achordion/coming-soon";
 
 export const metadata = { title: "About" };
+
+function Section({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="space-y-3">
+      <h2 className="text-sm font-semibold tracking-wide uppercase">{title}</h2>
+      <div className="text-foreground/90 space-y-4 text-base leading-7">
+        {children}
+      </div>
+    </section>
+  );
+}
+
+// Light-blue editorial link styling shared by every inline link on
+// the footer-linked content pages (about / donate). Sky-500 reads
+// well on a white background; sky-400 is the dark-mode counterpart.
+const LINK_CLASS =
+  "text-sky-600 hover:text-sky-700 dark:text-sky-400 dark:hover:text-sky-300 hover:underline underline-offset-4";
+
+function Out({ href, children }: { href: string; children: React.ReactNode }) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={LINK_CLASS}
+    >
+      {children}
+    </a>
+  );
+}
 
 export default function AboutPage() {
   return (
@@ -10,12 +47,180 @@ export default function AboutPage() {
       <PageHeader
         eyebrow="About"
         title="What Achordion is"
-        description="An open-source alternative front-end for ListenBrainz. Sister project to Parachord."
+        description="The independent music community and data layer. An open-source front-end for ListenBrainz, designed to feel like one product with Parachord, the universal music player."
       />
-      <ComingSoon
-        title="About page"
-        description="Project history, contributors, and a thank-you to the MetaBrainz Foundation."
-      />
+
+      {/* Same `max-w-2xl` as the PageHeader's description, left-
+          aligned at the page edge — keeps the subhead and the
+          section bodies on the same left rail. */}
+      <div className="max-w-2xl space-y-12 pb-12">
+        <Section title="The two-project tldr">
+          <p>
+            <strong>
+              Achordion is the independent music community and data layer.
+            </strong>{" "}
+            <Out href="https://github.com/Parachord/parachord">Parachord</Out>{" "}
+            <strong>is the player.</strong>{" "}
+            Together they&apos;re the open-source counterpoint to Spotify
+            / Apple Music — where the community, the data, and the
+            playback are tangled inside a walled garden. Here those three
+            layers are separate, open, and yours.
+          </p>
+          <p>
+            Achordion mirrors every functional page that listenbrainz.org
+            offers — listens, stats, charts, fresh releases, the user feed,
+            Year in Music, LB Radio, Critical Darlings — with a fresh
+            visual language and cleaner information architecture. Parachord
+            plays whatever you click. They&apos;re built to feel like one
+            product across desktop, mobile, and web.
+          </p>
+        </Section>
+
+        <Section title="Why this exists">
+          <p>
+            ListenBrainz is the open-source, MetaBrainz-run alternative to
+            last.fm — and it&apos;s great. But its UI hasn&apos;t had the
+            love its data deserves. Achordion is an attempt to give that
+            data a home that&apos;s easy to spend time in: cleaner reading,
+            denser browsing, every artist / album / track one click away,
+            and zero friction between &quot;I see something I like&quot; and
+            &quot;I&apos;m playing it.&quot;
+          </p>
+          <p>
+            That last part is where Parachord comes in. Every playable thing
+            on Achordion — every track row, every album cover, every chart
+            entry, every Critical Darling, every &quot;now playing&quot; pin
+            in a friend&apos;s feed — has a <code>parachord://</code> deep
+            link that hands the tracklist to Parachord without disrupting
+            your library. Parachord wakes if it isn&apos;t running, plays
+            the track, and routes through whichever streaming service or
+            local source the listener is set up with.
+          </p>
+        </Section>
+
+        <Section title="Your data stays yours">
+          <p>
+            <strong>Achordion is stateless.</strong>{" "}
+            It doesn&apos;t see, store, or own your listening data in any
+            way. There&apos;s no Achordion database, no Achordion analytics,
+            no Achordion-side profile of you. When you sign in, Achordion
+            authenticates you against MusicBrainz and then queries your
+            data live from ListenBrainz on each page view — the same way
+            opening listenbrainz.org would.
+          </p>
+          <p>
+            Your listens, loves, pins, follows, playlists, and stats all
+            live in your ListenBrainz account, run by the MetaBrainz
+            Foundation. Your identity lives at MusicBrainz. If Achordion
+            disappeared tomorrow, none of your data would go with it —
+            you&apos;d just point a different ListenBrainz client at the
+            same account and pick up where you left off.
+          </p>
+        </Section>
+
+        <Section title="Multi-source playback through one click">
+          <p>
+            Parachord aggregates playback across{" "}
+            <strong>
+              Spotify, Apple Music, SoundCloud, YouTube Music, Bandcamp,
+              Tidal, and your local files
+            </strong>{" "}
+            behind a single resolver. Click &quot;Play in Parachord&quot;
+            from Achordion and Parachord:
+          </p>
+          <ol className="ml-6 list-decimal space-y-1.5">
+            <li>Resolves the track against every authorized source.</li>
+            <li>
+              Picks the best match using a priority + confidence scoring
+              system — your preferred services first, with a confidence
+              floor that filters out wrong-song matches.
+            </li>
+            <li>
+              Plays through that source: Spotify Connect, MusicKit JS,
+              ExoPlayer for local / SoundCloud, etc.
+            </li>
+          </ol>
+          <p>
+            You control the priority order; Achordion just hands over the
+            tracklist.
+          </p>
+        </Section>
+
+        <Section title="Cross-platform scrobbling">
+          <p>
+            Parachord scrobbles every play to{" "}
+            <strong>ListenBrainz, Last.fm, and Libre.fm</strong>{" "}
+            simultaneously, with full MBID enrichment so listens carry the
+            canonical MusicBrainz identifiers (recording, release, artist) —
+            not just freeform strings. ISRCs and durations come along too.
+            Your Achordion view updates in near-real-time as Parachord
+            scrobbles whatever you play.
+          </p>
+          <p>
+            If you scrobble from somewhere else — Spotify direct, Pano
+            Scrobbler on Android, NepTunes on a Mac, the Web Scrobbler
+            browser extension — Achordion still reflects the activity through
+            ListenBrainz.
+          </p>
+        </Section>
+
+        <Section title="Built on">
+          <p>
+            <Out href="https://musicbrainz.org">MusicBrainz</Out>{" "}
+            for canonical music metadata and identity (sign in is the same
+            MB account ListenBrainz uses).{" "}
+            <Out href="https://listenbrainz.org">ListenBrainz</Out>{" "}
+            for listen history, stats, and recommendations.{" "}
+            <Out href="https://coverartarchive.org">Cover Art Archive</Out>{" "}
+            for, well, cover art. Wikidata + Wikimedia Commons for artist
+            photos. And occasional editorial feeds — Apple Music charts,
+            !earshot college-radio charts, Critical Darlings — to round out
+            the discovery surface.
+          </p>
+          <p>
+            None of that infrastructure is mine. The MetaBrainz Foundation
+            runs MusicBrainz and ListenBrainz on donations and a small
+            team. If you get value from Achordion, please{" "}
+            <Link
+              href="/donate"
+              className={`${LINK_CLASS} inline-flex items-center gap-1`}
+            >
+              <Heart className="size-3.5" />
+              support them
+            </Link>.
+          </p>
+        </Section>
+
+        <Section title="Who's behind it">
+          <p>
+            Achordion and Parachord are both made by{" "}
+            <Out href="https://github.com/jherskowitz">J Herskowitz</Out>.
+            Both projects are open source and gladly accept issues / PRs:
+          </p>
+          <ul className="ml-6 list-disc space-y-1.5">
+            <li>
+              <Out href="https://github.com/jherskowitz/achordion">
+                github.com/jherskowitz/achordion
+                <ExternalLink className="ml-1 inline size-3 align-text-top" />
+              </Out>
+            </li>
+            <li>
+              <Out href="https://github.com/Parachord/parachord">
+                github.com/Parachord/parachord
+                <ExternalLink className="ml-1 inline size-3 align-text-top" />
+              </Out>
+            </li>
+            <li>
+              <Out href="https://github.com/jherskowitz/spinbin">
+                github.com/jherskowitz/spinbin
+                <ExternalLink className="ml-1 inline size-3 align-text-top" />
+              </Out>{" "}
+              — public-radio playlist scraper that powers the Radio Rewinds
+              tab.
+            </li>
+          </ul>
+        </Section>
+      </div>
     </PageShell>
   );
 }

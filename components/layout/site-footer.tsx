@@ -43,9 +43,16 @@ export function SiteFooter() {
           <Link href="/donate" className="hover:text-foreground">
             Donate
           </Link>
-          <Link href="/changelog" className="hover:text-foreground">
-            Changelog
-          </Link>
+          {/* External — explicit anchor so prefetch / Link doesn't try
+              to hit the GitHub host as a Next route. */}
+          <a
+            href="https://github.com/jherskowitz/achordion"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:text-foreground"
+          >
+            Source Code
+          </a>
         </nav>
       </div>
     </footer>
