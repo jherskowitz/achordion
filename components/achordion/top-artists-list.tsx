@@ -1,4 +1,7 @@
+import { Suspense } from "react";
 import Link from "next/link";
+import { ArtistAvatar } from "./artist-avatar";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface ArtistEntry {
   artist_name: string;
@@ -27,6 +30,21 @@ export function TopArtistsList({ artists }: { artists: ArtistEntry[] }) {
             <span className="text-muted-foreground w-5 shrink-0 text-xs tabular-nums">
               {i + 1}
             </span>
+            {a.artist_mbid ? (
+              <Suspense
+                fallback={<Skeleton className="size-9 shrink-0 rounded-full" />}
+              >
+                <ArtistAvatar
+                  mbid={a.artist_mbid}
+                  name={a.artist_name}
+                  className="size-9 shrink-0"
+                  fallbackClassName="text-xs"
+                  width={128}
+                />
+              </Suspense>
+            ) : (
+              <div className="bg-muted size-9 shrink-0 rounded-full" />
+            )}
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-medium">
                 {a.artist_mbid ? (

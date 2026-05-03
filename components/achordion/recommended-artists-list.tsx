@@ -1,8 +1,11 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import type {
   RecommendedRecordingMbid,
   RecordingMetadata,
 } from "@/lib/clients/listenbrainz";
+import { ArtistAvatar } from "./artist-avatar";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface ArtistAggregate {
   mbid: string;
@@ -68,12 +71,25 @@ export function RecommendedArtistsList({
         <li key={a.mbid}>
           <Link
             href={`/artist/${a.mbid}`}
-            className="border-border/60 hover:border-foreground/30 hover:bg-muted/30 group block min-w-0 rounded-xl border p-4 transition-colors"
+            className="border-border/60 hover:border-foreground/30 hover:bg-muted/30 group flex min-w-0 items-center gap-3 rounded-xl border p-4 transition-colors"
           >
-            <p className="truncate text-sm font-medium">{a.name}</p>
-            <p className="text-muted-foreground/80 mt-1 text-xs">
-              {a.count} recommended track{a.count === 1 ? "" : "s"}
-            </p>
+            <Suspense
+              fallback={<Skeleton className="size-12 shrink-0 rounded-full" />}
+            >
+              <ArtistAvatar
+                mbid={a.mbid}
+                name={a.name}
+                className="size-12 shrink-0"
+                fallbackClassName="text-sm"
+                width={128}
+              />
+            </Suspense>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-medium">{a.name}</p>
+              <p className="text-muted-foreground/80 mt-0.5 text-xs">
+                {a.count} recommended track{a.count === 1 ? "" : "s"}
+              </p>
+            </div>
           </Link>
         </li>
       ))}
