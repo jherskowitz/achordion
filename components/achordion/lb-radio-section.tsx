@@ -97,7 +97,7 @@ export function LbRadioSection({
   );
 
   return (
-    <div className="border-border/60 overflow-hidden rounded-2xl border">
+    <div className="border-border/60 rounded-2xl border">
       <div className="flex flex-wrap items-center gap-3 p-5">
         <div className="flex flex-1 items-center gap-3">
           <IconTooltip
@@ -138,7 +138,7 @@ export function LbRadioSection({
       {expanded && (
         <div
           id="lb-radio-tracks"
-          className="border-border/60 max-h-[440px] overflow-y-auto border-t px-5"
+          className="border-border/60 max-h-[440px] overflow-y-auto rounded-b-2xl border-t px-5"
         >
           <ol className="divide-border/60 divide-y">
             {tracks.map((t, i) => {

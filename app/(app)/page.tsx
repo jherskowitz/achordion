@@ -17,7 +17,7 @@ const FEATURES = [
   },
   {
     icon: ShieldCheck,
-    title: "Your data, not ours",
+    title: "Your listening data, not ours",
     body: "Achordion is stateless — there is no Achordion database, no analytics, no profile of you. Your listens, follows, and playlists live in your ListenBrainz account. Leave whenever, take everything with you.",
   },
 ];
