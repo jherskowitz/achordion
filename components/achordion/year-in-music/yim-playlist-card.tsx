@@ -4,15 +4,11 @@ import {
   playlistMbidFromIdentifier,
   type YimPlaylist,
 } from "@/lib/clients/listenbrainz";
+import { stripHtml } from "@/lib/strip-html";
 
 function asString(v: string | string[] | undefined): string | undefined {
   if (!v) return undefined;
   return Array.isArray(v) ? v[0] : v;
-}
-
-function stripHtml(html: string | null | undefined): string {
-  if (!html) return "";
-  return html.replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim();
 }
 
 export function YimPlaylistCard({

@@ -6,6 +6,7 @@ import { Download, ExternalLink, Users } from "lucide-react";
 import { getPlaylist } from "@/lib/clients/listenbrainz";
 import { caaReleaseUrl } from "@/lib/clients/coverart";
 import { parachordPlayTrack, type ParachordTrack } from "@/lib/parachord";
+import { stripHtml } from "@/lib/strip-html";
 import { PageShell } from "@/components/achordion/page-shell";
 import { CoverArt } from "@/components/achordion/cover-art";
 import { OpenInParachordButton } from "@/components/achordion/open-in-parachord-button";
@@ -152,9 +153,9 @@ async function PlaylistBody({ mbid }: { mbid: string }) {
               )}
             </p>
           )}
-          {data.annotation && (
+          {data.annotation && stripHtml(data.annotation) && (
             <p className="text-muted-foreground/80 mt-3 max-w-prose text-sm leading-6">
-              {data.annotation}
+              {stripHtml(data.annotation)}
             </p>
           )}
           <div className="mt-5 flex flex-wrap items-center gap-3">

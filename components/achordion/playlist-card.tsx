@@ -5,6 +5,7 @@ import {
   type LbPlaylistSummary,
   type LbRadioTrack,
 } from "@/lib/clients/listenbrainz";
+import { stripHtml } from "@/lib/strip-html";
 import { PlaylistCoverMosaic } from "./playlist-cover-mosaic";
 
 const JSPF_PLAYLIST_KEY = "https://musicbrainz.org/doc/jspf#playlist";
@@ -91,9 +92,9 @@ export function PlaylistCard({
           )}
         </p>
       )}
-      {p.annotation && (
+      {p.annotation && stripHtml(p.annotation) && (
         <p className="text-muted-foreground/80 mt-2 line-clamp-2 text-xs leading-5">
-          {p.annotation}
+          {stripHtml(p.annotation)}
         </p>
       )}
     </div>
