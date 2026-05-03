@@ -27,9 +27,11 @@ import {
 import { FilterPills } from "@/components/achordion/filter-pills";
 import type { ArtistExternalLink } from "@/lib/clients/musicbrainz";
 import { LbRadioSection } from "@/components/achordion/lb-radio-section";
+import { OpenInParachordButton } from "@/components/achordion/open-in-parachord-button";
 import { SimilarArtists } from "@/components/achordion/similar-artists";
 import { TopTracksList } from "@/components/achordion/top-tracks-list";
 import { Skeleton } from "@/components/ui/skeleton";
+import type { ParachordTrack } from "@/lib/parachord";
 
 const DISCOGRAPHY_TYPE_OPTIONS = [
   { value: "studio" as const, label: "Albums + EPs" },
@@ -340,20 +342,45 @@ function filterBucketsByType(
 
 async function TopTracksSection({ mbid }: { mbid: string }) {
   const items = await getTopRecordingsForArtist(mbid);
+  const top = items.slice(0, 10);
+  // Build a ParachordTrack array straight from LB's top-recordings
+  // payload — title, artist, optional album. Hands the whole popular
+  // 10 off to Parachord on a single click.
+  const parachordTracks: ParachordTrack[] = top
+    .map((r) => {
+      if (!r.recording_name || !r.artist_name) return null;
+      return {
+        title: r.recording_name,
+        artist: r.artist_name,
+        ...(r.release_name ? { album: r.release_name } : {}),
+      } as ParachordTrack;
+    })
+    .filter((t): t is ParachordTrack => t !== null);
   return (
-    <TopTracksList
-      tracks={items.slice(0, 10).map((r) => ({
-        track_name: r.recording_name,
-        recording_mbid: r.recording_mbid,
-        artist_name: r.artist_name,
-        artist_mbids: r.artist_mbids,
-        release_name: r.release_name,
-        release_mbid: r.release_mbid,
-        listen_count: r.total_listen_count ?? 0,
-        caa_id: r.caa_id,
-        caa_release_mbid: r.caa_release_mbid,
-      }))}
-    />
+    <>
+      {parachordTracks.length > 0 && (
+        <div className="mb-3 flex justify-end">
+          <OpenInParachordButton
+            kind="playlist"
+            tracks={parachordTracks}
+            label="Play all"
+          />
+        </div>
+      )}
+      <TopTracksList
+        tracks={top.map((r) => ({
+          track_name: r.recording_name,
+          recording_mbid: r.recording_mbid,
+          artist_name: r.artist_name,
+          artist_mbids: r.artist_mbids,
+          release_name: r.release_name,
+          release_mbid: r.release_mbid,
+          listen_count: r.total_listen_count ?? 0,
+          caa_id: r.caa_id,
+          caa_release_mbid: r.caa_release_mbid,
+        }))}
+      />
+    </>
   );
 }
 
