@@ -147,26 +147,22 @@ async function ArtistBody({
           ) : undefined
         }
         afterTitle={
-          (streaming.length > 0 || tags.length > 0) && (
-            <div className="space-y-3 pt-1">
-              {streaming.length > 0 && <ExternalLinks links={streaming} />}
-              {tags.length > 0 && (
-                <div className="flex flex-wrap gap-1.5">
-                  {tags.map((t) => (
-                    <Link
-                      key={t.name}
-                      href={`/tag/${encodeURIComponent(t.name)}`}
-                      className="bg-muted text-muted-foreground hover:bg-foreground/15 hover:text-foreground rounded-full px-2.5 py-0.5 text-xs transition-colors"
-                    >
-                      {t.name}
-                    </Link>
-                  ))}
-                </div>
-              )}
-            </div>
-          )
+          streaming.length > 0 ? <ExternalLinks links={streaming} /> : null
         }
       />
+      {tags.length > 0 && (
+        <div className="-mt-2 flex flex-wrap gap-1.5 pb-4">
+          {tags.map((t) => (
+            <Link
+              key={t.name}
+              href={`/tag/${encodeURIComponent(t.name)}`}
+              className="bg-muted text-muted-foreground hover:bg-foreground/15 hover:text-foreground rounded-full px-2.5 py-0.5 text-xs transition-colors"
+            >
+              {t.name}
+            </Link>
+          ))}
+        </div>
+      )}
 
       <div className="mt-6 grid gap-10 lg:grid-cols-[1fr_240px]">
         <div className="min-w-0 space-y-12">
