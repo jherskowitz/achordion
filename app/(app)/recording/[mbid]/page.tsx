@@ -250,12 +250,65 @@ async function RecordingBody({ mbid }: { mbid: string }) {
         </div>
       )}
 
-      {/* Sidebar (Top listeners + Other Links) sits in a narrow
-          right-aligned column at the top so the heavy "Also appears
-          on" grid below can claim the full page width — same pattern
-          the artist page uses for its discography section. */}
+      {/* Two-column layout for the body: "Also appears on" fills the
+          left rail, sidebar (Top listeners + Other Links) anchors the
+          right. Same pattern the artist page uses. */}
       <div className="mt-6 grid gap-10 lg:grid-cols-[1fr_240px]">
-        <div className="min-w-0" />
+        <div className="min-w-0">
+          {otherReleaseGroups.length > 0 && (
+            <section>
+              <h2 className="mb-4 text-sm font-semibold tracking-wide uppercase">
+                Also appears on
+              </h2>
+              <ul className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-5 xl:grid-cols-6">
+                {otherReleaseGroups.map((r) => {
+                  const rg = r["release-group"];
+                  if (!rg) return null;
+                  return (
+                    <li key={rg.id} className="min-w-0">
+                      <div className="group relative overflow-hidden rounded-md">
+                        <Link
+                          href={`/release-group/${rg.id}`}
+                          className="block"
+                        >
+                          <CoverArt
+                            src={caaReleaseUrl(r.id, 250)}
+                            alt={rg.title}
+                            size={250}
+                            className="aspect-square w-full transition-opacity group-hover:opacity-90"
+                            rounded="md"
+                          />
+                        </Link>
+                        {/* "Also appears on" intermingles compilations,
+                            albums, EPs — the chip lets users tell
+                            formats apart at a glance. Renders nothing
+                            for non-Album/EP types. */}
+                        <ReleaseTypeChip type={rg["primary-type"]} />
+                        <PlayOnHoverFab
+                          href={parachordPlayAlbum({ mbid: rg.id })}
+                          label={`Play "${rg.title}" in Parachord`}
+                        />
+                      </div>
+                      <p className="mt-1.5 truncate text-xs font-medium">
+                        <Link
+                          href={`/release-group/${rg.id}`}
+                          className="hover:underline"
+                        >
+                          {rg.title}
+                        </Link>
+                      </p>
+                      {r.date && (
+                        <p className="text-muted-foreground/70 text-[11px] tabular-nums">
+                          {r.date.slice(0, 4)}
+                        </p>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          )}
+        </div>
         <aside className="space-y-8">
           {albumListeners?.listeners && albumListeners.listeners.length > 0 && (
             <div>
@@ -275,63 +328,6 @@ async function RecordingBody({ mbid }: { mbid: string }) {
           )}
         </aside>
       </div>
-
-      {otherReleaseGroups.length > 0 && (
-        <section className="mt-16">
-          <h2 className="mb-4 text-sm font-semibold tracking-wide uppercase">
-            Also appears on
-          </h2>
-          {/* Full page width so the grid can spread out — the dense
-              tile sizing (smaller covers, tighter type) keeps it
-              from competing with the track itself above. */}
-          <ul className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8">
-            {otherReleaseGroups.map((r) => {
-              const rg = r["release-group"];
-              if (!rg) return null;
-              return (
-                <li key={rg.id} className="min-w-0">
-                  <div className="group relative overflow-hidden rounded-md">
-                    <Link
-                      href={`/release-group/${rg.id}`}
-                      className="block"
-                    >
-                      <CoverArt
-                        src={caaReleaseUrl(r.id, 250)}
-                        alt={rg.title}
-                        size={250}
-                        className="aspect-square w-full transition-opacity group-hover:opacity-90"
-                        rounded="md"
-                      />
-                    </Link>
-                    {/* "Also appears on" intermingles compilations,
-                        albums, EPs — the chip lets users tell
-                        formats apart at a glance. Renders nothing
-                        for non-Album/EP types. */}
-                    <ReleaseTypeChip type={rg["primary-type"]} />
-                    <PlayOnHoverFab
-                      href={parachordPlayAlbum({ mbid: rg.id })}
-                      label={`Play "${rg.title}" in Parachord`}
-                    />
-                  </div>
-                  <p className="mt-1.5 truncate text-xs font-medium">
-                    <Link
-                      href={`/release-group/${rg.id}`}
-                      className="hover:underline"
-                    >
-                      {rg.title}
-                    </Link>
-                  </p>
-                  {r.date && (
-                    <p className="text-muted-foreground/70 text-[11px] tabular-nums">
-                      {r.date.slice(0, 4)}
-                    </p>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        </section>
-      )}
     </>
   );
 }
