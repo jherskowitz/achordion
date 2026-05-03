@@ -3,7 +3,28 @@ import type { ReleaseDetail, Track } from "@/lib/clients/musicbrainz";
 import { formatArtistCredit } from "@/lib/clients/musicbrainz";
 import { parachordPlayTrack } from "@/lib/parachord";
 import { recordingHref } from "@/lib/entity-links";
+import { ArtistCreditLinks } from "./artist-credit-links";
 import { PlayOverNumberCell } from "./parachord-button";
+
+/** MusicBrainz's special "Various Artists" entity. */
+const VARIOUS_ARTISTS_MBID = "89ad4ac3-39f7-470e-963a-56509c546377";
+
+/**
+ * True when each track's artist matters more than the release-level
+ * artist credit — compilations and Various Artists releases. We
+ * surface a per-track artist column on these so users can browse
+ * who's actually performing each track.
+ */
+function isVariousArtistsRelease(release: ReleaseDetail): boolean {
+  const credits = release["artist-credit"] ?? [];
+  for (const c of credits) {
+    if (c.artist?.id === VARIOUS_ARTISTS_MBID) return true;
+    if (c.name.toLowerCase() === "various artists") return true;
+  }
+  const rg = release["release-group"];
+  if (rg?.["secondary-types"]?.includes("Compilation")) return true;
+  return false;
+}
 
 function formatLength(ms?: number | null): string {
   if (!ms || ms <= 0) return "—";
@@ -23,14 +44,16 @@ function TrackRow({
   track,
   listenCount,
   fallbackArtist,
+  showArtist,
 }: {
   track: Track;
   listenCount?: number;
   fallbackArtist: string;
+  showArtist: boolean;
 }) {
   const recordingMbid = track.recording?.id;
-  const trackArtist = formatArtistCredit(track["artist-credit"]).name;
-  const artist = trackArtist || fallbackArtist;
+  const credit = formatArtistCredit(track["artist-credit"]);
+  const artist = credit.name || fallbackArtist;
   return (
     <li className="group flex items-center gap-4 py-2.5">
       <PlayOverNumberCell
@@ -52,6 +75,11 @@ function TrackRow({
             {track.title}
           </Link>
         </p>
+        {showArtist && credit.parts.length > 0 && (
+          <p className="text-muted-foreground truncate text-xs">
+            <ArtistCreditLinks parts={credit.parts} />
+          </p>
+        )}
       </div>
       {listenCount !== undefined && (
         <span className="text-muted-foreground/80 shrink-0 tabular-nums text-xs">
@@ -76,6 +104,7 @@ export function TrackList({ release, listenCounts }: TrackListProps) {
   }
   const showDiscHeading = media.length > 1;
   const fallbackArtist = formatArtistCredit(release["artist-credit"]).name;
+  const showArtist = isVariousArtistsRelease(release);
   return (
     <div className="border-border/60 rounded-xl border px-4">
       {media.map((medium, i) => (
@@ -92,6 +121,7 @@ export function TrackList({ release, listenCounts }: TrackListProps) {
                 key={track.id}
                 track={track}
                 fallbackArtist={fallbackArtist}
+                showArtist={showArtist}
                 listenCount={
                   track.recording?.id
                     ? listenCounts?.get(track.recording.id)
