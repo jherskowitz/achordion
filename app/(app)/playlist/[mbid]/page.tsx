@@ -169,30 +169,25 @@ async function PlaylistBody({ mbid }: { mbid: string }) {
               with {data.collaborators.join(", ")}
             </p>
           )}
-          {data.tracks.length > 0 && (
-            <p className="text-muted-foreground mt-2 text-sm tabular-nums">
-              <span className="text-foreground font-medium">
-                {data.tracks.length}
-              </span>{" "}
-              tracks
-              {totalMinutes > 0 && (
-                <>
-                  {" "}
-                  ·{" "}
-                  <span className="text-foreground font-medium">
-                    {totalMinutes}
-                  </span>{" "}
-                  min
-                </>
-              )}
-            </p>
-          )}
-          {data.annotation && stripHtml(data.annotation) && (
-            <p className="text-muted-foreground/80 mt-3 max-w-prose text-sm leading-6">
-              {stripHtml(data.annotation)}
-            </p>
-          )}
-          <div className="mt-5 flex flex-wrap items-center gap-3">
+          <div className="mt-2 flex flex-wrap items-center gap-3">
+            {data.tracks.length > 0 && (
+              <p className="text-muted-foreground text-sm tabular-nums">
+                <span className="text-foreground font-medium">
+                  {data.tracks.length}
+                </span>{" "}
+                tracks
+                {totalMinutes > 0 && (
+                  <>
+                    {" "}
+                    ·{" "}
+                    <span className="text-foreground font-medium">
+                      {totalMinutes}
+                    </span>{" "}
+                    min
+                  </>
+                )}
+              </p>
+            )}
             {isOwner ? (
               <PlaylistVisibilityToggle
                 mbid={mbid}
@@ -215,6 +210,13 @@ async function PlaylistBody({ mbid }: { mbid: string }) {
                 {data.isPublic ? "Public" : "Private"}
               </span>
             )}
+          </div>
+          {data.annotation && stripHtml(data.annotation) && (
+            <p className="text-muted-foreground/80 mt-3 max-w-prose text-sm leading-6">
+              {stripHtml(data.annotation)}
+            </p>
+          )}
+          <div className="mt-5 flex flex-wrap items-center gap-3">
             {data.tracks.length > 0 && (
               // Hand Parachord the public XSPF URL when one is available
               // (production deploy with a real host) so it can fetch the
