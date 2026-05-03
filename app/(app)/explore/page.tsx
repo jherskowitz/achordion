@@ -237,13 +237,13 @@ async function WeeklyAlgoSection({
   );
 }
 
-async function RecommendedTracksSection({
-  username,
-  familiarity,
-}: {
-  username: string;
-  familiarity: number;
-}) {
+/**
+ * Resolve the same filtered top-12 recommendation set used by the
+ * tracks rail and its Play-all button. Both call sites invoke this;
+ * the underlying LB fetches share Next's data cache so the second
+ * call is a free dedup, not a real round-trip.
+ */
+async function loadRecommendedTracks(username: string, familiarity: number) {
   const threshold = thresholdFromFamiliarity(familiarity);
   // Filter by track (recording) play count, not artist play count —
   // a familiar artist can still have a deep cut you've never heard,
@@ -255,12 +255,7 @@ async function RecommendedTracksSection({
     buildExcludedRecordingSet(username, threshold),
   ]);
   if (recordings.length === 0) {
-    return (
-      <p className="text-muted-foreground text-sm">
-        Listen for a few weeks and ListenBrainz will start surfacing
-        recommendations here.
-      </p>
-    );
+    return { top: [], metadata: new Map(), parachordTracks: [] };
   }
   const metadata = await getRecordingMetadata(
     recordings.map((r) => r.recording_mbid),
@@ -271,9 +266,7 @@ async function RecommendedTracksSection({
   // miss cases where the rec and the user's listen history use
   // different MBIDs for the same conceptual track. The
   // listen-count `exclude` set is kept as belt-and-braces for the
-  // graduated-strictness UX: at higher slider settings it catches
-  // a few extra alternate-MBID matches the latest_listened_at
-  // flag might miss.
+  // graduated-strictness UX.
   const filtered = recordings.filter((r) => {
     if (familiarity === 0) return true;
     if (r.latest_listened_at !== null) return false;
@@ -281,9 +274,6 @@ async function RecommendedTracksSection({
     return true;
   });
   const top = filtered.slice(0, 12);
-  // Build the ParachordTrack array straight from the recordings'
-  // metadata — title / artist / optional album / duration. Hands off
-  // a coherent tracklist to Parachord on click.
   const parachordTracks: ParachordTrack[] = top
     .map((r) => {
       const m = metadata.get(r.recording_mbid);
@@ -299,20 +289,47 @@ async function RecommendedTracksSection({
       } as ParachordTrack;
     })
     .filter((t): t is ParachordTrack => t !== null);
+  return { top, metadata, parachordTracks };
+}
 
+async function RecommendedTracksSection({
+  username,
+  familiarity,
+}: {
+  username: string;
+  familiarity: number;
+}) {
+  const { top, metadata } = await loadRecommendedTracks(username, familiarity);
+  if (top.length === 0) {
+    return (
+      <p className="text-muted-foreground text-sm">
+        Listen for a few weeks and ListenBrainz will start surfacing
+        recommendations here.
+      </p>
+    );
+  }
+  return <ExploreTrackList recordings={top} metadata={metadata} />;
+}
+
+/** Sits next to the Filters trigger on the Recommended-tracks row. */
+async function RecommendedTracksPlayAll({
+  username,
+  familiarity,
+}: {
+  username: string;
+  familiarity: number;
+}) {
+  const { parachordTracks } = await loadRecommendedTracks(
+    username,
+    familiarity,
+  );
+  if (parachordTracks.length === 0) return null;
   return (
-    <>
-      {parachordTracks.length > 0 && (
-        <div className="mb-3 flex justify-end">
-          <OpenInParachordButton
-            kind="playlist"
-            tracks={parachordTracks}
-            label="Play all"
-          />
-        </div>
-      )}
-      <ExploreTrackList recordings={top} metadata={metadata} />
-    </>
+    <OpenInParachordButton
+      kind="playlist"
+      tracks={parachordTracks}
+      label="Play all"
+    />
   );
 }
 
@@ -453,10 +470,12 @@ export default async function ExploreOverviewPage({
               title="Recommended artists"
               seeAllHref="/explore/recommended-artists"
             />
-            <FamiliaritySlider
-              initial={artistsFamiliarity}
-              param="artistsFamiliarity"
-            />
+            <div className="mb-3">
+              <FamiliaritySlider
+                initial={artistsFamiliarity}
+                param="artistsFamiliarity"
+              />
+            </div>
             {/* Key the Suspense on the threshold (not the slider value)
                 so within-bucket nudges don't trigger pointless skeleton
                 flashes — same threshold = same data, no need to refetch. */}
@@ -476,11 +495,22 @@ export default async function ExploreOverviewPage({
               title="Recommended tracks"
               seeAllHref="/explore/recommended-tracks"
             />
-            <FamiliaritySlider
-              initial={tracksFamiliarity}
-              param="tracksFamiliarity"
-              kind="track"
-            />
+            <div className="mb-3 flex items-start justify-between gap-3">
+              <FamiliaritySlider
+                initial={tracksFamiliarity}
+                param="tracksFamiliarity"
+                kind="track"
+              />
+              <Suspense
+                key={`tracks-pa-${thresholdFromFamiliarity(tracksFamiliarity) ?? "off"}`}
+                fallback={null}
+              >
+                <RecommendedTracksPlayAll
+                  username={username}
+                  familiarity={tracksFamiliarity}
+                />
+              </Suspense>
+            </div>
             <Suspense
               key={`tracks-${thresholdFromFamiliarity(tracksFamiliarity) ?? "off"}`}
               fallback={<TrackListSkeleton rows={8} />}

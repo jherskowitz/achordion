@@ -207,10 +207,16 @@ async function ArtistBody({
           </Suspense>
 
           <section>
-            <h2 className="mb-4 text-sm font-semibold tracking-wide uppercase">
-              Popular tracks
-            </h2>
-            <Suspense fallback={<ListSkeleton />}>
+            <Suspense
+              fallback={
+                <>
+                  <h2 className="mb-4 text-sm font-semibold tracking-wide uppercase">
+                    Popular tracks
+                  </h2>
+                  <ListSkeleton />
+                </>
+              }
+            >
               <TopTracksSection mbid={mbid} />
             </Suspense>
           </section>
@@ -358,15 +364,18 @@ async function TopTracksSection({ mbid }: { mbid: string }) {
     .filter((t): t is ParachordTrack => t !== null);
   return (
     <>
-      {parachordTracks.length > 0 && (
-        <div className="mb-3 flex justify-end">
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <h2 className="text-sm font-semibold tracking-wide uppercase">
+          Popular tracks
+        </h2>
+        {parachordTracks.length > 0 && (
           <OpenInParachordButton
             kind="playlist"
             tracks={parachordTracks}
             label="Play all"
           />
-        </div>
-      )}
+        )}
+      </div>
       <TopTracksList
         tracks={top.map((r) => ({
           track_name: r.recording_name,

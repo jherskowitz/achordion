@@ -7,7 +7,6 @@ import {
 } from "@/lib/clients/listenbrainz";
 import { buildExcludedArtistSet } from "@/lib/exclude-listened";
 import { thresholdFromFamiliarity } from "@/lib/familiarity";
-import { Breadcrumbs } from "@/components/achordion/breadcrumbs";
 import { FamiliaritySlider } from "@/components/achordion/familiarity-slider";
 import { PageShell } from "@/components/achordion/page-shell";
 import { RecommendedArtistsList } from "@/components/achordion/recommended-artists-list";
@@ -102,16 +101,12 @@ export default async function RecommendedArtistsPage({
   }
   return (
     <PageShell className="pt-8">
-      <Breadcrumbs
-        items={[
-          { label: "Explore", href: "/explore" },
-          { label: "Recommended artists" },
-        ]}
-      />
-      <h1 className="mt-2 mb-6 text-2xl font-semibold tracking-tight">
+      <h1 className="mb-6 text-2xl font-semibold tracking-tight">
         Recommended artists
       </h1>
-      <FamiliaritySlider initial={familiarity} param="familiarity" />
+      <div className="mb-3">
+        <FamiliaritySlider initial={familiarity} param="familiarity" />
+      </div>
       {/* Suspense keyed on the resolved threshold (not the raw slider
           value) so within-bucket nudges don't trigger pointless
           skeleton flashes. */}

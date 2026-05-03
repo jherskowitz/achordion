@@ -8,7 +8,6 @@ import {
 import { buildExcludedRecordingSet } from "@/lib/exclude-listened";
 import { thresholdFromFamiliarity } from "@/lib/familiarity";
 import type { ParachordTrack } from "@/lib/parachord";
-import { Breadcrumbs } from "@/components/achordion/breadcrumbs";
 import { ExploreTrackList } from "@/components/achordion/explore-track-list";
 import { FamiliaritySlider } from "@/components/achordion/familiarity-slider";
 import { OpenInParachordButton } from "@/components/achordion/open-in-parachord-button";
@@ -30,36 +29,23 @@ function parseFamiliarity(raw: string | undefined): number {
   return Math.max(0, Math.min(100, n));
 }
 
-async function Body({
-  username,
-  familiarity,
-}: {
-  username: string;
-  familiarity: number;
-}) {
+/** Shared loader so the list and the Play-all share filter logic.
+ *  Both call sites trigger the same LB fetches; Next's data cache
+ *  dedupes them within a single render. */
+async function loadFilteredTracks(username: string, familiarity: number) {
   const threshold = thresholdFromFamiliarity(familiarity);
   const [recordings, exclude] = await Promise.all([
     getRecommendedRecordings(username, 200, "raw").catch(() => []),
     buildExcludedRecordingSet(username, threshold),
   ]);
   if (recordings.length === 0) {
-    return (
-      <ComingSoon
-        title="No recommendations yet"
-        description="Listen for a few weeks and ListenBrainz will surface picks here."
-      />
-    );
+    return { top: [], metadata: new Map(), parachordTracks: [] };
   }
   const metadata = await getRecordingMetadata(
     recordings.map((r) => r.recording_mbid),
   );
   // Hide anything LB knows the user has heard, at any non-zero
-  // slider value. `latest_listened_at` is the only reliable signal
-  // for "I've heard this exact recommendation" — the rec and the
-  // user's listen history can use different MBIDs for the same
-  // conceptual track, so MBID-based filters miss those. The
-  // listen-count `exclude` set is kept as belt-and-braces for the
-  // graduated-strictness UX.
+  // slider value. See overview page for the full reasoning.
   const filtered = recordings.filter((r) => {
     if (familiarity === 0) return true;
     if (r.latest_listened_at !== null) return false;
@@ -82,20 +68,43 @@ async function Body({
       } as ParachordTrack;
     })
     .filter((t): t is ParachordTrack => t !== null);
+  return { top, metadata, parachordTracks };
+}
 
+async function Body({
+  username,
+  familiarity,
+}: {
+  username: string;
+  familiarity: number;
+}) {
+  const { top, metadata } = await loadFilteredTracks(username, familiarity);
+  if (top.length === 0) {
+    return (
+      <ComingSoon
+        title="No recommendations yet"
+        description="Listen for a few weeks and ListenBrainz will surface picks here."
+      />
+    );
+  }
+  return <ExploreTrackList recordings={top} metadata={metadata} />;
+}
+
+async function PlayAll({
+  username,
+  familiarity,
+}: {
+  username: string;
+  familiarity: number;
+}) {
+  const { parachordTracks } = await loadFilteredTracks(username, familiarity);
+  if (parachordTracks.length === 0) return null;
   return (
-    <>
-      {parachordTracks.length > 0 && (
-        <div className="mb-3 flex justify-end">
-          <OpenInParachordButton
-            kind="playlist"
-            tracks={parachordTracks}
-            label="Play all"
-          />
-        </div>
-      )}
-      <ExploreTrackList recordings={top} metadata={metadata} />
-    </>
+    <OpenInParachordButton
+      kind="playlist"
+      tracks={parachordTracks}
+      label="Play all"
+    />
   );
 }
 
@@ -141,20 +150,22 @@ export default async function RecommendedTracksPage({
   }
   return (
     <PageShell className="pt-8">
-      <Breadcrumbs
-        items={[
-          { label: "Explore", href: "/explore" },
-          { label: "Recommended tracks" },
-        ]}
-      />
-      <h1 className="mt-2 mb-6 text-2xl font-semibold tracking-tight">
+      <h1 className="mb-6 text-2xl font-semibold tracking-tight">
         Recommended tracks
       </h1>
-      <FamiliaritySlider
-        initial={familiarity}
-        param="familiarity"
-        kind="track"
-      />
+      <div className="mb-3 flex items-start justify-between gap-3">
+        <FamiliaritySlider
+          initial={familiarity}
+          param="familiarity"
+          kind="track"
+        />
+        <Suspense
+          key={`pa-${thresholdFromFamiliarity(familiarity) ?? "off"}`}
+          fallback={null}
+        >
+          <PlayAll username={username} familiarity={familiarity} />
+        </Suspense>
+      </div>
       <Suspense
         key={`${thresholdFromFamiliarity(familiarity) ?? "off"}`}
         fallback={<Fallback />}

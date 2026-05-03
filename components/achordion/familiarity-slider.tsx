@@ -72,7 +72,7 @@ export function FamiliaritySlider({
   }
 
   return (
-    <div className="mb-3">
+    <div className="min-w-0 flex-1">
       <button
         type="button"
         onClick={() => setOpen((x) => !x)}
