@@ -13,6 +13,7 @@ import {
 } from "@/lib/entity-links";
 import { stripHtml } from "@/lib/strip-html";
 import { PageShell } from "@/components/achordion/page-shell";
+import { Breadcrumbs } from "@/components/achordion/breadcrumbs";
 import { CoverArt } from "@/components/achordion/cover-art";
 import { OpenInParachordButton } from "@/components/achordion/open-in-parachord-button";
 import { PlayOverNumberCell } from "@/components/achordion/parachord-button";
@@ -93,8 +94,30 @@ async function PlaylistBody({ mbid }: { mbid: string }) {
     ...(t.durationMs ? { duration: Math.round(t.durationMs / 1000) } : {}),
   }));
 
+  // Breadcrumb trail: User › Playlists › <title>. Hide entirely
+  // when the playlist has no creator on file (rare — algorithmic /
+  // anonymous playlists), since the trail would dead-end.
+  const breadcrumbs = data.creator
+    ? [
+        {
+          label: data.creator,
+          href: `/user/${encodeURIComponent(data.creator)}`,
+        },
+        {
+          label: "Playlists",
+          href: `/user/${encodeURIComponent(data.creator)}/playlists`,
+        },
+        { label: data.title },
+      ]
+    : [];
+
   return (
     <>
+      {breadcrumbs.length > 0 && (
+        <div className="mt-8">
+          <Breadcrumbs items={breadcrumbs} />
+        </div>
+      )}
       <header className="mt-8 mb-10 grid gap-6 sm:grid-cols-[240px_1fr] sm:gap-8">
         <PlaylistCoverMosaic
           tracks={data.tracks}
@@ -198,15 +221,6 @@ async function PlaylistBody({ mbid }: { mbid: string }) {
                 Download XSPF
               </a>
             )}
-            <a
-              href={`https://listenbrainz.org/playlist/${mbid}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-xs underline-offset-4 hover:underline"
-            >
-              Open on ListenBrainz
-              <ExternalLink className="size-3" />
-            </a>
           </div>
         </div>
       </header>

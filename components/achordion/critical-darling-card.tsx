@@ -1,11 +1,10 @@
 import Link from "next/link";
-import { ExternalLink } from "lucide-react";
 import { CoverArt } from "./cover-art";
-import { ParachordCtaButton } from "./parachord-button";
+import { PlayOnHoverFab } from "./play-on-hover-fab";
 import { searchReleaseGroups } from "@/lib/clients/musicbrainz";
 import { caaReleaseGroupUrl } from "@/lib/clients/coverart";
 import { parachordPlayAlbum } from "@/lib/parachord";
-import { artistHref } from "@/lib/entity-links";
+import { artistHref, releaseGroupHref } from "@/lib/entity-links";
 import type { CriticsPickAlbum } from "@/lib/clients/critical-darlings";
 
 /**
@@ -43,41 +42,44 @@ export async function CriticalDarlingCard({
   album: CriticsPickAlbum;
 }) {
   const { mbid, coverUrl } = await resolveCover(album);
-  const albumHref = mbid ? `/release-group/${mbid}` : null;
+  // Use the lookup route as a fallback so the title+cover are always
+  // navigable even if MB search came back empty during render.
+  const albumLink = releaseGroupHref({
+    mbid,
+    artist: album.artist,
+    title: album.title,
+  });
   // Prefer the resolved MBID — Parachord picks the best resolver.
   // Fall back to artist+title when MB search didn't find a match.
   const parachordHref = parachordPlayAlbum(
     mbid ? { mbid } : { artist: album.artist, title: album.title },
   );
 
-  const cover = (
-    <CoverArt
-      src={coverUrl}
-      alt={album.title}
-      size={240}
-      className="aspect-square h-auto w-full transition-opacity group-hover:opacity-90"
-      rounded="md"
-    />
-  );
-
   return (
-    <article className="group min-w-0 space-y-2">
-      {albumHref ? (
-        <Link href={albumHref} className="block">
-          {cover}
+    <article className="min-w-0 space-y-2">
+      {/* Cover container is `group relative` so the play fab fades
+          in on hover — same treatment used on chart / discography /
+          fresh-releases grids. */}
+      <div className="group relative overflow-hidden rounded-md">
+        <Link href={albumLink} className="block">
+          <CoverArt
+            src={coverUrl}
+            alt={album.title}
+            size={240}
+            className="aspect-square h-auto w-full transition-opacity group-hover:opacity-90"
+            rounded="md"
+          />
         </Link>
-      ) : (
-        cover
-      )}
+        <PlayOnHoverFab
+          href={parachordHref}
+          label={`Play "${album.title}" by ${album.artist} in Parachord`}
+        />
+      </div>
       <div>
         <p className="truncate text-sm font-medium">
-          {albumHref ? (
-            <Link href={albumHref} className="hover:underline">
-              {album.title}
-            </Link>
-          ) : (
-            album.title
-          )}
+          <Link href={albumLink} className="hover:underline">
+            {album.title}
+          </Link>
         </p>
         <p className="text-muted-foreground truncate text-xs">
           <Link
@@ -95,35 +97,6 @@ export async function CriticalDarlingCard({
           {album.description}
         </p>
       )}
-      <div className="flex flex-wrap items-center gap-2 pt-1">
-        <ParachordCtaButton
-          href={parachordHref}
-          label="Play"
-          size="sm"
-        />
-        {album.link && (
-          <a
-            href={album.link}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs underline-offset-4 hover:underline"
-          >
-            Reviews
-            <ExternalLink className="size-3" />
-          </a>
-        )}
-        {album.spotifyUrl && (
-          <a
-            href={album.spotifyUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs underline-offset-4 hover:underline"
-          >
-            Spotify
-            <ExternalLink className="size-3" />
-          </a>
-        )}
-      </div>
     </article>
   );
 }
