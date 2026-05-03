@@ -6,6 +6,7 @@ import {
 } from "@/lib/clients/listenbrainz";
 import { caaReleaseGroupUrl, caaReleaseUrl } from "@/lib/clients/coverart";
 import { CoverArt } from "./cover-art";
+import { LazyArtistAvatar } from "./lazy-artist-avatar";
 import {
   artistHref,
   recordingHref,
@@ -57,29 +58,41 @@ function trackCover(t: TrackEntry): string | null {
 
 function ArtistRow({ entry, max }: { entry: ArtistEntry; max: number }) {
   const pct = Math.round((entry.listen_count / max) * 100);
+  const link = artistHref({
+    mbid: entry.artist_mbid,
+    name: entry.artist_name,
+  });
   return (
-    <li className="text-sm">
-      <div className="flex items-baseline justify-between gap-2">
-        <span className="min-w-0 truncate">
-          <Link
-            href={artistHref({
-              mbid: entry.artist_mbid,
-              name: entry.artist_name,
-            })}
-            className="hover:underline"
-          >
-            {entry.artist_name}
-          </Link>
-        </span>
-        <span className="text-muted-foreground/70 shrink-0 tabular-nums text-xs">
-          {entry.listen_count}
-        </span>
-      </div>
-      <div className="bg-muted mt-1 h-0.5 w-full overflow-hidden rounded-full">
-        <div
-          className="bg-foreground/60 h-full"
-          style={{ width: `${pct}%` }}
-        />
+    <li className="flex items-center gap-2.5 text-sm">
+      {entry.artist_mbid ? (
+        <Link href={link} className="shrink-0">
+          <LazyArtistAvatar
+            mbid={entry.artist_mbid}
+            name={entry.artist_name}
+            className="size-9"
+            fallbackClassName="text-xs"
+          />
+        </Link>
+      ) : (
+        <div className="bg-muted size-9 shrink-0 rounded-full" />
+      )}
+      <div className="min-w-0 flex-1">
+        <div className="flex items-baseline justify-between gap-2">
+          <span className="min-w-0 truncate">
+            <Link href={link} className="hover:underline">
+              {entry.artist_name}
+            </Link>
+          </span>
+          <span className="text-muted-foreground/70 shrink-0 tabular-nums text-xs">
+            {entry.listen_count}
+          </span>
+        </div>
+        <div className="bg-muted mt-1 h-0.5 w-full overflow-hidden rounded-full">
+          <div
+            className="bg-foreground/60 h-full"
+            style={{ width: `${pct}%` }}
+          />
+        </div>
       </div>
     </li>
   );

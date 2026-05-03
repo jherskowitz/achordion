@@ -4,12 +4,11 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Loader2, Search } from "lucide-react";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { CoverArt } from "./cover-art";
+import { LazyArtistAvatar } from "./lazy-artist-avatar";
 import { UserAvatar } from "./user-avatar";
 import { caaReleaseGroupUrl } from "@/lib/clients/coverart";
 import { artistHref } from "@/lib/entity-links";
-import { dicebearShapesUrl } from "@/lib/dicebear-shapes";
 
 /**
  * Client-side type-ahead search.
@@ -236,35 +235,6 @@ function ResultSection({
  * the AvatarFallback letter shows through, with the DiceBear SVG as
  * the always-present-but-low-priority placeholder behind both.
  */
-function LazyArtistAvatar({ mbid, name }: { mbid: string; name: string }) {
-  const [imageUrl, setImageUrl] = useState<string | null>(null);
-  useEffect(() => {
-    let cancelled = false;
-    fetch(`/api/artist-image?mbid=${mbid}&width=128`)
-      .then((r) => (r.ok ? r.json() : { url: null }))
-      .then((data: { url: string | null }) => {
-        if (!cancelled && data.url) setImageUrl(data.url);
-      })
-      .catch(() => {
-        // Silent — DiceBear placeholder stays.
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [mbid]);
-  const initial = name.slice(0, 1).toUpperCase();
-  // AvatarImage's `src` falls through to AvatarFallback when the URL
-  // 404s. We paint Wikidata when we have it, DiceBear otherwise; the
-  // initial letter stays as the absolute last-resort.
-  const src = imageUrl ?? dicebearShapesUrl(mbid);
-  return (
-    <Avatar className="size-10 shrink-0">
-      <AvatarImage src={src} alt={name} />
-      <AvatarFallback className="text-xs">{initial}</AvatarFallback>
-    </Avatar>
-  );
-}
-
 function ArtistRow({ row }: { row: ArtistRow }) {
   return (
     <li>
