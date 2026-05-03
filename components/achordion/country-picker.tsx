@@ -10,6 +10,14 @@ export interface CountryOption {
   flag: string;
 }
 
+/** Internal shape: each option carries its own pre-built href so the
+ *  client component never receives a function (RSC won't serialize
+ *  functions across the server/client boundary). The caller builds
+ *  hrefs on the server side and we just consume them. */
+export interface CountryOptionWithHref extends CountryOption {
+  href: string;
+}
+
 /**
  * Country dropdown for the chart pages.
  *
@@ -34,12 +42,11 @@ export interface CountryOption {
 export function CountryPicker({
   current,
   options,
-  hrefFor,
 }: {
   current: CountryOption;
-  options: CountryOption[];
-  /** Build the destination URL for a given country code. */
-  hrefFor: (code: string) => string;
+  /** Each option carries a pre-built `href` — building URLs on the
+   *  server side keeps the function-prop ban from RSC happy. */
+  options: CountryOptionWithHref[];
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -87,7 +94,7 @@ export function CountryPicker({
             return (
               <li key={c.code}>
                 <Link
-                  href={hrefFor(c.code)}
+                  href={c.href}
                   scroll={false}
                   suppressHydrationWarning
                   onClick={() => setOpen(false)}

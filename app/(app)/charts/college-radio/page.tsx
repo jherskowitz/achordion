@@ -138,8 +138,10 @@ export default async function CollegeRadioChartsPage({ searchParams }: PageProps
       <div className="mb-6 flex flex-wrap items-center gap-3">
         <CountryPicker
           current={countryInfo}
-          options={COLLEGE_CHARTS_COUNTRIES}
-          hrefFor={(code) => chartsHref({ country: code })}
+          options={COLLEGE_CHARTS_COUNTRIES.map((c) => ({
+            ...c,
+            href: chartsHref({ country: c.code }),
+          }))}
         />
       </div>
 

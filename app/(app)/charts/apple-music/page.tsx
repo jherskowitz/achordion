@@ -165,8 +165,10 @@ export default async function AppleMusicChartsPage({
 
         <CountryPicker
           current={countryInfo}
-          options={CHARTS_COUNTRIES}
-          hrefFor={(code) => chartsHref({ tab, country: code })}
+          options={CHARTS_COUNTRIES.map((c) => ({
+            ...c,
+            href: chartsHref({ tab, country: c.code }),
+          }))}
         />
       </div>
 
