@@ -73,9 +73,9 @@ async function fetchFeed(url: string): Promise<unknown | null> {
         "User-Agent": USER_AGENT,
         Accept: "application/json",
       },
-      // Charts shift slowly. Daily cache keeps us off Apple's servers
-      // for repeat views without hiding daily ranking moves.
-      next: { revalidate: 60 * 60 * 6, tags: ["apple-charts"] },
+      // Apple regenerates these feeds once a day, so anything shorter
+      // than 24h just hits their CDN for the same payload. 86400s.
+      next: { revalidate: 86400, tags: ["apple-charts"] },
     });
     if (!res.ok) return null;
     return await res.json();
