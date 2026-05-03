@@ -16,6 +16,7 @@ import {
 import { findBioSource, getBiography } from "@/lib/clients/wikipedia";
 import { PageShell } from "@/components/achordion/page-shell";
 import { PageHeader } from "@/components/achordion/page-header";
+import { ArtistAvatar } from "@/components/achordion/artist-avatar";
 import { ArtistInfoSidebar } from "@/components/achordion/artist-info-sidebar";
 import { Biography } from "@/components/achordion/biography";
 import { Discography } from "@/components/achordion/discography";
@@ -63,9 +64,23 @@ async function ArtistBody({ mbid }: { mbid: string }) {
   const totalListens = listeners?.total_listen_count;
   const totalListeners = listeners?.total_user_count;
 
+  // Wikidata is the primary source for artist photos — pull whichever
+  // wikidata URL MB has on file (artists may have several language
+  // editions; the first match is fine, they all resolve to the same QID).
+  const wikidataUrl = urls.find((u) => /wikidata\.org/i.test(u.url))?.url;
+
   return (
     <>
       <PageHeader
+        leading={
+          <ArtistAvatar
+            mbid={artist.id}
+            name={artist.name}
+            wikidataUrl={wikidataUrl}
+            className="size-20 sm:size-24"
+            fallbackClassName="text-2xl"
+          />
+        }
         eyebrow={artist.type ?? "Artist"}
         title={artist.name}
         description={
