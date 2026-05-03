@@ -18,7 +18,7 @@ export default function ExploreLayout({ children }: { children: ReactNode }) {
             Explore
           </p>
           <h1 className="pb-6 text-3xl font-semibold tracking-tight sm:text-4xl">
-            Discover music through listening
+            Find your music. Find your people. Share.
           </h1>
           <SectionTabs tabs={EXPLORE_TABS} />
         </div>

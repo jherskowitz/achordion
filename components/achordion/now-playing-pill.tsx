@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Radio } from "lucide-react";
 import { auth } from "@/auth";
 import { CoverArt } from "./cover-art";
+import { IconTooltip } from "@/components/ui/icon-tooltip";
 import { caaUrlFromListen } from "@/lib/clients/coverart";
 import { parachordListenAlong } from "@/lib/parachord";
 import { artistHref, recordingHref } from "@/lib/entity-links";
@@ -63,17 +64,18 @@ export async function NowPlayingPill({
         </p>
       </div>
       {username && !isOwnUser && (
-        <a
-          href={parachordListenAlong({
-            service: "listenbrainz",
-            user: username,
-          })}
-          title={`Listen along with ${username} in Parachord`}
-          className="bg-primary text-primary-foreground inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg px-3 text-xs font-medium transition-opacity hover:opacity-90"
-        >
-          <Radio className="size-3" />
-          Listen along
-        </a>
+        <IconTooltip label={`Listen along with ${username} in Parachord`}>
+          <a
+            href={parachordListenAlong({
+              service: "listenbrainz",
+              user: username,
+            })}
+            className="bg-primary text-primary-foreground inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg px-3 text-xs font-medium transition-opacity hover:opacity-90"
+          >
+            <Radio className="size-3" />
+            Listen along
+          </a>
+        </IconTooltip>
       )}
     </div>
   );

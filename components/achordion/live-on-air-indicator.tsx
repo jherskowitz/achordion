@@ -7,6 +7,7 @@ import type { PlayingNowListen } from "@/lib/clients/listenbrainz";
 import { parachordListenAlong } from "@/lib/parachord";
 import { artistHref, recordingHref } from "@/lib/entity-links";
 import { cn } from "@/lib/utils";
+import { IconTooltip } from "@/components/ui/icon-tooltip";
 
 const POLL_INTERVAL_MS = 25_000;
 
@@ -152,14 +153,17 @@ export function LiveOnAirIndicator({
           </Link>
         </span>
         {!hideListenAlong && (
-          <a
-            href={listenAlongHref}
-            title={`Listen along with ${username} in Parachord`}
-            className="bg-primary text-primary-foreground inline-flex h-6 shrink-0 items-center gap-1 rounded-full px-2 text-[10px] font-medium transition-opacity hover:opacity-90"
+          <IconTooltip
+            label={`Listen along with ${username} in Parachord`}
           >
-            <Radio className="size-2.5" />
-            Listen along
-          </a>
+            <a
+              href={listenAlongHref}
+              className="bg-primary text-primary-foreground inline-flex h-6 shrink-0 items-center gap-1 rounded-full px-2 text-[10px] font-medium transition-opacity hover:opacity-90"
+            >
+              <Radio className="size-2.5" />
+              Listen along
+            </a>
+          </IconTooltip>
         )}
       </div>
     );
@@ -189,14 +193,15 @@ export function LiveOnAirIndicator({
         </Link>
       </span>
       {!hideListenAlong && (
-        <a
-          href={listenAlongHref}
-          title={`Listen along with ${username} in Parachord`}
-          aria-label={`Listen along with ${username} in Parachord`}
-          className="bg-primary/90 text-primary-foreground hover:bg-primary inline-flex size-4 shrink-0 items-center justify-center rounded-full transition-colors"
-        >
-          <Radio className="size-2.5" />
-        </a>
+        <IconTooltip label={`Listen along with ${username} in Parachord`}>
+          <a
+            href={listenAlongHref}
+            aria-label={`Listen along with ${username} in Parachord`}
+            className="bg-primary/90 text-primary-foreground hover:bg-primary inline-flex size-4 shrink-0 items-center justify-center rounded-full transition-colors"
+          >
+            <Radio className="size-2.5" />
+          </a>
+        </IconTooltip>
       )}
     </div>
   );
