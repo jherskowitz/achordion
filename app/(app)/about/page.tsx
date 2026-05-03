@@ -98,6 +98,93 @@ export default function AboutPage() {
           </p>
         </Section>
 
+        <Section title="What we're trying to build">
+          <ol className="ml-6 list-decimal space-y-3">
+            <li>
+              <strong>An open community for listeners,</strong>{" "}
+              regardless of which streaming service they use. Today
+              Spotify users, Apple Music users, Tidal users, Bandcamp
+              die-hards, and the people on a NAS full of FLACs all live
+              in separate silos — none of them can see what the others
+              are listening to. Achordion is the place where that wall
+              comes down: every listener&apos;s scrobbles flow into the
+              same feed regardless of where the music actually came
+              from. Discover what your friend is playing this week even
+              if she&apos;s on Apple Music and you&apos;re on Spotify.
+            </li>
+            <li>
+              <strong>
+                A modern, generously-designed UI on top of ListenBrainz
+                and MusicBrainz.
+              </strong>{" "}
+              The data that the MetaBrainz Foundation has built is
+              extraordinary; the front-end shouldn&apos;t be the
+              limiting factor in spending time with it. We want the
+              experience to feel as polished as the proprietary
+              services people are migrating from — without the
+              proprietary catches.
+            </li>
+            <li>
+              <strong>
+                A push for the open-source music database to keep
+                growing.
+              </strong>{" "}
+              Every &quot;+ Add sources&quot; tile, every breadcrumb
+              deep-linked back to MusicBrainz, every chart that points
+              users into the canonical entity page is a small nudge
+              toward editing MB. The more people who can find a missing
+              relationship and fix it in one click, the better the open
+              data gets — and the better Achordion (and every other MB
+              client) gets for free.
+            </li>
+            <li>
+              <strong>
+                User-owned data, full portability, and listening
+                insights you can see all year.
+              </strong>{" "}
+              Your data lives in your ListenBrainz / MusicBrainz
+              accounts, not Achordion&apos;s. Export anywhere, point any
+              client at the same accounts, leave whenever. And the
+              listening visualizations — the charts, the heatmaps, the
+              top-X breakdowns, the year-in-music style summaries —
+              shouldn&apos;t only show up once a year on a single
+              proprietary platform&apos;s schedule. Your habits are
+              interesting all the time; the views to explore them
+              should be available all the time.
+            </li>
+          </ol>
+        </Section>
+
+        <Section title="A view for artists, not just listeners">
+          <p>
+            Today an artist who wants to understand their audience has
+            to log into Spotify for Artists, Apple Music for Artists,
+            YouTube Studio, Bandcamp&apos;s artist dashboard, and a
+            handful of others — each showing only the slice of fans
+            on that one platform. The full picture lives nowhere.
+          </p>
+          <p>
+            Because ListenBrainz collects scrobbles across services,
+            and because Parachord scrobbles every play regardless of
+            where the audio came from, an artist&apos;s page on
+            Achordion shows the whole audience in one place: who
+            their top listeners are, how many people are spinning
+            each release, which tracks are getting traction, which
+            cities the listening is coming from. One view, not seven
+            tabs — and the data the artist sees is exactly the data
+            their fans see. No black-box weighting, no platform-
+            specific dark patterns.
+          </p>
+          <p>
+            The same affordance works for fans curious about an
+            artist&apos;s reach. If you discover a small band on
+            Bandcamp and want to know how many people are seriously
+            into them across the whole listening community, the
+            answer&apos;s on their Achordion page rather than scattered
+            across half a dozen platform-specific stats pages.
+          </p>
+        </Section>
+
         <Section title="Your data stays yours">
           <p>
             <strong>Achordion is stateless.</strong>{" "}
