@@ -1678,6 +1678,61 @@ export async function getYearInMusic(
   }
 }
 
+// ─── User feedback (loves / hates) ──────────────────────────────────
+
+const FeedbackItemSchema = z
+  .object({
+    created: z.number(),
+    /**
+     * Loved tracks predate LB's MB-mapping work; older entries carry a
+     * `recording_msid` (LB's internal id) but no `recording_mbid`.
+     * Enriched lookups via `/metadata/recording/` only work for entries
+     * with an MBID, so older loves render as plain text via the
+     * track_metadata fallback when present.
+     */
+    recording_mbid: z.string().nullish(),
+    recording_msid: z.string().nullish(),
+    score: z.number(),
+    track_metadata: ListenSchema.shape.track_metadata.nullish(),
+  })
+  .passthrough();
+
+const FeedbackResponseSchema = z.object({
+  count: z.number().optional(),
+  total_count: z.number().optional(),
+  feedback: z.array(FeedbackItemSchema),
+});
+
+export type FeedbackItem = z.infer<typeof FeedbackItemSchema>;
+
+/**
+ * Fetch a user's loved (`score=1`) or hated (`score=-1`) recordings
+ * from LB. Public endpoint; no auth needed. Cached briefly so
+ * profile-page revisits stay snappy without hiding fresh loves.
+ */
+export async function getUserFeedback(
+  userName: string,
+  opts: { score?: 1 | -1; count?: number; offset?: number } = {},
+): Promise<FeedbackItem[]> {
+  const params = new URLSearchParams();
+  params.set("score", String(opts.score ?? 1));
+  params.set("count", String(opts.count ?? 50));
+  if (opts.offset) params.set("offset", String(opts.offset));
+  try {
+    const result = await lbFetch(
+      `/feedback/user/${encodeURIComponent(userName)}/get-feedback?${params}`,
+      FeedbackResponseSchema,
+      {
+        revalidate: 60 * 5,
+        tags: [`lb:user:${userName}:feedback`, cacheTagsLB.user(userName)],
+      },
+    );
+    return result.feedback;
+  } catch {
+    return [];
+  }
+}
+
 // ─── User feed (events) ─────────────────────────────────────────────
 
 const FeedTrackMetadataSchema = z
