@@ -70,8 +70,30 @@ Why two? Radix's `<TooltipTrigger asChild>` slot-clone chain resolves to differe
 - `/release-group/<mbid>` → `Artist › Album`.
 - `/recording/<mbid>` → `Artist › Album › Track`.
 - `/playlist/<mbid>` → `Creator › Playlists › <title>`.
+- `/explore/recommended-{artists,tracks}` → `Explore › Recommended …`.
 
 Decorative `Section › ThisPage` crumbs are removed across the app. Don't add them back.
+
+### 8. Pure helpers used by both server and client live in `/lib`, never in `"use client"` files
+
+If a server component (`async function Page(...)`) imports a function that lives in a file marked `"use client"`, Next will throw at runtime: *"Attempted to call X from the server but X is on the client."* Re-exporting the function from the client file doesn't help — Next tags any binding sourced from a client module as client-only.
+
+**Rule:** any pure, side-effect-free helper consumed on **both** sides of the boundary lives in a non-client module under `/lib`. The client component imports it from there too. See `lib/familiarity.ts` (math used by the explore page server component AND `<FamiliaritySlider>`) and `lib/entity-links.ts` (used by every server-rendered list AND every client component).
+
+### 9. Cover images always go through `<CoverArt>`, never raw `<Image>`
+
+`<CoverArt>` has built-in `onError` swap-to-`Disc3`-placeholder, so a 404 from Cover Art Archive (which is *common* for older / niche releases) never paints the browser's broken-image glyph + alt text. Even when you have a known-good URL, use `<CoverArt>` — the consistency means a downstream API regression doesn't surface as broken images on your page.
+
+### 10. Don't block first paint on slow lookups — paint placeholder, swap in
+
+Wikidata image resolution (artists), MB recording-metadata (track covers), CAA URL resolution (radio rewind tracklists) all involve external round-trips that should never block initial render. The pattern:
+
+1. Server component (or server fetch) returns the page with placeholder identifiers.
+2. Client component paints a fast-rendering placeholder (DiceBear avatar, neutral muted square, Disc3 glyph).
+3. After mount, client fires a fetch to the appropriate `/api/...` route.
+4. On success, swap the placeholder for the real image.
+
+Examples: `<LazyArtistAvatar>` (in search typeahead), `<LazyTrackCover>` (in radio rewind), the artist images that lazy-load in `<SearchTypeahead>` rows.
 
 ---
 
@@ -90,16 +112,49 @@ The Parachord browser extension (and other extensions some users run) **mutates 
 
 ---
 
+## Recommendation filtering ("Familiarity" slider)
+
+The Recommended Artists / Recommended Tracks rails on `/explore` (and the dedicated pages under `/explore/recommended-{artists,tracks}`) carry a slider that biases the results between "show me familiar music" and "show me only stuff I haven't heard". The pattern:
+
+- **`lib/familiarity.ts`** — pure module, server-and-client safe. Maps slider values 0–100 (step 10) to a listen-count threshold via 11 buckets. `describeFamiliarity(v, kind?)` returns the human-readable hint text, with `kind` ∈ `"artist" | "track"` for correct copy.
+- **`<FamiliaritySlider>`** — client component, takes `param` (URL key), `kind` (artist/track), `label`, `defaultValue`. URL-syncs via `router.replace` on `mouseup` / `touchend` / `keyup`. **Does not** wrap in `useTransition` — the previous UI staying visible during the transition was misread as "the slider does nothing." Eager replace + Suspense skeleton is the right cue.
+- **`lib/exclude-listened.ts`** — `buildExcludedArtistSet(username, threshold)` and `buildExcludedRecordingSet(username, threshold)`. Pull top 1000 artists / recordings from LB (the documented per-page max) and return the set of MBIDs whose `listen_count > threshold`.
+
+**Track filtering's reliability gotcha.** `recording_mbid` matches between LB recommendations and the user's listen history are *unreliable* — different release editions / remix MBIDs can refer to the same conceptual track. The MBID-based `exclude` set therefore misses real duplicates. The fix: **also use LB's per-recommendation `latest_listened_at` field**, which is set by LB based on whatever canonicalization their backend uses. So the final filter is: at any non-zero slider value, hide recs with `latest_listened_at !== null` AND hide MBIDs in the listen-count exclude set.
+
+**Suspense keys** on the recommendation sections key on the resolved threshold (`thresholdFromFamiliarity(...)`), not the raw slider value, so within-bucket nudges don't trigger pointless skeleton flashes.
+
+---
+
+## API route caching pattern
+
+For routes that resolve identifiers via expensive external calls (`/api/track-cover`, `/api/artist-image`), the cache stack is layered:
+
+1. **Next data cache** (server, all users) — set by `mbFetch` / `lbFetch` via `next: { revalidate, tags }`. Persistent per deployment.
+2. **Browser cache** — set by `Cache-Control: public, max-age=3600, s-maxage=3600, stale-while-revalidate=86400` on the route response. Returning visitors get instant covers from disk for an hour, plus a 24h stale-while-revalidate window where the cached value paints immediately and the server quietly refreshes.
+
+Together: a cover-art URL resolves once per (artist, album) pair globally, and once per browser tab per hour. Cover-art URLs are essentially immutable once known, so a 24h cache is safe.
+
+---
+
 ## MusicBrainz client patterns
 
 `lib/clients/musicbrainz.ts` exposes Zod-validated, cache-tagged fetchers. A few patterns to know:
 
 - **`mbFetch`** is the rate-limited fetch wrapper (1 req/sec). Always use it, never raw `fetch` against `musicbrainz.org`.
 - **`partitionArtistRelations({ relations })`** splits `url-rels` from `artist-rels`, used everywhere.
-- **`categoriseLinks(urls)`** further splits url-rels into `streaming` / `social` / `other`. Streaming goes in the favicon row; other goes in the sidebar's "Other Links."
+- **`categoriseLinks(urls)`** further splits url-rels into `streaming` / `social` / `other`. Filters dead hosts (Google+, Rdio, Vine, Grooveshark, etc. — see `DEAD_HOST_FRAGMENTS`) at the data layer so they never reach any sidebar / row. Streaming goes in the favicon row; other goes in the sidebar's "Other Links."
 - **`pickCanonicalRelease(rg)`** picks the **XW (worldwide) release first**, then earliest. MB editors conventionally attach Spotify/Apple url-rels to the XW release because those links apply globally — the album page merges url-rels from both the rg and the canonical release.
 - **`searchArtists` / `searchReleaseGroups` / `searchRecordings`** power the lookup routes; quote the name to bias toward exact-phrase matches.
-- **`bucketDiscography(groups)`** filters out non-studio secondary types (Compilation, Live, Remix, Soundtrack, Demo, Mixtape, Audio drama, Spokenword, Interview, DJ-mix) and groups Albums / EPs / Singles.
+- **`bucketDiscography(groups)`** filters out non-studio secondary types (Compilation, Live, Remix, Soundtrack, Demo, Mixtape, Audio drama, Spokenword, Interview, DJ-mix) and groups Albums / EPs / Singles. The artist page combines Album + EP into a synthetic "Studio" bucket sorted by date for the "Albums + EPs" filter, with `<ReleaseTypeChip>` overlays so users can tell formats apart.
+
+### Streaming favicon row — priority + URL canonicalization
+
+`<ExternalLinks>` (and `<OdesliLinks>`) sort streaming favicons by an explicit priority list: **Bandcamp → Spotify → Apple Music → Tidal → Qobuz → SoundCloud → YouTube Music → YouTube → everything else**. Defined in `STREAMING_HOST_PRIORITY` (`components/achordion/external-links.tsx`). When extending, update both files.
+
+The `href` rendered for Apple Music / iTunes / Spotify URLs is run through `normalizeStreamingUrl`, which strips the country / `intl-XX` path segment so the user's geo gets routed correctly by the destination service rather than getting forced into whichever store the MB editor used.
+
+`<IconTooltip>` shows the friendly site name (X for twitter.com / x.com, MusicBrainz for musicbrainz.org, Bandcamp always uses the canonical favicon regardless of the per-artist subdomain).
 
 ---
 
@@ -147,7 +202,11 @@ Helpers in `lib/parachord.ts`. Do not change those URL shapes without coordinati
 - `app/(app)/charts/` — sub-tabbed Charts: Apple Music (lazy MBID resolution), Spotify (placeholder), College Radio (Earshot Top 50 with country picker)
 - `app/(app)/radio/` — sub-tabbed Radio: Rewinds (default), Builder
 - `app/(app)/explore/` — Overview / Year-in-Music / Critical Darlings / Fresh Releases
-- `app/api/` — internal API routes (XSPF playlist export, etc.)
+- `app/api/` — internal API routes:
+  - `search/` — typeahead JSON endpoint (artists/albums/songs/users + popularity sort + `artist:` `album:` `song:` `user:` power filters)
+  - `track-cover/` — `(artist, title, album)` → CAA URL resolver for radio rewinds
+  - `artist-image/` — MBID → Wikidata-hosted thumbnail for typeahead artist rows
+  - `playlist/[mbid]/xspf/` — XSPF export
 - `app/{artist,recording,release-group}/lookup/route.ts` — click-time MBID resolvers (outside the (app) group on purpose, since they 302 elsewhere)
 
 ### Data clients
@@ -164,13 +223,24 @@ Helpers in `lib/parachord.ts`. Do not change those URL shapes without coordinati
 - `lib/entity-links.ts` — **the** way to render a name as a link
 - `lib/parachord.ts` — `parachord://` URL builders, protocol-spec aligned
 - `lib/use-parachord-presence.ts` — singleton WS presence hook
+- `lib/familiarity.ts` — slider value → listen-count threshold (server + client safe)
+- `lib/exclude-listened.ts` — `buildExcludedArtistSet` / `buildExcludedRecordingSet` for recommendation filtering
 - `lib/dicebear-shapes.ts` — generated avatar palette (deliberately non-violet so it doesn't fight the Parachord-purple Play CTAs)
 - `lib/apple-charts-countries.ts`, `lib/college-charts-countries.ts` — country pickers
 
 ### Components
 - `components/ui/` — shadcn primitives + custom `tooltip.tsx`, `icon-tooltip.tsx`
-- `components/achordion/` — application components (track lists, charts grids, sidebars, hero cards, etc.)
-- `components/layout/` — site header, main nav, wordmark, theme toggle
+- `components/achordion/` — application components (track lists, charts grids, sidebars, hero cards, etc.). Notable patterns:
+  - `play-on-hover-fab.tsx` — universal album-grid hover play button
+  - `parachord-button.tsx` — `<ParachordCtaButton>`, `<ParachordPlayButton>`, `<PlayOverNumberCell>`
+  - `open-in-parachord-button.tsx` — playlist / radio / import variants
+  - `artist-credit-links.tsx` — multi-artist credit with preserved join phrases
+  - `release-type-chip.tsx` — Album/EP overlay for mixed-type album grids
+  - `add-sources-button.tsx` — "+" tile linking to MB `/edit` page
+  - `familiarity-slider.tsx` — recommendation-rail strictness control
+  - `search-typeahead.tsx` — live search with `latest_listened_at` + popularity sort
+  - `lazy-track-cover.tsx` — non-blocking CAA cover-art lookup for radio rewinds
+- `components/layout/` — site header, main nav, wordmark, theme toggle, footer
 - `components/providers/` — Theme / Query / Tooltip providers (one mount of `TooltipProvider` for the whole app)
 
 ---
