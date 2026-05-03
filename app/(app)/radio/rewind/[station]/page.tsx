@@ -4,7 +4,7 @@ import { ArrowLeft, ExternalLink, Play } from "lucide-react";
 import { getSpinbinPlaylist } from "@/lib/clients/spinbin";
 import { getSpinbinStation } from "@/lib/spinbin-stations";
 import { parachordPlayTrack } from "@/lib/parachord";
-import { CoverArt } from "@/components/achordion/cover-art";
+import { LazyTrackCover } from "@/components/achordion/lazy-track-cover";
 import { OpenInParachordButton } from "@/components/achordion/open-in-parachord-button";
 import { PageShell } from "@/components/achordion/page-shell";
 import { ParachordPlayButton } from "@/components/achordion/parachord-button";
@@ -148,7 +148,6 @@ export default async function RewindStationPage({ params }: PageProps) {
       ) : (
         <ol className="border-border/60 divide-border/60 divide-y rounded-xl border px-4">
           {tracks.map((t, i) => {
-            const cover = t.image ?? null;
             return (
               <li
                 key={`${t.title}-${i}`}
@@ -166,7 +165,20 @@ export default async function RewindStationPage({ params }: PageProps) {
                   title="Play in Parachord"
                   className="group/cover relative shrink-0 overflow-hidden rounded-md"
                 >
-                  <CoverArt src={cover} alt={t.album ?? t.title} size={40} />
+                  {/* Lazy CAA lookup when spinbin didn't include a
+                      cover URL on its feed. Page paints instantly
+                      with placeholders; covers stream in over the
+                      next several seconds as MB / CAA round-trips
+                      complete. Cached server-side so subsequent
+                      visits are fast. */}
+                  <LazyTrackCover
+                    artist={t.creator}
+                    title={t.title}
+                    album={t.album}
+                    alt={t.album ?? t.title}
+                    size={40}
+                    initialSrc={t.image}
+                  />
                   <span
                     aria-hidden
                     className="absolute inset-0 flex items-center justify-center bg-black/55 opacity-0 transition-opacity group-hover/cover:opacity-100"

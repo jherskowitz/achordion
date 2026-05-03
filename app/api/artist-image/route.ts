@@ -1,6 +1,13 @@
 import { getArtist, partitionArtistRelations } from "@/lib/clients/musicbrainz";
 import { getArtistImageFromWikidata } from "@/lib/clients/wikidata";
 
+// Browser cache: 1h fresh, 24h stale-while-revalidate. Wikidata
+// images change rarely; a stale response in flight is fine.
+const CACHE_HEADERS = {
+  "Cache-Control":
+    "public, max-age=3600, s-maxage=3600, stale-while-revalidate=86400",
+};
+
 /**
  * Resolve an MB artist MBID to a Wikidata-hosted thumbnail URL.
  *
@@ -27,13 +34,17 @@ export async function GET(request: Request) {
     const artist = await getArtist(mbid);
     const { urls } = partitionArtistRelations(artist);
     const wikidataUrl = urls.find((u) => /wikidata\.org/i.test(u.url))?.url;
-    if (!wikidataUrl) return Response.json({ url: null });
+    if (!wikidataUrl)
+      return Response.json({ url: null }, { headers: CACHE_HEADERS });
     const imageUrl = await getArtistImageFromWikidata(
       wikidataUrl,
       Number.isFinite(width) ? width : 128,
     );
-    return Response.json({ url: imageUrl ?? null });
+    return Response.json(
+      { url: imageUrl ?? null },
+      { headers: CACHE_HEADERS },
+    );
   } catch {
-    return Response.json({ url: null });
+    return Response.json({ url: null }, { headers: CACHE_HEADERS });
   }
 }
