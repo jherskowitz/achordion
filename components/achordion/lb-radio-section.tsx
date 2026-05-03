@@ -101,6 +101,7 @@ export function LbRadioSection({
       <div className="flex flex-wrap items-center gap-3 p-5">
         <div className="flex flex-1 items-center gap-3">
           <IconTooltip
+            side="top"
             label={
               parachordRunning
                 ? `Play ${seedLabel} Radio in Parachord`
