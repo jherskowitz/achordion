@@ -2,8 +2,8 @@ import type { ReactNode } from "react";
 import { SectionTabs, type SectionTab } from "@/components/achordion/section-tabs";
 
 const CHARTS_TABS: SectionTab[] = [
+  { href: "/charts/listenbrainz", label: "ListenBrainz" },
   { href: "/charts/apple-music", label: "Apple Music" },
-  { href: "/charts/spotify", label: "Spotify" },
   { href: "/charts/college-radio", label: "College Radio" },
 ];
 

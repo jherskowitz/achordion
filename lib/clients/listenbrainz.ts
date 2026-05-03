@@ -239,6 +239,138 @@ export async function getSitewideTopArtists(range = "week", count = 10) {
   return result.payload.artists;
 }
 
+const SitewideStatsReleaseGroupsSchema = z.object({
+  payload: z.object({
+    release_groups: z.array(
+      z.object({
+        release_group_name: z.string(),
+        release_group_mbid: z.string().nullish(),
+        artist_name: z.string(),
+        artist_mbids: z.array(z.string()).optional(),
+        listen_count: z.number(),
+        caa_id: z.union([z.number(), z.string()]).nullish(),
+        caa_release_mbid: z.string().nullish(),
+      }),
+    ),
+    range: z.string(),
+    from_ts: z.number().optional(),
+    to_ts: z.number().optional(),
+  }),
+});
+
+export interface SitewideTopReleaseGroup {
+  release_group_name: string;
+  release_group_mbid: string | null;
+  artist_name: string;
+  artist_mbids: string[];
+  listen_count: number;
+  caa_id: number | string | null;
+  caa_release_mbid: string | null;
+}
+
+const SitewideStatsRecordingsSchema = z.object({
+  payload: z.object({
+    recordings: z.array(
+      z.object({
+        track_name: z.string(),
+        recording_mbid: z.string().nullish(),
+        artist_name: z.string(),
+        artist_mbids: z.array(z.string()).optional(),
+        release_name: z.string().nullish(),
+        release_mbid: z.string().nullish(),
+        listen_count: z.number(),
+      }),
+    ),
+    range: z.string(),
+    from_ts: z.number().optional(),
+    to_ts: z.number().optional(),
+  }),
+});
+
+export interface SitewideTopRecording {
+  track_name: string;
+  recording_mbid: string | null;
+  artist_name: string;
+  artist_mbids: string[];
+  release_name: string | null;
+  release_mbid: string | null;
+  listen_count: number;
+}
+
+/**
+ * Sitewide top tracks (recordings) by listen count. Same shape as the
+ * release-groups endpoint, but per-track. LB doesn't include cover-
+ * art identifiers here (unlike release-groups), so callers need to
+ * resolve covers separately — `LazyTrackCover` is the right tool.
+ */
+export async function getSitewideTopRecordings(
+  range = "week",
+  count = 50,
+): Promise<SitewideTopRecording[]> {
+  try {
+    const params = new URLSearchParams({ range, count: String(count) });
+    const result = await lbFetch(
+      `/stats/sitewide/recordings?${params}`,
+      SitewideStatsRecordingsSchema,
+      { revalidate: 60 * 60, tags: [`lb:sitewide:recordings:${range}`] },
+    );
+    return result.payload.recordings.map((r) => ({
+      track_name: r.track_name,
+      recording_mbid: r.recording_mbid ?? null,
+      artist_name: r.artist_name,
+      artist_mbids: r.artist_mbids ?? [],
+      release_name: r.release_name ?? null,
+      release_mbid: r.release_mbid ?? null,
+      listen_count: r.listen_count,
+    }));
+  } catch (err) {
+    if (
+      err instanceof ListenBrainzError &&
+      (err.status === 204 || err.status === 404)
+    ) {
+      return [];
+    }
+    throw err;
+  }
+}
+
+/**
+ * Sitewide top albums (release-groups) by listen count over the given
+ * range. Public, unauthed; LB returns CAA cover-art identifiers
+ * inline so we render straight off the response without a follow-up
+ * lookup.
+ */
+export async function getSitewideTopReleaseGroups(
+  range = "week",
+  count = 50,
+): Promise<SitewideTopReleaseGroup[]> {
+  try {
+    const params = new URLSearchParams({ range, count: String(count) });
+    const result = await lbFetch(
+      `/stats/sitewide/release-groups?${params}`,
+      SitewideStatsReleaseGroupsSchema,
+      { revalidate: 60 * 60, tags: [`lb:sitewide:rgs:${range}`] },
+    );
+    return result.payload.release_groups.map((r) => ({
+      release_group_name: r.release_group_name,
+      release_group_mbid: r.release_group_mbid ?? null,
+      artist_name: r.artist_name,
+      artist_mbids: r.artist_mbids ?? [],
+      listen_count: r.listen_count,
+      caa_id: r.caa_id ?? null,
+      caa_release_mbid: r.caa_release_mbid ?? null,
+    }));
+  } catch (err) {
+    if (
+      err instanceof ListenBrainzError &&
+      (err.status === 204 || err.status === 404)
+    ) {
+      return [];
+    }
+    throw err;
+  }
+}
+
 const TopRecordingForArtistSchema = z.object({
   recording_mbid: z.string(),
   recording_name: z.string(),
