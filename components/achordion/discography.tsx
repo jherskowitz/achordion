@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { CoverArt } from "./cover-art";
 import { PlayOnHoverFab } from "./play-on-hover-fab";
+import { ReleaseTypeChip } from "./release-type-chip";
 import { caaReleaseGroupUrl } from "@/lib/clients/coverart";
 import { parachordPlayAlbum } from "@/lib/parachord";
 import type { DiscographyBucket } from "@/lib/clients/musicbrainz";
@@ -15,6 +16,11 @@ const TYPE_LABELS: Record<string, string> = {
   Live: "Live",
   Soundtrack: "Soundtracks",
   Remix: "Remixes",
+  // Synthetic bucket produced by the artist page when the filter is
+  // "Albums + EPs" — entries from both primary types intermingled and
+  // sorted by date. The release-type chip lights up per cover so the
+  // mix stays scannable.
+  Studio: "Albums + EPs",
 };
 
 export function Discography({ buckets }: { buckets: DiscographyBucket[] }) {
@@ -40,6 +46,10 @@ export function Discography({ buckets }: { buckets: DiscographyBucket[] }) {
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
             {bucket.releaseGroups.map((rg) => {
               const year = rg["first-release-date"]?.slice(0, 4);
+              // Type chip only on the merged "Studio" bucket — single-
+              // type buckets (Album-only / EP-only) don't need it
+              // because the section header already labels them.
+              const showChip = bucket.type === "Studio";
               return (
                 <div key={rg.id} className="min-w-0">
                   <div className="group relative overflow-hidden rounded-md">
@@ -55,6 +65,9 @@ export function Discography({ buckets }: { buckets: DiscographyBucket[] }) {
                         rounded="md"
                       />
                     </Link>
+                    {showChip && (
+                      <ReleaseTypeChip type={rg["primary-type"]} />
+                    )}
                     <PlayOnHoverFab
                       href={parachordPlayAlbum({ mbid: rg.id })}
                       label={`Play "${rg.title}" in Parachord`}

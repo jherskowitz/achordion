@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { OnAirIndicator } from "./on-air-indicator";
+import { UserAvatar } from "./user-avatar";
 
 interface ListenerEntry {
   user_name: string;
@@ -23,13 +24,16 @@ export function TopListenersList({ listeners }: { listeners: ListenerEntry[] }) 
               href={`/user/${encodeURIComponent(l.user_name)}`}
               className="block"
             >
-              <div className="flex items-center justify-between">
-                <span className="truncate">
-                  <span className="text-muted-foreground/70 mr-2 text-xs tabular-nums">
-                    {i + 1}
-                  </span>
-                  {l.user_name}
+              <div className="flex items-center gap-2">
+                <span className="text-muted-foreground/70 w-4 shrink-0 text-xs tabular-nums">
+                  {i + 1}
                 </span>
+                <UserAvatar
+                  username={l.user_name}
+                  className="size-6 shrink-0"
+                  fallbackClassName="text-[10px]"
+                />
+                <span className="min-w-0 flex-1 truncate">{l.user_name}</span>
                 <span className="text-muted-foreground shrink-0 text-xs tabular-nums">
                   {l.listen_count.toLocaleString()}
                 </span>
@@ -42,11 +46,11 @@ export function TopListenersList({ listeners }: { listeners: ListenerEntry[] }) 
               </div>
             </Link>
             <Suspense fallback={null}>
-              {/* Indent past the rank-number column so the now-playing
+              {/* Indent past the rank + avatar columns so the now-playing
                   line lines up under the username, not the row edge. */}
               <OnAirIndicator
                 username={l.user_name}
-                className="mt-1 ml-7"
+                className="mt-1 ml-12"
               />
             </Suspense>
           </li>

@@ -92,6 +92,18 @@ async function ArtistBody({
   //   social    → favicon row inside the bio block
   //   other     → wiki/discogs/lyrics/etc. in the sidebar
   const { streaming, social, other } = categoriseLinks(urls);
+  // Always include MusicBrainz itself in the bio block's social /
+  // official sites row so users can jump to the MB entity page from
+  // any artist regardless of which other reference links MB editors
+  // have wired up. Type is "official homepage" so the dedupe + sort
+  // pass treats it as a preferred entry.
+  const socialWithMb: ArtistExternalLink[] = [
+    ...social,
+    {
+      type: "official homepage",
+      url: `https://musicbrainz.org/artist/${artist.id}`,
+    },
+  ];
 
   const tags = (artist.genres?.length ? artist.genres : artist.tags ?? [])
     .filter((t) => t.count > 0)
@@ -178,14 +190,12 @@ async function ArtistBody({
             <Suspense
               fallback={<Skeleton className="h-32 w-full rounded-xl" />}
             >
-              <BiographySection source={bioSource} socialLinks={social} />
+              <BiographySection source={bioSource} socialLinks={socialWithMb} />
             </Suspense>
           ) : (
-            social.length > 0 && (
-              <div className="border-border/60 bg-card/30 mb-6 rounded-xl border p-5">
-                <ExternalLinks links={social} />
-              </div>
-            )
+            <div className="border-border/60 bg-card/30 mb-6 rounded-xl border p-5">
+              <ExternalLinks links={socialWithMb} />
+            </div>
           )}
 
           <Suspense
@@ -203,7 +213,11 @@ async function ArtistBody({
             </Suspense>
           </section>
         </div>
-        <ArtistInfoSidebar artist={artist} linksOverride={other} />
+        <ArtistInfoSidebar
+          artist={artist}
+          linksOverride={other}
+          topListeners={listeners?.listeners}
+        />
       </div>
 
       {/* Full-width sections — out of the 1fr/240px grid since the
@@ -308,8 +322,20 @@ function filterBucketsByType(
   if (type === "album") return buckets.filter((b) => b.type === "Album");
   if (type === "ep") return buckets.filter((b) => b.type === "EP");
   if (type === "single") return buckets.filter((b) => b.type === "Single");
-  // "studio" — Albums + EPs.
-  return buckets.filter((b) => b.type === "Album" || b.type === "EP");
+  // "studio" — Albums + EPs intermingled, sorted newest first.
+  // Synthetic "Studio" bucket triggers the type-chip overlay on each
+  // cover so users can tell formats apart at a glance (handled by
+  // <Discography>).
+  const studio = buckets
+    .filter((b) => b.type === "Album" || b.type === "EP")
+    .flatMap((b) => b.releaseGroups);
+  if (studio.length === 0) return [];
+  studio.sort((a, b) => {
+    const da = a["first-release-date"] ?? "";
+    const db = b["first-release-date"] ?? "";
+    return db.localeCompare(da);
+  });
+  return [{ type: "Studio", releaseGroups: studio }];
 }
 
 async function TopTracksSection({ mbid }: { mbid: string }) {
