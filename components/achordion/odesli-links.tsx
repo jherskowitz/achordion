@@ -1,6 +1,7 @@
 import { getOdesliLinks } from "@/lib/clients/odesli";
 import { IconTooltip } from "@/components/ui/icon-tooltip";
 import { AddSourcesButton } from "./add-sources-button";
+import { normalizeStreamingUrl } from "./external-links";
 
 /**
  * Server component that takes a streaming URL we have for the entity
@@ -20,15 +21,22 @@ import { AddSourcesButton } from "./add-sources-button";
  * empty page is worse than hiding the row.
  */
 
+// Order matches the streaming-host priority used by ExternalLinks
+// (Bandcamp → Spotify → Apple Music → Tidal → Qobuz → SoundCloud →
+// YouTube), then everything else Odesli might return. Note: Bandcamp
+// and Qobuz aren't included in Odesli's free-tier responses, but
+// they're listed at the top in case the API begins surfacing them.
 const PLATFORM_ORDER: { key: string; label: string; host: string }[] = [
+  { key: "bandcamp", label: "Bandcamp", host: "bandcamp.com" },
   { key: "spotify", label: "Spotify", host: "spotify.com" },
   { key: "appleMusic", label: "Apple Music", host: "music.apple.com" },
+  { key: "tidal", label: "Tidal", host: "tidal.com" },
+  { key: "qobuz", label: "Qobuz", host: "qobuz.com" },
+  { key: "soundcloud", label: "SoundCloud", host: "soundcloud.com" },
   { key: "youtubeMusic", label: "YouTube Music", host: "music.youtube.com" },
   { key: "youtube", label: "YouTube", host: "youtube.com" },
-  { key: "tidal", label: "Tidal", host: "tidal.com" },
   { key: "deezer", label: "Deezer", host: "deezer.com" },
   { key: "amazonMusic", label: "Amazon Music", host: "music.amazon.com" },
-  { key: "soundcloud", label: "SoundCloud", host: "soundcloud.com" },
   { key: "pandora", label: "Pandora", host: "pandora.com" },
   { key: "anghami", label: "Anghami", host: "anghami.com" },
   { key: "boomplay", label: "Boomplay", host: "boomplay.com" },
@@ -106,11 +114,16 @@ function FaviconLink({
   label: string;
   host: string;
 }) {
+  // Strip the country / locale segment so Apple Music / iTunes /
+  // Spotify auto-route to the user's storefront. Odesli responses are
+  // scoped to the userCountry we ask for; stripping the segment lets
+  // those URLs work for users elsewhere too.
+  const href = normalizeStreamingUrl(url);
   return (
     <li>
       <IconTooltip label={label}>
         <a
-          href={url}
+          href={href}
           target="_blank"
           rel="noopener noreferrer"
           aria-label={label}

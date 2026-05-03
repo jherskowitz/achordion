@@ -23,6 +23,102 @@ const PREFERRED_TYPES = new Set([
   "purchase for download",
 ]);
 
+/**
+ * Within the streaming favicon row we want a deterministic, opinionated
+ * order: Bandcamp first (artist-supportive), then the major DSPs in
+ * descending order of how often Achordion's audience uses them, then
+ * everything else by MB's natural ordering. Anything matched here goes
+ * to the front; unmatched links keep their relative order behind.
+ *
+ * Hosts are matched as substrings of the lowercased URL — covers both
+ * `https://open.spotify.com/…` and `https://spotify.com/…`-style
+ * variations without enumerating subdomains.
+ */
+const STREAMING_HOST_PRIORITY: string[] = [
+  "bandcamp.com",
+  "spotify.com",
+  "music.apple.com",
+  "tidal.com",
+  "qobuz.com",
+  "soundcloud.com",
+  "music.youtube.com",
+  "youtube.com",
+];
+
+function streamingPriority(url: string): number {
+  const u = url.toLowerCase();
+  for (let i = 0; i < STREAMING_HOST_PRIORITY.length; i++) {
+    if (u.includes(STREAMING_HOST_PRIORITY[i])) return i;
+  }
+  return STREAMING_HOST_PRIORITY.length;
+}
+
+/**
+ * Hosts that are definitively dead — sites that have shut down /
+ * redirect to homepages / are otherwise useless to surface. MB
+ * editors leave these on entities for years after the service dies,
+ * so we filter at the presentation layer rather than waiting for
+ * data cleanup upstream. Substring match on the lowercased URL.
+ */
+const DEAD_HOST_FRAGMENTS = [
+  "plus.google.com", // Google+ — shut down April 2019
+  "googleplus.com",
+  "rdio.com", // Rdio — shut down December 2015
+  "vine.co", // Vine — shut down January 2017
+  "grooveshark.com", // Grooveshark — shut down April 2015
+  "imeem.com", // imeem — shut down 2009
+  "8tracks.com", // 8tracks — shut down January 2019
+  "thesixtyone.com", // thesixtyone — shut down 2012
+  "exfm.com", // ex.fm — shut down 2013
+  "playmusic.com", // Google Play Music — shut down December 2020
+  "songkick.com/concerts", // Songkick concerts merged into Bandsintown
+  "myspace.com/music", // Myspace Music — effectively dead (data lost in 2019)
+];
+
+function isDeadHost(url: string): boolean {
+  const u = url.toLowerCase();
+  return DEAD_HOST_FRAGMENTS.some((h) => u.includes(h));
+}
+
+/**
+ * Normalize a streaming URL by stripping the country / locale segment.
+ *
+ * Used for two purposes:
+ *   1. Deduplication — MB editors routinely attach the same Apple
+ *      Music / iTunes link in multiple regional variants on a single
+ *      entity (`/us/album/…`, `/gb/album/…`, `/jp/album/…`); the
+ *      normalized form lets the dedupe step keep just one.
+ *   2. Rendered href — Apple Music auto-routes users to their own
+ *      storefront when no country segment is present, so stripping
+ *      the segment means a US-based MB editor adding a `/us/` URL
+ *      doesn't force a UK user into the US store.
+ *
+ * Applied to:
+ *   - `music.apple.com/<cc>/…` and `itunes.apple.com/<cc>/…` →
+ *     strip the leading two-letter country segment.
+ *   - `open.spotify.com/intl-XX/…` → strip the `/intl-XX/` prefix.
+ *
+ * Returns the original URL on parse failure.
+ */
+export function normalizeStreamingUrl(url: string): string {
+  try {
+    const u = new URL(url);
+    const host = u.hostname.toLowerCase();
+    if (host === "music.apple.com" || host === "itunes.apple.com") {
+      const seg = u.pathname.split("/").filter(Boolean);
+      if (seg.length > 0 && /^[a-z]{2}$/i.test(seg[0])) {
+        u.pathname = "/" + seg.slice(1).join("/");
+      }
+    }
+    if (host === "open.spotify.com") {
+      u.pathname = u.pathname.replace(/^\/intl-[a-z]{2,5}\//i, "/");
+    }
+    return u.toString();
+  } catch {
+    return url;
+  }
+}
+
 // ─── Categorisation helpers ────────────────────────────────────────
 // The artist page splits external links across three locations
 // (streaming row under the title, social row in the bio block, leftover
@@ -92,7 +188,7 @@ export interface CategorisedLinks {
 /**
  * Split a flat list of MB url-rels into:
  *   - streaming  → Spotify / Apple Music / YouTube / Bandcamp / etc.
- *   - social     → Twitter, Instagram, Mastodon, "official homepage", …
+ *   - social     → X / Instagram / Mastodon / "official homepage" / …
  *   - other      → Wikipedia, Wikidata, Discogs, IMDb, lyrics sites, …
  *
  * Streaming wins ties — a `bandcamp.com` URL typed as
@@ -104,7 +200,9 @@ export function categoriseLinks(
   const streaming: ArtistExternalLink[] = [];
   const social: ArtistExternalLink[] = [];
   const other: ArtistExternalLink[] = [];
-  for (const l of links) {
+  // Drop dead-host links upfront so they don't reach the sidebar's
+  // "Other Links" either — same filter that's applied at render time.
+  for (const l of links.filter((x) => !isDeadHost(x.url))) {
     if (isStreaming(l)) streaming.push(l);
     else if (isSocial(l)) social.push(l);
     else other.push(l);
@@ -134,6 +232,7 @@ const HOST_LABEL_RULES: [string, string][] = [
   ["vimeo.com", "Vimeo"],
   ["wikipedia.org", "Wikipedia"],
   ["wikidata.org", "Wikidata"],
+  ["musicbrainz.org", "MusicBrainz"],
   ["discogs.com", "Discogs"],
   ["genius.com", "Genius"],
   ["last.fm", "Last.fm"],
@@ -141,8 +240,8 @@ const HOST_LABEL_RULES: [string, string][] = [
   ["musixmatch.com", "Musixmatch"],
   ["azlyrics.com", "AZLyrics"],
   ["instagram.com", "Instagram"],
-  ["twitter.com", "Twitter"],
-  ["x.com", "Twitter"],
+  ["twitter.com", "X"],
+  ["x.com", "X"],
   ["facebook.com", "Facebook"],
   ["tiktok.com", "TikTok"],
   ["threads.net", "Threads"],
@@ -197,10 +296,18 @@ function tooltipLabel(link: ArtistExternalLink): string {
  * globe glyph when the domain doesn't have a favicon, so we don't need
  * an extra fallback path. Empty string for malformed URLs (the `<img>`
  * shows the browser's broken-image glyph then).
+ *
+ * Special-case: every artist on Bandcamp lives on `<artist>.bandcamp.com`
+ * and most don't set a favicon, so the s2 lookup returns a generic
+ * globe. Force the canonical `bandcamp.com` icon for any *.bandcamp.com
+ * URL so the row stays recognisable.
  */
 function faviconUrl(url: string): string {
   try {
     const host = new URL(url).hostname;
+    if (host.toLowerCase().endsWith(".bandcamp.com")) {
+      return `https://www.google.com/s2/favicons?domain=bandcamp.com&sz=64`;
+    }
     return `https://www.google.com/s2/favicons?domain=${host}&sz=64`;
   } catch {
     return "";
@@ -216,13 +323,28 @@ export function ExternalLinks({
    *  `edit-relationships` page so users can add more URLs. */
   addSources?: { mbEntity: "artist" | "release-group" | "recording" | "release"; mbid: string };
 }) {
-  // Dedupe by URL and bias preferred service rels to the front.
-  const deduped = Array.from(
-    new Map(links.map((l) => [l.url, l])).values(),
-  );
+  // Dedupe and sort:
+  //   1. drop dead-host links (Google+, Rdio, Vine, etc. — see
+  //      DEAD_HOST_FRAGMENTS).
+  //   2. dedupe by NORMALIZED url so regional Apple Music / Spotify
+  //      variants of the same canonical link collapse to one. Keep
+  //      the first occurrence's original URL in the value — the
+  //      country code in the path is harmless when clicked.
+  //   3. sort by streaming-host priority (Bandcamp → Spotify → Apple
+  //      Music → Tidal → Qobuz → SoundCloud → YouTube), then by
+  //      preferred MB rel-types, then natural ordering.
+  const seen = new Map<string, ArtistExternalLink>();
+  for (const l of links) {
+    if (isDeadHost(l.url)) continue;
+    const key = normalizeStreamingUrl(l.url);
+    if (!seen.has(key)) seen.set(key, l);
+  }
+  const deduped = Array.from(seen.values());
   const sorted = deduped
     .slice()
     .sort((a, b) => {
+      const sp = streamingPriority(a.url) - streamingPriority(b.url);
+      if (sp !== 0) return sp;
       const ap = PREFERRED_TYPES.has(a.type) ? 0 : 1;
       const bp = PREFERRED_TYPES.has(b.type) ? 0 : 1;
       return ap - bp;
@@ -236,6 +358,10 @@ export function ExternalLinks({
       {sorted.map((link) => {
         const label = tooltipLabel(link);
         const src = faviconUrl(link.url);
+        // Render the country-stripped URL so Apple Music / iTunes /
+        // Spotify auto-route to the user's storefront instead of the
+        // one MB's editor happened to use.
+        const href = normalizeStreamingUrl(link.url);
         return (
           // CSS-only IconTooltip — pure styling sibling, no Radix
           // slot chain, no hydration round-trip. See
@@ -243,7 +369,7 @@ export function ExternalLinks({
           <li key={link.url}>
             <IconTooltip label={label}>
               <a
-                href={link.url}
+                href={href}
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-label={label}
