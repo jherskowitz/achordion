@@ -224,14 +224,9 @@ async function ArtistBody({
         </Suspense>
       </section>
 
-      <section className="mt-16">
-        <h2 className="mb-6 text-sm font-semibold tracking-wide uppercase">
-          Fans also like
-        </h2>
-        <Suspense fallback={<SimilarArtistsSkeleton />}>
-          <SimilarArtistsSection mbid={mbid} />
-        </Suspense>
-      </section>
+      <Suspense fallback={<SimilarArtistsSkeleton />}>
+        <SimilarArtistsSection mbid={mbid} />
+      </Suspense>
     </>
   );
 }
@@ -253,29 +248,38 @@ async function LbRadioBlock({
 
 async function SimilarArtistsSection({ mbid }: { mbid: string }) {
   const similar = await getSimilarArtists(mbid, 12);
-  if (similar.length === 0) {
-    return (
-      <p className="text-muted-foreground text-sm">
-        No similar artists on file.
-      </p>
-    );
-  }
-  return <SimilarArtists artists={similar} />;
+  // Hide the section entirely when there's nothing to show — the
+  // heading was leaving an empty card visible for artists with no LB
+  // similar-artists data on file.
+  if (similar.length === 0) return null;
+  return (
+    <section className="mt-16">
+      <h2 className="mb-6 text-sm font-semibold tracking-wide uppercase">
+        Fans also like
+      </h2>
+      <SimilarArtists artists={similar} />
+    </section>
+  );
 }
 
 function SimilarArtistsSkeleton() {
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-      {Array.from({ length: 8 }).map((_, i) => (
-        <div
-          key={i}
-          className="border-border/60 space-y-2 rounded-xl border p-4"
-        >
-          <Skeleton className="h-4 w-2/3" />
-          <Skeleton className="h-3 w-full" />
-        </div>
-      ))}
-    </div>
+    <section className="mt-16">
+      <h2 className="mb-6 text-sm font-semibold tracking-wide uppercase">
+        Fans also like
+      </h2>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+        {Array.from({ length: 8 }).map((_, i) => (
+          <div
+            key={i}
+            className="border-border/60 space-y-2 rounded-xl border p-4"
+          >
+            <Skeleton className="h-4 w-2/3" />
+            <Skeleton className="h-3 w-full" />
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
 
