@@ -16,7 +16,6 @@ import {
 import { PageShell } from "@/components/achordion/page-shell";
 import { AlbumHeader } from "@/components/achordion/album-header";
 import { TrackList } from "@/components/achordion/track-list";
-import { EditionsList } from "@/components/achordion/editions-list";
 import { TopListenersList } from "@/components/achordion/top-listeners-list";
 import { ExternalLinks } from "@/components/achordion/external-links";
 import { ComingSoon } from "@/components/achordion/coming-soon";
@@ -109,20 +108,6 @@ async function AlbumBody({ mbid }: { mbid: string }) {
             )}
           </section>
 
-          {(rg.releases ?? []).length > 1 && (
-            <section>
-              <h2 className="mb-4 text-sm font-semibold tracking-wide uppercase">
-                Editions{" "}
-                <span className="text-muted-foreground/70 text-xs font-normal tabular-nums">
-                  · {rg.releases?.length}
-                </span>
-              </h2>
-              <EditionsList
-                releases={rg.releases ?? []}
-                highlightId={canonical?.id}
-              />
-            </section>
-          )}
         </div>
 
         <aside className="space-y-8">
