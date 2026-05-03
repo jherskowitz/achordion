@@ -24,14 +24,32 @@ import {
   ExternalLinks,
   categoriseLinks,
 } from "@/components/achordion/external-links";
+import { FilterPills } from "@/components/achordion/filter-pills";
 import type { ArtistExternalLink } from "@/lib/clients/musicbrainz";
 import { LbRadioSection } from "@/components/achordion/lb-radio-section";
 import { SimilarArtists } from "@/components/achordion/similar-artists";
 import { TopTracksList } from "@/components/achordion/top-tracks-list";
 import { Skeleton } from "@/components/ui/skeleton";
 
+const DISCOGRAPHY_TYPE_OPTIONS = [
+  { value: "studio" as const, label: "Albums + EPs" },
+  { value: "album" as const, label: "Albums" },
+  { value: "ep" as const, label: "EPs" },
+  { value: "single" as const, label: "Singles" },
+  { value: "all" as const, label: "All" },
+] as const;
+
+type DiscographyType = (typeof DISCOGRAPHY_TYPE_OPTIONS)[number]["value"];
+
+function parseDiscographyType(v: string | undefined): DiscographyType {
+  return DISCOGRAPHY_TYPE_OPTIONS.some((o) => o.value === v)
+    ? (v as DiscographyType)
+    : "studio";
+}
+
 interface PageParams {
   params: Promise<{ mbid: string }>;
+  searchParams: Promise<{ type?: string }>;
 }
 
 async function BiographySection({
@@ -48,7 +66,13 @@ async function BiographySection({
   return <Biography bio={bio} footer={footer} />;
 }
 
-async function ArtistBody({ mbid }: { mbid: string }) {
+async function ArtistBody({
+  mbid,
+  discographyType,
+}: {
+  mbid: string;
+  discographyType: DiscographyType;
+}) {
   let artist;
   try {
     artist = await getArtist(mbid);
@@ -174,11 +198,26 @@ async function ArtistBody({ mbid }: { mbid: string }) {
           </section>
 
           <section>
-            <h2 className="mb-6 text-sm font-semibold tracking-wide uppercase">
-              Discography
-            </h2>
-            <Suspense fallback={<DiscographySkeleton />}>
-              <DiscographySection mbid={mbid} />
+            <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+              <h2 className="text-sm font-semibold tracking-wide uppercase">
+                Discography
+              </h2>
+              <FilterPills
+                param="type"
+                active={discographyType}
+                options={DISCOGRAPHY_TYPE_OPTIONS}
+                defaultValue="studio"
+                ariaLabel="Discography type"
+              />
+            </div>
+            <Suspense
+              key={discographyType}
+              fallback={<DiscographySkeleton />}
+            >
+              <DiscographySection
+                mbid={mbid}
+                type={discographyType}
+              />
             </Suspense>
           </section>
         </div>
@@ -240,10 +279,29 @@ function SimilarArtistsSkeleton() {
   );
 }
 
-async function DiscographySection({ mbid }: { mbid: string }) {
+async function DiscographySection({
+  mbid,
+  type,
+}: {
+  mbid: string;
+  type: DiscographyType;
+}) {
   const groups = await getArtistReleaseGroups(mbid);
-  const buckets = bucketDiscography(groups);
+  const allBuckets = bucketDiscography(groups);
+  const buckets = filterBucketsByType(allBuckets, type);
   return <Discography buckets={buckets} />;
+}
+
+function filterBucketsByType(
+  buckets: ReturnType<typeof bucketDiscography>,
+  type: DiscographyType,
+): ReturnType<typeof bucketDiscography> {
+  if (type === "all") return buckets;
+  if (type === "album") return buckets.filter((b) => b.type === "Album");
+  if (type === "ep") return buckets.filter((b) => b.type === "EP");
+  if (type === "single") return buckets.filter((b) => b.type === "Single");
+  // "studio" — Albums + EPs.
+  return buckets.filter((b) => b.type === "Album" || b.type === "EP");
 }
 
 async function TopTracksSection({ mbid }: { mbid: string }) {
@@ -299,8 +357,13 @@ function ListSkeleton() {
   );
 }
 
-export default async function ArtistPage({ params }: PageParams) {
+export default async function ArtistPage({
+  params,
+  searchParams,
+}: PageParams) {
   const { mbid } = await params;
+  const sp = await searchParams;
+  const discographyType = parseDiscographyType(sp.type);
   return (
     <PageShell>
       <Suspense
@@ -312,7 +375,7 @@ export default async function ArtistPage({ params }: PageParams) {
           </div>
         }
       >
-        <ArtistBody mbid={mbid} />
+        <ArtistBody mbid={mbid} discographyType={discographyType} />
       </Suspense>
     </PageShell>
   );

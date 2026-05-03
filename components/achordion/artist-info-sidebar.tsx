@@ -133,7 +133,7 @@ export function ArtistInfoSidebar({
       {urls.length > 0 && (
         <div>
           <h3 className="mb-2 text-xs tracking-wide uppercase text-muted-foreground">
-            Links
+            Other Links
           </h3>
           <ExternalLinks links={urls} />
         </div>
