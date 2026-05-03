@@ -1,6 +1,5 @@
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
-import { Pencil } from "lucide-react";
 import {
   formatArtistCredit,
   getRelease,
@@ -170,17 +169,6 @@ async function AlbumBody({ mbid }: { mbid: string }) {
               <ExternalLinks links={otherUrls} />
             </div>
           )}
-          <div className="border-border/60 border-t pt-4">
-            <a
-              href={`https://musicbrainz.org/release-group/${rg.id}/edit`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-muted-foreground/70 hover:text-foreground inline-flex items-center gap-1.5 text-xs"
-            >
-              <Pencil className="size-3" />
-              Edit on MusicBrainz
-            </a>
-          </div>
         </aside>
       </div>
     </>

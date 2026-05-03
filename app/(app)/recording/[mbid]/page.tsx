@@ -1,7 +1,6 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Pencil } from "lucide-react";
 import {
   dedupeReleaseGroups,
   formatArtistCredit,
@@ -9,11 +8,15 @@ import {
   partitionArtistRelations,
   type RecordingRelease,
 } from "@/lib/clients/musicbrainz";
-import { getRecordingPopularity } from "@/lib/clients/listenbrainz";
+import {
+  getRecordingPopularity,
+  getReleaseGroupListeners,
+} from "@/lib/clients/listenbrainz";
 import { caaReleaseUrl } from "@/lib/clients/coverart";
 import { parachordPlayAlbum, parachordPlayTrack } from "@/lib/parachord";
 import { CoverArt } from "@/components/achordion/cover-art";
 import { PlayOnHoverFab } from "@/components/achordion/play-on-hover-fab";
+import { ReleaseTypeChip } from "@/components/achordion/release-type-chip";
 import {
   ExternalLinks,
   categoriseLinks,
@@ -21,7 +24,7 @@ import {
 import { OdesliLinks } from "@/components/achordion/odesli-links";
 import { PageHeader } from "@/components/achordion/page-header";
 import { PageShell } from "@/components/achordion/page-shell";
-import { ParachordCtaButton } from "@/components/achordion/parachord-button";
+import { TopListenersList } from "@/components/achordion/top-listeners-list";
 
 interface PageProps {
   params: Promise<{ mbid: string }>;
@@ -62,7 +65,16 @@ async function RecordingBody({ mbid }: { mbid: string }) {
     (r) => r["release-group"]?.id !== heroReleaseGroup?.id,
   );
   const length = formatLength(recording.length);
-  const popularity = await getRecordingPopularity(mbid).catch(() => null);
+  // Recording popularity totals + the album's top-listeners list
+  // (LB has no per-recording top-listeners endpoint — the hero
+  // album's listeners is the closest proxy and is a strict superset
+  // of users who'd have logged this track).
+  const [popularity, albumListeners] = await Promise.all([
+    getRecordingPopularity(mbid).catch(() => null),
+    heroReleaseGroup
+      ? getReleaseGroupListeners(heroReleaseGroup.id).catch(() => null)
+      : Promise.resolve(null),
+  ]);
   const cover = heroRelease ? caaReleaseUrl(heroRelease.id, 500) : null;
   const { urls } = partitionArtistRelations({
     relations: recording.relations,
@@ -86,13 +98,26 @@ async function RecordingBody({ mbid }: { mbid: string }) {
     <>
       <PageHeader
         leading={
-          <CoverArt
-            src={cover}
-            alt={recording.title}
-            size={500}
-            className="aspect-square w-32 sm:w-40"
-            rounded="md"
-          />
+          // Cover-art tile with the standard hover play fab — same
+          // treatment as every album grid, so playback is consistent.
+          // Replaces the dedicated "Play in Parachord" CTA pill that
+          // used to sit below the byline.
+          <div className="group relative aspect-square w-32 overflow-hidden rounded-md sm:w-40">
+            <CoverArt
+              src={cover}
+              alt={recording.title}
+              size={500}
+              className="aspect-square w-full transition-opacity group-hover:opacity-90"
+              rounded="md"
+            />
+            <PlayOnHoverFab
+              href={parachordPlayTrack({
+                artist: credit.name,
+                title: recording.title,
+              })}
+              label={`Play "${recording.title}" by ${credit.name} in Parachord`}
+            />
+          </div>
         }
         eyebrow="Track"
         title={recording.title}
@@ -175,6 +200,18 @@ async function RecordingBody({ mbid }: { mbid: string }) {
             : []),
           { label: recording.title },
         ]}
+        afterTitle={
+          // External streaming favicon row sits directly under the
+          // artist · album · year · length byline. Suspense lets the
+          // Odesli call (cached 24h per seed URL) stream in without
+          // blocking the rest of the header.
+          <Suspense fallback={null}>
+            <OdesliLinks
+              seedUrl={odesliSeed}
+              recordingMbid={recording.id}
+            />
+          </Suspense>
+        }
         actions={
           popularity ? (
             <div className="flex items-baseline gap-6 text-right">
@@ -213,81 +250,21 @@ async function RecordingBody({ mbid }: { mbid: string }) {
         </div>
       )}
 
+      {/* Sidebar (Top listeners + Other Links) sits in a narrow
+          right-aligned column at the top so the heavy "Also appears
+          on" grid below can claim the full page width — same pattern
+          the artist page uses for its discography section. */}
       <div className="mt-6 grid gap-10 lg:grid-cols-[1fr_240px]">
-        <div className="min-w-0 space-y-12">
-          <section>
-            {/* Play button + cross-service favicon row inline. The
-                Odesli call is cached for 24h per seed URL so it stays
-                well under the 10 req/min free-tier ceiling, and the
-                row renders nothing when Odesli has no usable data. */}
-            <div className="flex flex-wrap items-center gap-3">
-              <ParachordCtaButton
-                href={parachordPlayTrack({
-                  artist: credit.name,
-                  title: recording.title,
-                })}
-                label={`Play in Parachord`}
-              />
-              <Suspense fallback={null}>
-                <OdesliLinks
-                  seedUrl={odesliSeed}
-                  recordingMbid={recording.id}
-                />
-              </Suspense>
-            </div>
-          </section>
-
-          {otherReleaseGroups.length > 0 && (
-            <section>
-              <h2 className="mb-4 text-sm font-semibold tracking-wide uppercase">
-                Also appears on
-              </h2>
-              <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">
-                {otherReleaseGroups.map((r) => {
-                  const rg = r["release-group"];
-                  if (!rg) return null;
-                  return (
-                    <li key={rg.id} className="min-w-0">
-                      <div className="group relative overflow-hidden rounded-md">
-                        <Link
-                          href={`/release-group/${rg.id}`}
-                          className="block"
-                        >
-                          <CoverArt
-                            src={caaReleaseUrl(r.id, 500)}
-                            alt={rg.title}
-                            size={500}
-                            className="aspect-square w-full transition-opacity group-hover:opacity-90"
-                            rounded="md"
-                          />
-                        </Link>
-                        <PlayOnHoverFab
-                          href={parachordPlayAlbum({ mbid: rg.id })}
-                          label={`Play "${rg.title}" in Parachord`}
-                        />
-                      </div>
-                      <p className="mt-2 truncate text-sm font-medium">
-                        <Link
-                          href={`/release-group/${rg.id}`}
-                          className="hover:underline"
-                        >
-                          {rg.title}
-                        </Link>
-                      </p>
-                      {r.date && (
-                        <p className="text-muted-foreground/70 text-xs tabular-nums">
-                          {r.date.slice(0, 4)}
-                        </p>
-                      )}
-                    </li>
-                  );
-                })}
-              </ul>
-            </section>
-          )}
-        </div>
-
+        <div className="min-w-0" />
         <aside className="space-y-8">
+          {albumListeners?.listeners && albumListeners.listeners.length > 0 && (
+            <div>
+              <h3 className="mb-3 text-xs tracking-wide uppercase text-muted-foreground">
+                Top listeners
+              </h3>
+              <TopListenersList listeners={albumListeners.listeners} />
+            </div>
+          )}
           {otherUrls.length > 0 && (
             <div>
               <h3 className="mb-3 text-xs tracking-wide uppercase text-muted-foreground">
@@ -296,33 +273,65 @@ async function RecordingBody({ mbid }: { mbid: string }) {
               <ExternalLinks links={otherUrls} />
             </div>
           )}
-          {recording.isrcs && recording.isrcs.length > 0 && (
-            <div>
-              <h3 className="mb-3 text-xs tracking-wide uppercase text-muted-foreground">
-                ISRCs
-              </h3>
-              <ul className="space-y-1 font-mono text-xs">
-                {recording.isrcs.map((isrc) => (
-                  <li key={isrc} className="text-muted-foreground">
-                    {isrc}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-          <div className="border-border/60 border-t pt-4">
-            <a
-              href={`https://musicbrainz.org/recording/${recording.id}/edit`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-muted-foreground/70 hover:text-foreground inline-flex items-center gap-1.5 text-xs"
-            >
-              <Pencil className="size-3" />
-              Edit on MusicBrainz
-            </a>
-          </div>
         </aside>
       </div>
+
+      {otherReleaseGroups.length > 0 && (
+        <section className="mt-16">
+          <h2 className="mb-4 text-sm font-semibold tracking-wide uppercase">
+            Also appears on
+          </h2>
+          {/* Full page width so the grid can spread out — the dense
+              tile sizing (smaller covers, tighter type) keeps it
+              from competing with the track itself above. */}
+          <ul className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8">
+            {otherReleaseGroups.map((r) => {
+              const rg = r["release-group"];
+              if (!rg) return null;
+              return (
+                <li key={rg.id} className="min-w-0">
+                  <div className="group relative overflow-hidden rounded-md">
+                    <Link
+                      href={`/release-group/${rg.id}`}
+                      className="block"
+                    >
+                      <CoverArt
+                        src={caaReleaseUrl(r.id, 250)}
+                        alt={rg.title}
+                        size={250}
+                        className="aspect-square w-full transition-opacity group-hover:opacity-90"
+                        rounded="md"
+                      />
+                    </Link>
+                    {/* "Also appears on" intermingles compilations,
+                        albums, EPs — the chip lets users tell
+                        formats apart at a glance. Renders nothing
+                        for non-Album/EP types. */}
+                    <ReleaseTypeChip type={rg["primary-type"]} />
+                    <PlayOnHoverFab
+                      href={parachordPlayAlbum({ mbid: rg.id })}
+                      label={`Play "${rg.title}" in Parachord`}
+                    />
+                  </div>
+                  <p className="mt-1.5 truncate text-xs font-medium">
+                    <Link
+                      href={`/release-group/${rg.id}`}
+                      className="hover:underline"
+                    >
+                      {rg.title}
+                    </Link>
+                  </p>
+                  {r.date && (
+                    <p className="text-muted-foreground/70 text-[11px] tabular-nums">
+                      {r.date.slice(0, 4)}
+                    </p>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
     </>
   );
 }
