@@ -3,6 +3,7 @@ import { Pin, Play, UserPlus, Bell } from "lucide-react";
 import { CoverArt } from "./cover-art";
 import { caaUrlFromListen } from "@/lib/clients/coverart";
 import { parachordPlayTrack } from "@/lib/parachord";
+import { artistHref, recordingHref } from "@/lib/entity-links";
 import type { FeedEvent } from "@/lib/clients/listenbrainz";
 
 function relativeTime(unixSeconds: number): string {
@@ -127,28 +128,24 @@ function PinEvent({ event }: { event: FeedEvent }) {
           </a>
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-medium">
-              {recordingMbid ? (
-                <Link
-                  href={`/recording/${recordingMbid}`}
-                  className="hover:underline"
-                >
-                  {trackName}
-                </Link>
-              ) : (
-                trackName
-              )}
+              <Link
+                href={recordingHref({
+                  mbid: recordingMbid,
+                  artist: artistName,
+                  title: trackName,
+                })}
+                className="hover:underline"
+              >
+                {trackName}
+              </Link>
             </p>
             <p className="text-muted-foreground truncate text-xs">
-              {artistMbid ? (
-                <Link
-                  href={`/artist/${artistMbid}`}
-                  className="hover:text-foreground"
-                >
-                  {artistName}
-                </Link>
-              ) : (
-                artistName
-              )}
+              <Link
+                href={artistHref({ mbid: artistMbid, name: artistName })}
+                className="hover:text-foreground"
+              >
+                {artistName}
+              </Link>
             </p>
             {m?.blurb_content && (
               <p className="text-foreground/80 mt-1.5 text-sm leading-5 italic">

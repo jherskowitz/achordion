@@ -6,6 +6,11 @@ import {
 } from "@/lib/clients/listenbrainz";
 import { caaReleaseGroupUrl, caaReleaseUrl } from "@/lib/clients/coverart";
 import { CoverArt } from "./cover-art";
+import {
+  artistHref,
+  recordingHref,
+  releaseGroupHref,
+} from "@/lib/entity-links";
 
 interface ArtistEntry {
   artist_name: string;
@@ -17,6 +22,7 @@ interface AlbumEntry {
   release_group_name: string;
   release_group_mbid?: string | null;
   artist_name: string;
+  artist_mbids?: string[];
   listen_count: number;
   caa_id?: number | string | null;
   caa_release_mbid?: string | null;
@@ -26,6 +32,7 @@ interface TrackEntry {
   track_name: string;
   recording_mbid?: string | null;
   artist_name: string;
+  artist_mbids?: string[];
   release_mbid?: string | null;
   listen_count: number;
   caa_id?: number | string | null;
@@ -54,16 +61,15 @@ function ArtistRow({ entry, max }: { entry: ArtistEntry; max: number }) {
     <li className="text-sm">
       <div className="flex items-baseline justify-between gap-2">
         <span className="min-w-0 truncate">
-          {entry.artist_mbid ? (
-            <Link
-              href={`/artist/${entry.artist_mbid}`}
-              className="hover:underline"
-            >
-              {entry.artist_name}
-            </Link>
-          ) : (
-            entry.artist_name
-          )}
+          <Link
+            href={artistHref({
+              mbid: entry.artist_mbid,
+              name: entry.artist_name,
+            })}
+            className="hover:underline"
+          >
+            {entry.artist_name}
+          </Link>
         </span>
         <span className="text-muted-foreground/70 shrink-0 tabular-nums text-xs">
           {entry.listen_count}
@@ -81,44 +87,34 @@ function ArtistRow({ entry, max }: { entry: ArtistEntry; max: number }) {
 
 function AlbumRow({ entry }: { entry: AlbumEntry }) {
   const cover = albumCover(entry);
+  // Cover + album-title share one link, artist sits as a sibling
+  // (nested-anchor avoidance) so both are independently clickable.
+  const albumLink = releaseGroupHref({
+    mbid: entry.release_group_mbid,
+    artist: entry.artist_name,
+    title: entry.release_group_name,
+  });
+  const artistLink = artistHref({
+    mbid: entry.artist_mbids?.[0],
+    name: entry.artist_name,
+  });
   return (
     <li className="flex items-center gap-2.5">
-      {entry.release_group_mbid ? (
-        <Link
-          href={`/release-group/${entry.release_group_mbid}`}
-          className="flex min-w-0 flex-1 items-center gap-2.5"
-        >
-          <CoverArt
-            src={cover}
-            alt={entry.release_group_name}
-            size={36}
-          />
-          <div className="min-w-0">
-            <p className="truncate text-sm font-medium">
-              {entry.release_group_name}
-            </p>
-            <p className="text-muted-foreground truncate text-xs">
-              {entry.artist_name}
-            </p>
-          </div>
-        </Link>
-      ) : (
-        <div className="flex min-w-0 flex-1 items-center gap-2.5">
-          <CoverArt
-            src={cover}
-            alt={entry.release_group_name}
-            size={36}
-          />
-          <div className="min-w-0">
-            <p className="truncate text-sm font-medium">
-              {entry.release_group_name}
-            </p>
-            <p className="text-muted-foreground truncate text-xs">
-              {entry.artist_name}
-            </p>
-          </div>
-        </div>
-      )}
+      <Link href={albumLink} className="shrink-0">
+        <CoverArt src={cover} alt={entry.release_group_name} size={36} />
+      </Link>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-medium">
+          <Link href={albumLink} className="hover:underline">
+            {entry.release_group_name}
+          </Link>
+        </p>
+        <p className="text-muted-foreground truncate text-xs">
+          <Link href={artistLink} className="hover:text-foreground">
+            {entry.artist_name}
+          </Link>
+        </p>
+      </div>
       <span className="text-muted-foreground/70 shrink-0 tabular-nums text-xs">
         {entry.listen_count}
       </span>
@@ -128,24 +124,30 @@ function AlbumRow({ entry }: { entry: AlbumEntry }) {
 
 function TrackRow({ entry }: { entry: TrackEntry }) {
   const cover = trackCover(entry);
+  const trackLink = recordingHref({
+    mbid: entry.recording_mbid,
+    artist: entry.artist_name,
+    title: entry.track_name,
+  });
+  const artistLink = artistHref({
+    mbid: entry.artist_mbids?.[0],
+    name: entry.artist_name,
+  });
   return (
     <li className="flex items-center gap-2.5">
-      <CoverArt src={cover} alt={entry.track_name} size={36} />
+      <Link href={trackLink} className="shrink-0">
+        <CoverArt src={cover} alt={entry.track_name} size={36} />
+      </Link>
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium">
-          {entry.recording_mbid ? (
-            <Link
-              href={`/recording/${entry.recording_mbid}`}
-              className="hover:underline"
-            >
-              {entry.track_name}
-            </Link>
-          ) : (
-            entry.track_name
-          )}
+          <Link href={trackLink} className="hover:underline">
+            {entry.track_name}
+          </Link>
         </p>
         <p className="text-muted-foreground truncate text-xs">
-          {entry.artist_name}
+          <Link href={artistLink} className="hover:text-foreground">
+            {entry.artist_name}
+          </Link>
         </p>
       </div>
       <span className="text-muted-foreground/70 shrink-0 tabular-nums text-xs">

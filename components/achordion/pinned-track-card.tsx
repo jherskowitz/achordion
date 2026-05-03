@@ -5,6 +5,7 @@ import { caaUrlFromListen } from "@/lib/clients/coverart";
 import type { PinnedRecording } from "@/lib/clients/listenbrainz";
 import { parachordPlayTrack } from "@/lib/parachord";
 import { ParachordCtaButton } from "./parachord-button";
+import { artistHref, releaseGroupHref } from "@/lib/entity-links";
 import { cn } from "@/lib/utils";
 
 function relativeFromNow(unixSeconds: number): string {
@@ -34,20 +35,24 @@ function PinnedByline({
     meta.additional_info?.artist_mbids?.[0];
   return (
     <>
-      {artistMbid ? (
-        <Link
-          href={`/artist/${artistMbid}`}
-          className="hover:text-foreground"
-        >
-          {meta.artist_name}
-        </Link>
-      ) : (
-        meta.artist_name
-      )}
+      <Link
+        href={artistHref({ mbid: artistMbid, name: meta.artist_name })}
+        className="hover:text-foreground"
+      >
+        {meta.artist_name}
+      </Link>
       {meta.release_name && (
         <>
           <span className="opacity-50"> · </span>
-          <span className="italic">{meta.release_name}</span>
+          <Link
+            href={releaseGroupHref({
+              artist: meta.artist_name,
+              title: meta.release_name,
+            })}
+            className="italic hover:text-foreground hover:underline"
+          >
+            {meta.release_name}
+          </Link>
         </>
       )}
     </>

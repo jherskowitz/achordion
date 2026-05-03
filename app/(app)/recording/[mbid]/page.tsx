@@ -11,9 +11,14 @@ import {
 } from "@/lib/clients/musicbrainz";
 import { getRecordingPopularity } from "@/lib/clients/listenbrainz";
 import { caaReleaseUrl } from "@/lib/clients/coverart";
-import { parachordPlayTrack } from "@/lib/parachord";
+import { parachordPlayAlbum, parachordPlayTrack } from "@/lib/parachord";
 import { CoverArt } from "@/components/achordion/cover-art";
-import { ExternalLinks } from "@/components/achordion/external-links";
+import { PlayOnHoverFab } from "@/components/achordion/play-on-hover-fab";
+import {
+  ExternalLinks,
+  categoriseLinks,
+} from "@/components/achordion/external-links";
+import { OdesliLinks } from "@/components/achordion/odesli-links";
 import { PageHeader } from "@/components/achordion/page-header";
 import { PageShell } from "@/components/achordion/page-shell";
 import { ParachordCtaButton } from "@/components/achordion/parachord-button";
@@ -62,6 +67,12 @@ async function RecordingBody({ mbid }: { mbid: string }) {
   const { urls } = partitionArtistRelations({
     relations: recording.relations,
   });
+  // Use the first MB streaming url-rel (Spotify / Apple / etc.) as the
+  // seed for Odesli's cross-service lookup. Sidebar "Other Links" gets
+  // everything that isn't a streaming service so we don't double-show
+  // Spotify both there and in the favicon row.
+  const { streaming: streamingUrls, other: otherUrls } = categoriseLinks(urls);
+  const odesliSeed = streamingUrls[0]?.url ?? null;
   const tags = (recording.genres?.length
     ? recording.genres
     : recording.tags ?? []
@@ -139,7 +150,31 @@ async function RecordingBody({ mbid }: { mbid: string }) {
             )}
           </span>
         }
-        breadcrumbs={[{ label: "Tracks" }, { label: recording.title }]}
+        breadcrumbs={[
+          // Artist → Album → Track. Use the primary credited artist
+          // (formatArtistCredit's first part) so guest features don't
+          // pollute the trail. Album crumb is the hero release group
+          // we already picked for the cover/title.
+          ...(credit.parts[0]
+            ? [
+                {
+                  label: credit.parts[0].name,
+                  ...(credit.parts[0].id
+                    ? { href: `/artist/${credit.parts[0].id}` }
+                    : {}),
+                },
+              ]
+            : []),
+          ...(heroReleaseGroup
+            ? [
+                {
+                  label: heroReleaseGroup.title,
+                  href: `/release-group/${heroReleaseGroup.id}`,
+                },
+              ]
+            : []),
+          { label: recording.title },
+        ]}
         actions={
           popularity ? (
             <div className="flex items-baseline gap-6 text-right">
@@ -181,13 +216,22 @@ async function RecordingBody({ mbid }: { mbid: string }) {
       <div className="mt-6 grid gap-10 lg:grid-cols-[1fr_240px]">
         <div className="min-w-0 space-y-12">
           <section>
-            <ParachordCtaButton
-              href={parachordPlayTrack({
-                artist: credit.name,
-                title: recording.title,
-              })}
-              label={`Play in Parachord`}
-            />
+            {/* Play button + cross-service favicon row inline. The
+                Odesli call is cached for 24h per seed URL so it stays
+                well under the 10 req/min free-tier ceiling, and the
+                row renders nothing when Odesli has no usable data. */}
+            <div className="flex flex-wrap items-center gap-3">
+              <ParachordCtaButton
+                href={parachordPlayTrack({
+                  artist: credit.name,
+                  title: recording.title,
+                })}
+                label={`Play in Parachord`}
+              />
+              <Suspense fallback={null}>
+                <OdesliLinks seedUrl={odesliSeed} />
+              </Suspense>
+            </div>
           </section>
 
           {otherReleaseGroups.length > 0 && (
@@ -201,26 +245,37 @@ async function RecordingBody({ mbid }: { mbid: string }) {
                   if (!rg) return null;
                   return (
                     <li key={rg.id} className="min-w-0">
-                      <Link
-                        href={`/release-group/${rg.id}`}
-                        className="group block"
-                      >
-                        <CoverArt
-                          src={caaReleaseUrl(r.id, 500)}
-                          alt={rg.title}
-                          size={500}
-                          className="aspect-square w-full transition-opacity group-hover:opacity-90"
-                          rounded="md"
+                      <div className="group relative overflow-hidden rounded-md">
+                        <Link
+                          href={`/release-group/${rg.id}`}
+                          className="block"
+                        >
+                          <CoverArt
+                            src={caaReleaseUrl(r.id, 500)}
+                            alt={rg.title}
+                            size={500}
+                            className="aspect-square w-full transition-opacity group-hover:opacity-90"
+                            rounded="md"
+                          />
+                        </Link>
+                        <PlayOnHoverFab
+                          href={parachordPlayAlbum({ mbid: rg.id })}
+                          label={`Play "${rg.title}" in Parachord`}
                         />
-                        <p className="mt-2 truncate text-sm font-medium">
+                      </div>
+                      <p className="mt-2 truncate text-sm font-medium">
+                        <Link
+                          href={`/release-group/${rg.id}`}
+                          className="hover:underline"
+                        >
                           {rg.title}
+                        </Link>
+                      </p>
+                      {r.date && (
+                        <p className="text-muted-foreground/70 text-xs tabular-nums">
+                          {r.date.slice(0, 4)}
                         </p>
-                        {r.date && (
-                          <p className="text-muted-foreground/70 text-xs tabular-nums">
-                            {r.date.slice(0, 4)}
-                          </p>
-                        )}
-                      </Link>
+                      )}
                     </li>
                   );
                 })}
@@ -230,12 +285,12 @@ async function RecordingBody({ mbid }: { mbid: string }) {
         </div>
 
         <aside className="space-y-8">
-          {urls.length > 0 && (
+          {otherUrls.length > 0 && (
             <div>
               <h3 className="mb-3 text-xs tracking-wide uppercase text-muted-foreground">
-                Links
+                Other Links
               </h3>
-              <ExternalLinks links={urls} />
+              <ExternalLinks links={otherUrls} />
             </div>
           )}
           {recording.isrcs && recording.isrcs.length > 0 && (

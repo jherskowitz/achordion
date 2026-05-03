@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { CoverArt } from "./cover-art";
 import { caaUrlFromListen } from "@/lib/clients/coverart";
 import { parachordListenAlong } from "@/lib/parachord";
+import { artistHref, recordingHref } from "@/lib/entity-links";
 import type { PlayingNowListen } from "@/lib/clients/listenbrainz";
 
 export async function NowPlayingPill({
@@ -28,6 +29,9 @@ export async function NowPlayingPill({
   const artistMbid =
     meta.mbid_mapping?.artist_mbids?.[0] ??
     meta.additional_info?.artist_mbids?.[0];
+  const recordingMbid =
+    meta.mbid_mapping?.recording_mbid ??
+    meta.additional_info?.recording_mbid;
 
   return (
     <div className="border-border/60 bg-card/40 flex items-center gap-3 rounded-xl border p-3">
@@ -38,19 +42,24 @@ export async function NowPlayingPill({
           Now playing
         </p>
         <p className="mt-0.5 truncate text-sm font-medium">
-          {meta.track_name}
+          <Link
+            href={recordingHref({
+              mbid: recordingMbid,
+              artist: meta.artist_name,
+              title: meta.track_name,
+            })}
+            className="hover:underline"
+          >
+            {meta.track_name}
+          </Link>
         </p>
         <p className="text-muted-foreground truncate text-xs">
-          {artistMbid ? (
-            <Link
-              href={`/artist/${artistMbid}`}
-              className="hover:text-foreground"
-            >
-              {meta.artist_name}
-            </Link>
-          ) : (
-            meta.artist_name
-          )}
+          <Link
+            href={artistHref({ mbid: artistMbid, name: meta.artist_name })}
+            className="hover:text-foreground"
+          >
+            {meta.artist_name}
+          </Link>
         </p>
       </div>
       {username && !isOwnUser && (

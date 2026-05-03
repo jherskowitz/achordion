@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { CoverArt } from "./cover-art";
+import { PlayOnHoverFab } from "./play-on-hover-fab";
 import { caaReleaseGroupUrl } from "@/lib/clients/coverart";
+import { parachordPlayAlbum } from "@/lib/parachord";
 import type { DiscographyBucket } from "@/lib/clients/musicbrainz";
 
 const TYPE_LABELS: Record<string, string> = {
@@ -39,20 +41,32 @@ export function Discography({ buckets }: { buckets: DiscographyBucket[] }) {
             {bucket.releaseGroups.map((rg) => {
               const year = rg["first-release-date"]?.slice(0, 4);
               return (
-                <Link
-                  key={rg.id}
-                  href={`/release-group/${rg.id}`}
-                  className="group min-w-0"
-                >
-                  <CoverArt
-                    src={caaReleaseGroupUrl(rg.id, 250)}
-                    alt={rg.title}
-                    size={240}
-                    className="aspect-square h-auto w-full transition-opacity group-hover:opacity-90"
-                    rounded="md"
-                  />
+                <div key={rg.id} className="min-w-0">
+                  <div className="group relative overflow-hidden rounded-md">
+                    <Link
+                      href={`/release-group/${rg.id}`}
+                      className="block"
+                    >
+                      <CoverArt
+                        src={caaReleaseGroupUrl(rg.id, 250)}
+                        alt={rg.title}
+                        size={240}
+                        className="aspect-square h-auto w-full transition-opacity group-hover:opacity-90"
+                        rounded="md"
+                      />
+                    </Link>
+                    <PlayOnHoverFab
+                      href={parachordPlayAlbum({ mbid: rg.id })}
+                      label={`Play "${rg.title}" in Parachord`}
+                    />
+                  </div>
                   <p className="mt-2 truncate text-sm font-medium">
-                    {rg.title}
+                    <Link
+                      href={`/release-group/${rg.id}`}
+                      className="hover:underline"
+                    >
+                      {rg.title}
+                    </Link>
                   </p>
                   <p className="text-muted-foreground/80 text-xs tabular-nums">
                     {year ?? "—"}
@@ -62,7 +76,7 @@ export function Discography({ buckets }: { buckets: DiscographyBucket[] }) {
                       </span>
                     )}
                   </p>
-                </Link>
+                </div>
               );
             })}
           </div>

@@ -16,9 +16,13 @@ import {
 } from "@/lib/clients/listenbrainz";
 import { PageShell } from "@/components/achordion/page-shell";
 import { AlbumHeader } from "@/components/achordion/album-header";
+import { Breadcrumbs } from "@/components/achordion/breadcrumbs";
 import { TrackList } from "@/components/achordion/track-list";
 import { TopListenersList } from "@/components/achordion/top-listeners-list";
-import { ExternalLinks } from "@/components/achordion/external-links";
+import {
+  ExternalLinks,
+  categoriseLinks,
+} from "@/components/achordion/external-links";
 import { ComingSoon } from "@/components/achordion/coming-soon";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -57,12 +61,31 @@ async function AlbumBody({ mbid }: { mbid: string }) {
 
   const credit = formatArtistCredit(rg["artist-credit"]);
   const canonical = pickCanonicalRelease(rg);
-  const { urls } = partitionArtistRelations(rg);
 
   const [release, listeners] = await Promise.all([
     canonical ? getRelease(canonical.id).catch(() => null) : Promise.resolve(null),
     getReleaseGroupListeners(mbid).catch(() => null),
   ]);
+
+  // Merge url-rels from both the release group AND the canonical
+  // release. MB editors often attach Spotify / Apple Music to a
+  // specific release (edition) rather than the abstract release group,
+  // so the rg-level rels alone routinely come up empty even for albums
+  // that are widely streaming. `partitionArtistRelations` accepts
+  // anything with a `relations?` field, so we can call it on either.
+  const rgUrls = partitionArtistRelations(rg).urls;
+  const releaseUrls = release
+    ? partitionArtistRelations({ relations: release.relations }).urls
+    : [];
+  // Dedupe by URL — release-group and release editions sometimes
+  // duplicate the same Spotify / Apple link.
+  const urls = Array.from(
+    new Map([...rgUrls, ...releaseUrls].map((l) => [l.url, l])).values(),
+  );
+  // Streaming services render as a favicon row above the tracklist;
+  // everything else (Wikipedia, Discogs, lyrics, etc.) stays in the
+  // sidebar's "Other Links" so we don't show Spotify/Apple twice.
+  const { streaming: streamingUrls, other: otherUrls } = categoriseLinks(urls);
 
   const listenCounts = release
     ? await fetchListenCounts(release, credit.primaryArtistId)
@@ -84,13 +107,32 @@ async function AlbumBody({ mbid }: { mbid: string }) {
         })
     : undefined;
 
+  // Artist › Album breadcrumb. Primary credited artist only, so guest
+  // features in the byline don't pollute the trail.
+  const primary = credit.parts[0];
+  const breadcrumbs = primary
+    ? [
+        {
+          label: primary.name,
+          ...(primary.id ? { href: `/artist/${primary.id}` } : {}),
+        },
+        { label: rg.title },
+      ]
+    : [];
+
   return (
     <>
+      {breadcrumbs.length > 0 && (
+        <div className="mt-8">
+          <Breadcrumbs items={breadcrumbs} />
+        </div>
+      )}
       <AlbumHeader
         rg={rg}
         totalListens={listeners?.total_listen_count}
         totalListeners={listeners?.total_user_count}
         parachordTracks={parachordTracks}
+        streamingLinks={streamingUrls}
       />
 
       <div className="grid gap-10 lg:grid-cols-[1fr_240px]">
@@ -120,12 +162,12 @@ async function AlbumBody({ mbid }: { mbid: string }) {
               <TopListenersList listeners={listeners.listeners} />
             </div>
           )}
-          {urls.length > 0 && (
+          {otherUrls.length > 0 && (
             <div>
               <h3 className="mb-3 text-xs tracking-wide uppercase text-muted-foreground">
-                Links
+                Other Links
               </h3>
-              <ExternalLinks links={urls} />
+              <ExternalLinks links={otherUrls} />
             </div>
           )}
           <div className="border-border/60 border-t pt-4">

@@ -5,6 +5,7 @@ import { ParachordCtaButton } from "./parachord-button";
 import { searchReleaseGroups } from "@/lib/clients/musicbrainz";
 import { caaReleaseGroupUrl } from "@/lib/clients/coverart";
 import { parachordPlayAlbum } from "@/lib/parachord";
+import { artistHref } from "@/lib/entity-links";
 import type { CriticsPickAlbum } from "@/lib/clients/critical-darlings";
 
 /**
@@ -78,7 +79,14 @@ export async function CriticalDarlingCard({
             album.title
           )}
         </p>
-        <p className="text-muted-foreground truncate text-xs">{album.artist}</p>
+        <p className="text-muted-foreground truncate text-xs">
+          <Link
+            href={artistHref({ name: album.artist })}
+            className="hover:text-foreground hover:underline"
+          >
+            {album.artist}
+          </Link>
+        </p>
       </div>
       {album.description && (
         // Synopses are written to fit in a tweet (~280 chars), so always

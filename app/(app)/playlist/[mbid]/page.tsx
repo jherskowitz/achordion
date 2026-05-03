@@ -6,6 +6,11 @@ import { Download, ExternalLink, Users } from "lucide-react";
 import { getPlaylist } from "@/lib/clients/listenbrainz";
 import { caaReleaseUrl } from "@/lib/clients/coverart";
 import { parachordPlayTrack, type ParachordTrack } from "@/lib/parachord";
+import {
+  artistHref,
+  recordingHref,
+  releaseGroupHref,
+} from "@/lib/entity-links";
 import { stripHtml } from "@/lib/strip-html";
 import { PageShell } from "@/components/achordion/page-shell";
 import { CoverArt } from "@/components/achordion/cover-art";
@@ -239,31 +244,33 @@ async function PlaylistBody({ mbid }: { mbid: string }) {
                 />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium">
-                    {t.recordingMbid ? (
-                      <Link
-                        href={`/recording/${t.recordingMbid}`}
-                        className="hover:underline"
-                      >
-                        {t.title}
-                      </Link>
-                    ) : (
-                      t.title
-                    )}
+                    <Link
+                      href={recordingHref({
+                        mbid: t.recordingMbid,
+                        artist: t.artistName,
+                        title: t.title,
+                      })}
+                      className="hover:underline"
+                    >
+                      {t.title}
+                    </Link>
                   </p>
                   <p className="text-muted-foreground truncate text-xs">
-                    {t.artistMbid ? (
-                      <Link
-                        href={`/artist/${t.artistMbid}`}
-                        className="hover:text-foreground"
-                      >
-                        {t.artistName}
-                      </Link>
-                    ) : (
-                      t.artistName
-                    )}
+                    <Link
+                      href={artistHref({
+                        mbid: t.artistMbid,
+                        name: t.artistName,
+                      })}
+                      className="hover:text-foreground"
+                    >
+                      {t.artistName}
+                    </Link>
                     {t.releaseName && (
                       <>
                         <span className="opacity-50"> · </span>
+                        {/* Release-MBID points at a specific edition.
+                            Without it, lookup at the release-group
+                            level since that's our canonical album page. */}
                         {t.releaseMbid ? (
                           <Link
                             href={`/release/${t.releaseMbid}/album`}
@@ -272,7 +279,15 @@ async function PlaylistBody({ mbid }: { mbid: string }) {
                             {t.releaseName}
                           </Link>
                         ) : (
-                          <em>{t.releaseName}</em>
+                          <Link
+                            href={releaseGroupHref({
+                              artist: t.artistName,
+                              title: t.releaseName,
+                            })}
+                            className="hover:text-foreground italic"
+                          >
+                            {t.releaseName}
+                          </Link>
                         )}
                       </>
                     )}

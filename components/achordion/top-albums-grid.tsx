@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { CoverArt } from "./cover-art";
 import { caaReleaseGroupUrl } from "@/lib/clients/coverart";
+import { artistHref, releaseGroupHref } from "@/lib/entity-links";
+import { PlayOnHoverFab } from "./play-on-hover-fab";
+import { parachordPlayAlbum } from "@/lib/parachord";
 
 interface AlbumEntry {
   release_group_name: string;
@@ -33,37 +36,74 @@ export function TopAlbumsGrid({ albums }: { albums: AlbumEntry[] }) {
   return (
     <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
       {albums.map((rg, i) => {
-        const inner = (
-          <>
-            <CoverArt
-              src={coverFor(rg)}
-              alt={rg.release_group_name}
-              size={240}
-              className="aspect-square h-auto w-full transition-opacity group-hover:opacity-90"
-              rounded="md"
-            />
+        // Rank pip overlay matches the chart-tile treatment: pinned
+        // top-left of the cover, foreground-on-background pill.
+        const rank = i + 1;
+        const albumHref = releaseGroupHref({
+          mbid: rg.release_group_mbid,
+          artist: rg.artist_name,
+          title: rg.release_group_name,
+        });
+        const aHref = artistHref({
+          mbid: rg.artist_mbids?.[0],
+          name: rg.artist_name,
+        });
+        // Cover + album-title click target wraps the cover; the
+        // artist-name link sits as a sibling so it's independently
+        // clickable (nesting <a> inside <a> isn't allowed).
+        return (
+          <div
+            key={`${rg.release_group_mbid ?? rg.release_group_name}-${i}`}
+            className="min-w-0"
+          >
+            {/* Cover container is `group` so the play fab fades in on
+                hover. Link wraps the cover + title; the fab is a
+                sibling <a> inside the relative container so we don't
+                nest anchors. */}
+            <div className="group relative overflow-hidden rounded-md">
+              <Link href={albumHref} className="block">
+                <CoverArt
+                  src={coverFor(rg)}
+                  alt={rg.release_group_name}
+                  size={240}
+                  className="aspect-square h-auto w-full transition-opacity group-hover:opacity-90"
+                  rounded="md"
+                />
+              </Link>
+              <span
+                aria-hidden
+                className="bg-foreground/85 text-background pointer-events-none absolute top-2 left-2 inline-flex h-6 min-w-6 items-center justify-center rounded-full px-2 text-[10px] font-semibold tabular-nums"
+              >
+                {rank}
+              </span>
+              <PlayOnHoverFab
+                href={parachordPlayAlbum({
+                  ...(rg.release_group_mbid
+                    ? { mbid: rg.release_group_mbid }
+                    : {
+                        artist: rg.artist_name,
+                        title: rg.release_group_name,
+                      }),
+                })}
+                label={`Play "${rg.release_group_name}" by ${rg.artist_name} in Parachord`}
+              />
+            </div>
             <p className="mt-2 truncate text-sm font-medium">
-              {rg.release_group_name}
+              <Link href={albumHref} className="hover:underline">
+                {rg.release_group_name}
+              </Link>
             </p>
             <p className="text-muted-foreground truncate text-xs">
-              {rg.artist_name}
+              <Link
+                href={aHref}
+                className="hover:text-foreground hover:underline"
+              >
+                {rg.artist_name}
+              </Link>
             </p>
             <p className="text-muted-foreground/70 text-xs tabular-nums">
               {rg.listen_count.toLocaleString()} listens
             </p>
-          </>
-        );
-        return rg.release_group_mbid ? (
-          <Link
-            key={`${rg.release_group_mbid}-${i}`}
-            href={`/release-group/${rg.release_group_mbid}`}
-            className="group min-w-0"
-          >
-            {inner}
-          </Link>
-        ) : (
-          <div key={i} className="min-w-0">
-            {inner}
           </div>
         );
       })}

@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { ArtistAvatar } from "./artist-avatar";
 import { Skeleton } from "@/components/ui/skeleton";
+import { artistHref } from "@/lib/entity-links";
 
 interface ArtistEntry {
   artist_name: string;
@@ -47,16 +48,15 @@ export function TopArtistsList({ artists }: { artists: ArtistEntry[] }) {
             )}
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-medium">
-                {a.artist_mbid ? (
-                  <Link
-                    href={`/artist/${a.artist_mbid}`}
-                    className="hover:underline"
-                  >
-                    {a.artist_name}
-                  </Link>
-                ) : (
-                  a.artist_name
-                )}
+                <Link
+                  href={artistHref({
+                    mbid: a.artist_mbid,
+                    name: a.artist_name,
+                  })}
+                  className="hover:underline"
+                >
+                  {a.artist_name}
+                </Link>
               </p>
               <div className="bg-muted mt-1.5 h-1 w-full overflow-hidden rounded-full">
                 <div

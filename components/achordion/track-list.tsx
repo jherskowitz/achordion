@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { ReleaseDetail, Track } from "@/lib/clients/musicbrainz";
 import { formatArtistCredit } from "@/lib/clients/musicbrainz";
 import { parachordPlayTrack } from "@/lib/parachord";
+import { recordingHref } from "@/lib/entity-links";
 import { PlayOverNumberCell } from "./parachord-button";
 
 function formatLength(ms?: number | null): string {
@@ -40,16 +41,16 @@ function TrackRow({
       />
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium">
-          {recordingMbid ? (
-            <Link
-              href={`/recording/${recordingMbid}`}
-              className="hover:underline"
-            >
-              {track.title}
-            </Link>
-          ) : (
-            track.title
-          )}
+          <Link
+            href={recordingHref({
+              mbid: recordingMbid,
+              artist,
+              title: track.title,
+            })}
+            className="hover:underline"
+          >
+            {track.title}
+          </Link>
         </p>
       </div>
       {listenCount !== undefined && (

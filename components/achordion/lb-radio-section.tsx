@@ -9,6 +9,7 @@ import { caaReleaseUrl } from "@/lib/clients/coverart";
 import { parachordPlayTrack, type ParachordTrack } from "@/lib/parachord";
 import { OpenInParachordButton } from "./open-in-parachord-button";
 import { PlayOverNumberCell } from "./parachord-button";
+import { artistHref, recordingHref } from "@/lib/entity-links";
 import { cn } from "@/lib/utils";
 
 interface LbRadioSectionProps {
@@ -113,28 +114,27 @@ export function LbRadioSection({
                   />
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium">
-                      {t.recordingMbid ? (
-                        <Link
-                          href={`/recording/${t.recordingMbid}`}
-                          className="hover:underline"
-                        >
-                          {t.title}
-                        </Link>
-                      ) : (
-                        t.title
-                      )}
+                      <Link
+                        href={recordingHref({
+                          mbid: t.recordingMbid,
+                          artist: t.artistName,
+                          title: t.title,
+                        })}
+                        className="hover:underline"
+                      >
+                        {t.title}
+                      </Link>
                     </p>
                     <p className="text-muted-foreground truncate text-xs">
-                      {t.artistMbid ? (
-                        <Link
-                          href={`/artist/${t.artistMbid}`}
-                          className="hover:text-foreground"
-                        >
-                          {t.artistName}
-                        </Link>
-                      ) : (
-                        t.artistName
-                      )}
+                      <Link
+                        href={artistHref({
+                          mbid: t.artistMbid,
+                          name: t.artistName,
+                        })}
+                        className="hover:text-foreground"
+                      >
+                        {t.artistName}
+                      </Link>
                     </p>
                   </div>
                 </li>

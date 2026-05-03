@@ -12,6 +12,11 @@ import { ComingSoon } from "@/components/achordion/coming-soon";
 import { CoverArt } from "@/components/achordion/cover-art";
 import { PageShell } from "@/components/achordion/page-shell";
 import { ParachordPlayButton } from "@/components/achordion/parachord-button";
+import {
+  artistHref,
+  recordingHref,
+  releaseGroupHref,
+} from "@/lib/entity-links";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export const metadata = { title: "Loves" };
@@ -156,28 +161,27 @@ async function LovesBody({ name }: { name: string }) {
               </a>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium">
-                  {t.recordingMbid ? (
-                    <Link
-                      href={`/recording/${t.recordingMbid}`}
-                      className="hover:underline"
-                    >
-                      {t.trackName}
-                    </Link>
-                  ) : (
-                    t.trackName
-                  )}
+                  <Link
+                    href={recordingHref({
+                      mbid: t.recordingMbid,
+                      artist: t.artistName,
+                      title: t.trackName,
+                    })}
+                    className="hover:underline"
+                  >
+                    {t.trackName}
+                  </Link>
                 </p>
                 <p className="text-muted-foreground truncate text-xs">
-                  {t.artistMbid ? (
-                    <Link
-                      href={`/artist/${t.artistMbid}`}
-                      className="hover:text-foreground"
-                    >
-                      {t.artistName}
-                    </Link>
-                  ) : (
-                    t.artistName
-                  )}
+                  <Link
+                    href={artistHref({
+                      mbid: t.artistMbid,
+                      name: t.artistName,
+                    })}
+                    className="hover:text-foreground"
+                  >
+                    {t.artistName}
+                  </Link>
                   {t.releaseName && (
                     <>
                       <span className="mx-1.5 opacity-50">·</span>
@@ -189,7 +193,15 @@ async function LovesBody({ name }: { name: string }) {
                           {t.releaseName}
                         </Link>
                       ) : (
-                        <span className="italic">{t.releaseName}</span>
+                        <Link
+                          href={releaseGroupHref({
+                            artist: t.artistName,
+                            title: t.releaseName,
+                          })}
+                          className="italic hover:text-foreground"
+                        >
+                          {t.releaseName}
+                        </Link>
                       )}
                     </>
                   )}

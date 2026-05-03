@@ -119,7 +119,9 @@ async function ArtistBody({
         description={
           artist.disambiguation ? <em>{artist.disambiguation}</em> : undefined
         }
-        breadcrumbs={[{ label: "Artists" }, { label: artist.name }]}
+        // No breadcrumb — artist is the top of the entity hierarchy and
+        // we don't have an /artists directory page to crumb back to.
+        // The "Artist" eyebrow already labels what kind of page this is.
         actions={
           totalListens !== undefined || totalListeners !== undefined ? (
             <div className="flex items-baseline gap-6 text-right">

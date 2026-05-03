@@ -4,6 +4,11 @@ import { caaUrlFromListen } from "@/lib/clients/coverart";
 import type { Listen } from "@/lib/clients/listenbrainz";
 import { parachordPlayTrack } from "@/lib/parachord";
 import { ParachordPlayButton } from "./parachord-button";
+import {
+  artistHref,
+  recordingHref,
+  releaseGroupHref,
+} from "@/lib/entity-links";
 import { cn } from "@/lib/utils";
 
 function relativeTime(unixSeconds: number): string {
@@ -43,31 +48,30 @@ export function ScrobbleRow({
       <CoverArt src={cover} alt={meta.release_name ?? meta.track_name} size={48} />
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium">
-          {recordingMbid ? (
-            <Link
-              href={`/recording/${recordingMbid}`}
-              className="hover:underline"
-            >
-              {meta.track_name}
-            </Link>
-          ) : (
-            meta.track_name
-          )}
+          <Link
+            href={recordingHref({
+              mbid: recordingMbid,
+              artist: meta.artist_name,
+              title: meta.track_name,
+            })}
+            className="hover:underline"
+          >
+            {meta.track_name}
+          </Link>
         </p>
         <p className="text-muted-foreground truncate text-xs">
-          {artistMbid ? (
-            <Link
-              href={`/artist/${artistMbid}`}
-              className="hover:text-foreground"
-            >
-              {meta.artist_name}
-            </Link>
-          ) : (
-            meta.artist_name
-          )}
+          <Link
+            href={artistHref({ mbid: artistMbid, name: meta.artist_name })}
+            className="hover:text-foreground"
+          >
+            {meta.artist_name}
+          </Link>
           {meta.release_name && (
             <>
               <span className={cn("mx-1.5 opacity-50")}>·</span>
+              {/* Release-MBID, when present, points at a specific
+                  edition. Without it we lookup at the release-group
+                  level since that's the canonical entity for albums. */}
               {releaseMbid ? (
                 <Link
                   href={`/release/${releaseMbid}`}
@@ -76,7 +80,15 @@ export function ScrobbleRow({
                   {meta.release_name}
                 </Link>
               ) : (
-                <span className="italic">{meta.release_name}</span>
+                <Link
+                  href={releaseGroupHref({
+                    artist: meta.artist_name,
+                    title: meta.release_name,
+                  })}
+                  className="italic hover:text-foreground"
+                >
+                  {meta.release_name}
+                </Link>
               )}
             </>
           )}

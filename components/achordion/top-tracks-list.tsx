@@ -3,6 +3,7 @@ import { CoverArt } from "./cover-art";
 import { caaReleaseGroupUrl, caaReleaseUrl } from "@/lib/clients/coverart";
 import { parachordPlayTrack } from "@/lib/parachord";
 import { PlayOverNumberCell } from "./parachord-button";
+import { artistHref, recordingHref } from "@/lib/entity-links";
 
 interface TrackEntry {
   track_name: string;
@@ -56,28 +57,24 @@ export function TopTracksList({ tracks }: { tracks: TrackEntry[] }) {
             />
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-medium">
-                {t.recording_mbid ? (
-                  <Link
-                    href={`/recording/${t.recording_mbid}`}
-                    className="hover:underline"
-                  >
-                    {t.track_name}
-                  </Link>
-                ) : (
-                  t.track_name
-                )}
+                <Link
+                  href={recordingHref({
+                    mbid: t.recording_mbid,
+                    artist: t.artist_name,
+                    title: t.track_name,
+                  })}
+                  className="hover:underline"
+                >
+                  {t.track_name}
+                </Link>
               </p>
               <p className="text-muted-foreground truncate text-xs">
-                {artistMbid ? (
-                  <Link
-                    href={`/artist/${artistMbid}`}
-                    className="hover:text-foreground"
-                  >
-                    {t.artist_name}
-                  </Link>
-                ) : (
-                  t.artist_name
-                )}
+                <Link
+                  href={artistHref({ mbid: artistMbid, name: t.artist_name })}
+                  className="hover:text-foreground"
+                >
+                  {t.artist_name}
+                </Link>
               </p>
             </div>
             <span className="text-muted-foreground shrink-0 tabular-nums text-xs">

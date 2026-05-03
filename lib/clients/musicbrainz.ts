@@ -364,6 +364,14 @@ const ReleaseDetailSchema = z
     "release-group": ReleaseGroupSchema.nullish(),
     "artist-credit": ArtistCreditSchema.optional(),
     media: z.array(MediumSchema).optional(),
+    // Streaming / purchase / review url-rels — release-level URLs are
+    // often denser than release-group-level ones (e.g. Spotify and
+    // Apple Music are usually attached to a specific edition rather
+    // than the abstract release group). The album page merges these
+    // with the rg-level rels for the favicon row.
+    relations: z
+      .array(z.union([ArtistRelationSchema, UrlRelationSchema]))
+      .optional(),
   })
   .passthrough();
 
@@ -372,7 +380,7 @@ export type Track = z.infer<typeof TrackSchema>;
 
 export async function getRelease(mbid: string): Promise<ReleaseDetail> {
   return mbFetch(
-    `/release/${encodeURIComponent(mbid)}?inc=recordings+artist-credits+release-groups`,
+    `/release/${encodeURIComponent(mbid)}?inc=recordings+artist-credits+release-groups+url-rels`,
     ReleaseDetailSchema,
     { tags: [cacheTagsMB.release(mbid)] },
   );
@@ -478,9 +486,16 @@ export function pickCanonicalRelease(
   if (releases.length === 0) return null;
   const official = releases.filter((r) => r.status === "Official");
   const pool = official.length > 0 ? official : releases;
-  return pool
-    .slice()
-    .sort((a, b) => (a.date ?? "9999").localeCompare(b.date ?? "9999"))[0];
+  // Prefer the XW (worldwide) edition over any country-specific one.
+  // MB editors conventionally attach streaming-service url-rels
+  // (Spotify / Apple / Deezer / etc.) to the XW release because those
+  // links apply globally. After that, fall back to earliest date.
+  return pool.slice().sort((a, b) => {
+    const ax = a.country === "XW" ? 0 : 1;
+    const bx = b.country === "XW" ? 0 : 1;
+    if (ax !== bx) return ax - bx;
+    return (a.date ?? "9999").localeCompare(b.date ?? "9999");
+  })[0];
 }
 
 export function formatArtistCredit(
@@ -646,6 +661,38 @@ export async function searchReleaseGroups(query: string, limit = 8) {
     { revalidate: 60 * 60 },
   );
   return result["release-groups"];
+}
+
+const RecordingSearchSchema = z.object({
+  recordings: z.array(
+    z.object({
+      id: z.string(),
+      title: z.string(),
+      length: z.number().nullish(),
+      "artist-credit": z
+        .array(
+          z.object({
+            name: z.string(),
+            artist: z.object({ id: z.string(), name: z.string() }),
+          }),
+        )
+        .optional(),
+      score: z.number().optional(),
+    }),
+  ),
+});
+
+/**
+ * MB recording search — used by `/recording/lookup` to resolve a
+ * (artist, title) pair to a recording MBID at click time.
+ */
+export async function searchRecordings(query: string, limit = 8) {
+  if (!query.trim()) return [];
+  const params = new URLSearchParams({ query, limit: String(limit) });
+  const result = await mbFetch(`/recording?${params}`, RecordingSearchSchema, {
+    revalidate: 60 * 60,
+  });
+  return result.recordings;
 }
 
 // ─── Tag-based discovery ────────────────────────────────────────────

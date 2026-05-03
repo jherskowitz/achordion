@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { Radio } from "lucide-react";
 import type { PlayingNowListen } from "@/lib/clients/listenbrainz";
 import { parachordListenAlong } from "@/lib/parachord";
+import { artistHref, recordingHref } from "@/lib/entity-links";
 import { cn } from "@/lib/utils";
 
 const POLL_INTERVAL_MS = 25_000;
@@ -102,6 +104,21 @@ export function LiveOnAirIndicator({
     service: "listenbrainz",
     user: username,
   });
+  const recordingMbid =
+    meta.mbid_mapping?.recording_mbid ??
+    meta.additional_info?.recording_mbid;
+  const artistMbid =
+    meta.mbid_mapping?.artist_mbids?.[0] ??
+    meta.additional_info?.artist_mbids?.[0];
+  const trackLink = recordingHref({
+    mbid: recordingMbid,
+    artist: meta.artist_name,
+    title: meta.track_name,
+  });
+  const artistLink = artistHref({
+    mbid: artistMbid,
+    name: meta.artist_name,
+  });
 
   const dot = (
     <span
@@ -120,8 +137,19 @@ export function LiveOnAirIndicator({
       >
         {dot}
         <span className="min-w-0 truncate">
-          <span className="text-foreground font-medium">{meta.track_name}</span>
-          <span className="text-muted-foreground"> — {meta.artist_name}</span>
+          <Link
+            href={trackLink}
+            className="text-foreground font-medium hover:underline"
+          >
+            {meta.track_name}
+          </Link>
+          <span className="text-muted-foreground"> — </span>
+          <Link
+            href={artistLink}
+            className="text-muted-foreground hover:text-foreground hover:underline"
+          >
+            {meta.artist_name}
+          </Link>
         </span>
         {!hideListenAlong && (
           <a
@@ -146,8 +174,19 @@ export function LiveOnAirIndicator({
     >
       {dot}
       <span className="min-w-0 truncate">
-        <span className="text-foreground/90">{meta.track_name}</span>
-        <span className="text-muted-foreground"> — {meta.artist_name}</span>
+        <Link
+          href={trackLink}
+          className="text-foreground/90 hover:underline"
+        >
+          {meta.track_name}
+        </Link>
+        <span className="text-muted-foreground"> — </span>
+        <Link
+          href={artistLink}
+          className="text-muted-foreground hover:text-foreground hover:underline"
+        >
+          {meta.artist_name}
+        </Link>
       </span>
       {!hideListenAlong && (
         <a

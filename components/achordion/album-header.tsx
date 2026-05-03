@@ -1,9 +1,13 @@
 import Link from "next/link";
 import { CoverArt } from "./cover-art";
 import { caaReleaseGroupUrl } from "@/lib/clients/coverart";
-import type { ReleaseGroupDetail } from "@/lib/clients/musicbrainz";
+import type {
+  ArtistExternalLink,
+  ReleaseGroupDetail,
+} from "@/lib/clients/musicbrainz";
 import { formatArtistCredit } from "@/lib/clients/musicbrainz";
 import { ParachordCtaButton } from "./parachord-button";
+import { ExternalLinks } from "./external-links";
 import { parachordPlayAlbum, type ParachordTrack } from "@/lib/parachord";
 
 interface AlbumHeaderProps {
@@ -11,6 +15,12 @@ interface AlbumHeaderProps {
   totalListens?: number;
   totalListeners?: number;
   parachordTracks?: ParachordTrack[];
+  /**
+   * Streaming-service url-rels (Spotify / Apple / Bandcamp / etc.)
+   * rendered as a favicon row inline with the Play in Parachord
+   * button. Pass the merged rg-level + release-level streaming subset.
+   */
+  streamingLinks?: ArtistExternalLink[];
 }
 
 function ArtistByline({
@@ -23,16 +33,16 @@ function ArtistByline({
     <>
       {parts.map((p, i) => (
         <span key={`${p.id ?? p.name}-${i}`}>
-          {p.id ? (
-            <Link
-              href={`/artist/${p.id}`}
-              className="hover:text-foreground hover:underline underline-offset-4"
-            >
-              {p.name}
-            </Link>
-          ) : (
-            p.name
-          )}
+          <Link
+            href={
+              p.id
+                ? `/artist/${p.id}`
+                : `/artist/lookup?name=${encodeURIComponent(p.name)}`
+            }
+            className="hover:text-foreground hover:underline underline-offset-4"
+          >
+            {p.name}
+          </Link>
           {p.join}
         </span>
       ))}
@@ -45,6 +55,7 @@ export function AlbumHeader({
   totalListens,
   totalListeners,
   parachordTracks,
+  streamingLinks,
 }: AlbumHeaderProps) {
   const credit = formatArtistCredit(rg["artist-credit"]);
   const year = rg["first-release-date"]?.slice(0, 4);
@@ -117,9 +128,11 @@ export function AlbumHeader({
           </div>
         )}
         {/* Prefer the MBID — Parachord picks the best resolver. Fall back
-            to title+artist or an inline tracklist if needed. */}
+            to title+artist or an inline tracklist if needed. The
+            streaming favicon row sits inline with the Play button on
+            wider screens, wrapping below it on narrow ones. */}
         {(rg.id || (parachordTracks && parachordTracks.length > 0)) && (
-          <div className="mt-5">
+          <div className="mt-5 flex flex-wrap items-center gap-3">
             <ParachordCtaButton
               href={parachordPlayAlbum({
                 ...(rg.id
@@ -132,6 +145,9 @@ export function AlbumHeader({
               })}
               label="Play in Parachord"
             />
+            {streamingLinks && streamingLinks.length > 0 && (
+              <ExternalLinks links={streamingLinks} />
+            )}
           </div>
         )}
       </div>
