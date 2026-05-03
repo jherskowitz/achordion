@@ -223,7 +223,7 @@ function Step2Services() {
 function Step3Parachord() {
   return (
     <section className="space-y-6">
-      <div className="border-border/60 bg-card/40 rounded-2xl border p-6">
+      <div className="border-border/60 bg-card/40 overflow-hidden rounded-2xl border p-6">
         <h2 className="text-lg font-semibold tracking-tight">
           Step 3 · Install Parachord
         </h2>
@@ -260,6 +260,18 @@ function Step3Parachord() {
             <ExternalLink className="size-3" />
           </a>
         </div>
+
+        {/* Self-hosted from public/ — no remote-pattern allowlist hassle,
+            and the image ships with the bundle so it works offline in
+            dev. Source: parachord.com/assets/hero.png */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/parachord-hero.png"
+          alt="The Parachord desktop app, showing a Now Playing view with album art and queue"
+          width={1512}
+          height={927}
+          className="border-border/40 mt-6 block w-full rounded-xl border"
+        />
 
         <div className="border-border/60 mt-6 rounded-xl border p-4">
           <p className="text-foreground inline-flex items-center gap-1.5 text-xs font-medium tracking-wide uppercase">

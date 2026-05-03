@@ -116,6 +116,11 @@ function PlatformPills({ platforms }: { platforms: string[] }) {
 }
 
 function FeaturedCard({ client }: { client: LbClient }) {
+  // Show the Parachord hero shot in the featured card. Other clients
+  // would render the same `<FeaturedCard>` without an image — but in
+  // practice we only feature Parachord, so a flag-on-the-client is
+  // overkill. Match by name.
+  const showHero = client.name === "Parachord";
   return (
     <a
       href={client.url}
@@ -123,10 +128,24 @@ function FeaturedCard({ client }: { client: LbClient }) {
       rel="noopener noreferrer"
       className="group from-primary/15 via-primary/8 to-background border-primary/30 hover:border-primary/50 relative block overflow-hidden rounded-2xl border bg-gradient-to-br p-6 transition-colors"
     >
-      <span className="bg-primary text-primary-foreground absolute top-4 right-4 inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-medium tracking-wide uppercase">
+      <span className="bg-primary text-primary-foreground absolute top-4 right-4 z-10 inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-medium tracking-wide uppercase">
         <Sparkles className="size-2.5" />
         Featured
       </span>
+      {showHero && (
+        <>
+          {/* Self-hosted from public/ — same asset as the welcome wizard.
+              eslint-disable-next-line @next/next/no-img-element */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/parachord-hero.png"
+            alt="The Parachord desktop app"
+            width={1512}
+            height={927}
+            className="border-border/40 mb-5 block w-full rounded-xl border"
+          />
+        </>
+      )}
       <h4 className="text-foreground text-lg font-semibold tracking-tight">
         {client.name}
       </h4>
