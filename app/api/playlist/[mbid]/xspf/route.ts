@@ -1,4 +1,5 @@
 import { getPlaylist } from "@/lib/clients/listenbrainz";
+import { getLbTokenForRequest } from "@/lib/lb-token";
 import { playlistToXspf } from "@/lib/xspf";
 
 const MBID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -12,7 +13,17 @@ export async function GET(
     return new Response("Invalid playlist MBID", { status: 400 });
   }
 
-  const playlist = await getPlaylist(mbid);
+  // Cached unauthed lookup first; fall back to the viewer's authed
+  // call so the owner can download their own private playlists.
+  let playlist = await getPlaylist(mbid);
+  let viaAuth = false;
+  if (!playlist) {
+    const token = await getLbTokenForRequest();
+    if (token) {
+      playlist = await getPlaylist(mbid, token).catch(() => null);
+      if (playlist) viaAuth = true;
+    }
+  }
   if (!playlist) {
     return new Response("Playlist not found", { status: 404 });
   }
@@ -29,7 +40,11 @@ export async function GET(
     headers: {
       "content-type": "application/xspf+xml; charset=utf-8",
       "content-disposition": `inline; filename="${safeName}.xspf"`,
-      "cache-control": "public, max-age=300",
+      // Authed responses may include a private playlist — never let a
+      // shared cache hold onto those.
+      "cache-control": viaAuth
+        ? "private, no-store"
+        : "public, max-age=300",
     },
   });
 }

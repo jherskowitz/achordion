@@ -29,7 +29,12 @@ async function loadOwnedPlaylist(
       reason: "Add your ListenBrainz token in /settings/connections.",
     };
   }
-  const current = await getPlaylist(mbid).catch(() => null);
+  // Try authed first — the playlist might be private, in which case
+  // the unauthed endpoint 404s. Authed lookup also bypasses the data
+  // cache, so we get the freshest collaborators list to forward.
+  const current =
+    (await getPlaylist(mbid, token).catch(() => null)) ??
+    (await getPlaylist(mbid).catch(() => null));
   if (!current) return { ok: false, reason: "Playlist not found." };
   if (
     !current.creator ||

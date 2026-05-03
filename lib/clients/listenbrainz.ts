@@ -33,6 +33,14 @@ interface FetchOptions {
    * point of polling.
    */
   noStore?: boolean;
+  /**
+   * LB user token for endpoints whose response varies per-viewer
+   * (e.g. private playlists visible only to the owner). When set,
+   * `lbFetch` switches to `no-store` automatically — the response
+   * is personal so we can't share it across viewers via the data
+   * cache.
+   */
+  token?: string;
 }
 
 async function lbFetch<T>(
@@ -41,10 +49,18 @@ async function lbFetch<T>(
   opts: FetchOptions = {},
 ): Promise<T> {
   const url = `${LB_BASE}${path}`;
+  // When a token is provided the response is personalized — caching
+  // it under a viewer-agnostic URL key would cross the streams.
+  const noStore = opts.noStore || opts.token !== undefined;
+  const headers: Record<string, string> = {
+    "User-Agent": USER_AGENT,
+    Accept: "application/json",
+  };
+  if (opts.token) headers.Authorization = `Token ${opts.token}`;
   const res = await fetch(url, {
-    headers: { "User-Agent": USER_AGENT, Accept: "application/json" },
-    cache: opts.noStore ? "no-store" : undefined,
-    next: opts.noStore
+    headers,
+    cache: noStore ? "no-store" : undefined,
+    next: noStore
       ? undefined
       : {
           revalidate: opts.revalidate ?? 60,
@@ -320,6 +336,11 @@ export async function getUserPlaylists(
   name: string,
   count = 25,
   offset = 0,
+  /** Pass the viewer's LB token to include the user's *private*
+   *  playlists in the response — only honored when LB's auth resolves
+   *  the token to the same user being queried. Without a token the
+   *  endpoint returns public playlists only. */
+  token?: string,
 ): Promise<UserPlaylistsPage> {
   try {
     const params = new URLSearchParams({
@@ -329,10 +350,9 @@ export async function getUserPlaylists(
     const result = await lbFetch(
       `/user/${encodeURIComponent(name)}/playlists?${params}`,
       UserPlaylistsResponseSchema,
-      {
-        revalidate: 60 * 5,
-        tags: [`lb:user:${name}:playlists`],
-      },
+      token
+        ? { token }
+        : { revalidate: 60 * 5, tags: [`lb:user:${name}:playlists`] },
     );
     return {
       playlists: result.playlists,
@@ -1507,12 +1527,20 @@ export interface PlaylistDetail {
   tracks: LbRadioTrack[];
 }
 
-export async function getPlaylist(mbid: string): Promise<PlaylistDetail | null> {
+export async function getPlaylist(
+  mbid: string,
+  /** Pass the viewer's LB token to fetch a *private* playlist (LB
+   *  returns 404 to unauthenticated viewers). Public playlists work
+   *  with or without a token. */
+  token?: string,
+): Promise<PlaylistDetail | null> {
   try {
     const result = await lbFetch(
       `/playlist/${encodeURIComponent(mbid)}`,
       PlaylistDetailResponseSchema,
-      { revalidate: 60 * 5, tags: [`lb:playlist:${mbid}`] },
+      token
+        ? { token }
+        : { revalidate: 60 * 5, tags: [`lb:playlist:${mbid}`] },
     );
     const p = result.playlist;
     const ext = p.extension?.["https://musicbrainz.org/doc/jspf#playlist"];

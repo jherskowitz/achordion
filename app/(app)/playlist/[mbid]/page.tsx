@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { Download, ExternalLink, Globe, Lock, Users } from "lucide-react";
 import { auth } from "@/auth";
+import { getLbTokenForRequest } from "@/lib/lb-token";
 import { getPlaylist } from "@/lib/clients/listenbrainz";
 import { caaReleaseUrl } from "@/lib/clients/coverart";
 import { parachordPlayTrack, type ParachordTrack } from "@/lib/parachord";
@@ -81,7 +82,19 @@ async function publicUrl(path: string): Promise<string | null> {
 }
 
 async function PlaylistBody({ mbid }: { mbid: string }) {
-  const [data, session] = await Promise.all([getPlaylist(mbid), auth()]);
+  // Hit the unauthed (cached) endpoint first — it covers every
+  // public playlist, which is the overwhelming majority. Only fall
+  // back to the per-viewer authed lookup when the cached call comes
+  // back null AND the viewer has a token; that's the only path that
+  // can resolve a private playlist owned by the viewer.
+  const [session, token] = await Promise.all([
+    auth(),
+    getLbTokenForRequest(),
+  ]);
+  let data = await getPlaylist(mbid);
+  if (!data && token) {
+    data = await getPlaylist(mbid, token).catch(() => null);
+  }
   if (!data) notFound();
   const xspfUrl = await publicUrl(`/api/playlist/${mbid}/xspf`);
   const viewer = session?.user?.mbUsername ?? null;

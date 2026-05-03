@@ -6,6 +6,8 @@ import {
   type LbPlaylistSummary,
   type LbRadioTrack,
 } from "@/lib/clients/listenbrainz";
+import { auth } from "@/auth";
+import { getLbTokenForRequest } from "@/lib/lb-token";
 import { PageShell } from "@/components/achordion/page-shell";
 import { PlaylistCard } from "@/components/achordion/playlist-card";
 import { ComingSoon } from "@/components/achordion/coming-soon";
@@ -18,14 +20,19 @@ interface PageParams {
 async function CardWithCovers({
   entry,
   hideCreatorIfMatches,
+  token,
 }: {
   entry: LbPlaylistSummary;
   hideCreatorIfMatches?: string;
+  /** Forwarded so private-playlist track previews resolve when the
+   *  viewer is the owner — LB 404s the playlist endpoint without auth
+   *  for private items. */
+  token?: string;
 }) {
   const mbid = playlistMbidFromIdentifier(entry.playlist.identifier);
   let tracks: LbRadioTrack[] = [];
   if (mbid) {
-    const detail = await getPlaylist(mbid).catch(() => null);
+    const detail = await getPlaylist(mbid, token).catch(() => null);
     if (detail) tracks = detail.tracks;
   }
   return (
@@ -51,9 +58,19 @@ function CardSkeleton() {
 }
 
 async function PlaylistsList({ name }: { name: string }) {
+  // Owner-of-this-page check: pass the viewer's LB token only when
+  // they're looking at their own playlists. LB returns the user's
+  // private playlists alongside public ones when authed; without a
+  // token (or for any other viewer) the response is public-only.
+  const session = await auth();
+  const viewer = session?.user?.mbUsername;
+  const isSelf =
+    !!viewer && viewer.toLowerCase() === name.toLowerCase();
+  const token = isSelf ? await getLbTokenForRequest() : null;
+
   let page;
   try {
-    page = await getUserPlaylists(name, 50);
+    page = await getUserPlaylists(name, 50, 0, token ?? undefined);
   } catch (err) {
     return (
       <ComingSoon
@@ -81,6 +98,7 @@ async function PlaylistsList({ name }: { name: string }) {
               <CardWithCovers
                 entry={entry}
                 hideCreatorIfMatches={name}
+                token={token ?? undefined}
               />
             </Suspense>
           </li>
