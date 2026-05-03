@@ -111,11 +111,7 @@ export default async function RecommendedArtistsPage({
       <h1 className="mt-2 mb-6 text-2xl font-semibold tracking-tight">
         Recommended artists
       </h1>
-      <FamiliaritySlider
-        initial={familiarity}
-        param="familiarity"
-        label="Recommendation settings"
-      />
+      <FamiliaritySlider initial={familiarity} param="familiarity" />
       {/* Suspense keyed on the resolved threshold (not the raw slider
           value) so within-bucket nudges don't trigger pointless
           skeleton flashes. */}

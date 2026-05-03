@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { ChevronDown, SlidersHorizontal } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { describeFamiliarity } from "@/lib/familiarity";
 
 /**
@@ -16,9 +18,11 @@ import { describeFamiliarity } from "@/lib/familiarity";
  * of the recommendations. See `thresholdFromFamiliarity` for the
  * 11-bucket mapping.
  *
- * Commits on `mouseup` / `touchend` / `keyup` rather than `input` so
- * each drag produces one URL update + re-render rather than dozens.
- * router.replace + scroll: false keeps history clean.
+ * Self-discloses: collapsed by default behind a small "Filters"
+ * toggle in the section header area; auto-opens when the user has
+ * an override in the URL (so they can see what's active). Commits
+ * on `mouseup` / `touchend` / `keyup` rather than `input` so each
+ * drag produces one URL update + re-render rather than dozens.
  */
 
 export function FamiliaritySlider({
@@ -32,8 +36,7 @@ export function FamiliaritySlider({
   /** URL search-param key this slider owns (e.g. `artistsFamiliarity`,
    *  `tracksFamiliarity`). Lets two sliders coexist on one page. */
   param: string;
-  /** Section label shown to the left of the description, e.g.
-   *  "Recommended artists settings". */
+  /** Optional label shown when expanded. Defaults to "Filters". */
   label?: string;
   /** Whether this slider filters artists or tracks — drives the
    *  "Hide tracks I've listened to..." vs "Hide artists I've
@@ -47,6 +50,12 @@ export function FamiliaritySlider({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [v, setV] = useState(initial);
+  // Auto-open when the user has tuned this slider away from the
+  // default — otherwise their override is invisible behind a closed
+  // disclosure and looks like nothing happened.
+  const [open, setOpen] = useState(initial !== defaultValue);
+
+  const overridden = v !== defaultValue;
 
   function commit(value: number) {
     const next = new URLSearchParams(searchParams.toString());
@@ -59,37 +68,59 @@ export function FamiliaritySlider({
     // Eager replace (no transition wrapper) so the URL update fires
     // immediately and the keyed Suspense boundary downstream
     // re-suspends → user sees the skeleton flash → new data paints.
-    // useTransition was keeping the previous UI visible during the
-    // re-fetch, which read as "the slider doesn't do anything".
     router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
   }
 
   return (
-    <div className="border-border/60 bg-muted/30 mb-4 flex flex-col gap-2 rounded-xl border p-4">
-      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-        <p className="text-sm font-medium">{label ?? "How familiar?"}</p>
-        <p className="text-muted-foreground/70 text-xs">
-          {describeFamiliarity(v, kind)}
-        </p>
-      </div>
-      <input
-        type="range"
-        min={0}
-        max={100}
-        step={10}
-        value={v}
-        onChange={(e) => setV(Number(e.target.value))}
-        onMouseUp={(e) => commit(Number(e.currentTarget.value))}
-        onTouchEnd={(e) => commit(Number(e.currentTarget.value))}
-        onKeyUp={(e) => commit(Number(e.currentTarget.value))}
-        aria-label={label ?? "Familiarity threshold"}
-        className="accent-foreground w-full cursor-pointer"
-      />
-      <div className="text-muted-foreground/70 flex justify-between text-[11px] tracking-wide uppercase">
-        <span>Familiar</span>
-        <span>Balanced</span>
-        <span>Discoveries</span>
-      </div>
+    <div className="mb-3">
+      <button
+        type="button"
+        onClick={() => setOpen((x) => !x)}
+        aria-expanded={open}
+        className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-xs"
+      >
+        <SlidersHorizontal className="size-3" />
+        <span>{label ?? "Filters"}</span>
+        {overridden && (
+          <span className="text-muted-foreground/70 hidden sm:inline">
+            · {describeFamiliarity(v, kind)}
+          </span>
+        )}
+        <ChevronDown
+          className={cn(
+            "size-3 transition-transform",
+            open && "rotate-180",
+          )}
+        />
+      </button>
+      {open && (
+        <div className="border-border/60 bg-muted/30 mt-2 rounded-lg border px-3 py-2">
+          <div className="flex items-center gap-3">
+            <span className="text-muted-foreground/70 shrink-0 text-[10px] tracking-wide uppercase">
+              Familiar
+            </span>
+            <input
+              type="range"
+              min={0}
+              max={100}
+              step={10}
+              value={v}
+              onChange={(e) => setV(Number(e.target.value))}
+              onMouseUp={(e) => commit(Number(e.currentTarget.value))}
+              onTouchEnd={(e) => commit(Number(e.currentTarget.value))}
+              onKeyUp={(e) => commit(Number(e.currentTarget.value))}
+              aria-label={label ?? "Familiarity threshold"}
+              className="accent-foreground h-1 w-full cursor-pointer"
+            />
+            <span className="text-muted-foreground/70 shrink-0 text-[10px] tracking-wide uppercase">
+              Discoveries
+            </span>
+          </div>
+          <p className="text-muted-foreground/70 mt-1 text-[11px]">
+            {describeFamiliarity(v, kind)}
+          </p>
+        </div>
+      )}
     </div>
   );
 }

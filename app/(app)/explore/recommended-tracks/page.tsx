@@ -153,7 +153,6 @@ export default async function RecommendedTracksPage({
       <FamiliaritySlider
         initial={familiarity}
         param="familiarity"
-        label="Recommendation settings"
         kind="track"
       />
       <Suspense

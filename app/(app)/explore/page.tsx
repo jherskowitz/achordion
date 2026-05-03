@@ -456,7 +456,6 @@ export default async function ExploreOverviewPage({
             <FamiliaritySlider
               initial={artistsFamiliarity}
               param="artistsFamiliarity"
-              label="Recommendation settings"
             />
             {/* Key the Suspense on the threshold (not the slider value)
                 so within-bucket nudges don't trigger pointless skeleton
@@ -480,7 +479,6 @@ export default async function ExploreOverviewPage({
             <FamiliaritySlider
               initial={tracksFamiliarity}
               param="tracksFamiliarity"
-              label="Recommendation settings"
               kind="track"
             />
             <Suspense
