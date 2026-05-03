@@ -513,6 +513,10 @@ export async function getArtistReleaseGroups(
   const PAGE = 100;
   const MAX = 500;
   const all: ReleaseGroup[] = [];
+  // MB sometimes returns the same release-group across pagination
+  // boundaries when the underlying ordering shifts mid-fetch — dedupe
+  // by MBID so React doesn't choke on duplicate keys.
+  const seen = new Set<string>();
   let offset = 0;
   while (offset < MAX) {
     const params = new URLSearchParams({
@@ -528,7 +532,11 @@ export async function getArtistReleaseGroups(
         tags: [cacheTagsMB.artist(mbid), `mb:artist:${mbid}:rgs`],
       },
     );
-    all.push(...result["release-groups"]);
+    for (const rg of result["release-groups"]) {
+      if (seen.has(rg.id)) continue;
+      seen.add(rg.id);
+      all.push(rg);
+    }
     if (result["release-groups"].length < PAGE) break;
     offset += PAGE;
   }

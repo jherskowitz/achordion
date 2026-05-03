@@ -12,6 +12,13 @@ interface PageHeaderProps {
    * by the artist page to slot in a hero avatar. Sized by the caller.
    */
   leading?: ReactNode;
+  /**
+   * Optional content rendered inside the title column, below the
+   * description. Used by the artist page to slot the service-icon
+   * row and the genre tags inline so they indent past the avatar
+   * instead of starting flush at the page edge.
+   */
+  afterTitle?: ReactNode;
 }
 
 export function PageHeader({
@@ -21,6 +28,7 @@ export function PageHeader({
   actions,
   eyebrow,
   leading,
+  afterTitle,
 }: PageHeaderProps) {
   return (
     <header className="flex flex-col gap-4 pt-8 pb-6 sm:flex-row sm:items-end sm:justify-between sm:gap-8">
@@ -43,6 +51,7 @@ export function PageHeader({
               {description}
             </p>
           )}
+          {afterTitle}
         </div>
       </div>
       {actions && (

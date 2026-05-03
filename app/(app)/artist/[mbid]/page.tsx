@@ -146,25 +146,27 @@ async function ArtistBody({
             </div>
           ) : undefined
         }
+        afterTitle={
+          (streaming.length > 0 || tags.length > 0) && (
+            <div className="space-y-3 pt-1">
+              {streaming.length > 0 && <ExternalLinks links={streaming} />}
+              {tags.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {tags.map((t) => (
+                    <Link
+                      key={t.name}
+                      href={`/tag/${encodeURIComponent(t.name)}`}
+                      className="bg-muted text-muted-foreground hover:bg-foreground/15 hover:text-foreground rounded-full px-2.5 py-0.5 text-xs transition-colors"
+                    >
+                      {t.name}
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
+          )
+        }
       />
-      {streaming.length > 0 && (
-        <div className="-mt-2 pb-4">
-          <ExternalLinks links={streaming} />
-        </div>
-      )}
-      {tags.length > 0 && (
-        <div className="-mt-2 flex flex-wrap gap-1.5 pb-4">
-          {tags.map((t) => (
-            <Link
-              key={t.name}
-              href={`/tag/${encodeURIComponent(t.name)}`}
-              className="bg-muted text-muted-foreground hover:bg-foreground/15 hover:text-foreground rounded-full px-2.5 py-0.5 text-xs transition-colors"
-            >
-              {t.name}
-            </Link>
-          ))}
-        </div>
-      )}
 
       <div className="mt-6 grid gap-10 lg:grid-cols-[1fr_240px]">
         <div className="min-w-0 space-y-12">
@@ -196,33 +198,31 @@ async function ArtistBody({
               <TopTracksSection mbid={mbid} />
             </Suspense>
           </section>
-
-          <section>
-            <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-              <h2 className="text-sm font-semibold tracking-wide uppercase">
-                Discography
-              </h2>
-              <FilterPills
-                param="type"
-                active={discographyType}
-                options={DISCOGRAPHY_TYPE_OPTIONS}
-                defaultValue="studio"
-                ariaLabel="Discography type"
-              />
-            </div>
-            <Suspense
-              key={discographyType}
-              fallback={<DiscographySkeleton />}
-            >
-              <DiscographySection
-                mbid={mbid}
-                type={discographyType}
-              />
-            </Suspense>
-          </section>
         </div>
         <ArtistInfoSidebar artist={artist} linksOverride={other} />
       </div>
+
+      {/* Full-width sections — out of the 1fr/240px grid since the
+          sidebar's content (life-span / members / links) ends well
+          above where the discography starts. Lets the cover grid use
+          the entire page width. */}
+      <section className="mt-16">
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-sm font-semibold tracking-wide uppercase">
+            Discography
+          </h2>
+          <FilterPills
+            param="type"
+            active={discographyType}
+            options={DISCOGRAPHY_TYPE_OPTIONS}
+            defaultValue="studio"
+            ariaLabel="Discography type"
+          />
+        </div>
+        <Suspense key={discographyType} fallback={<DiscographySkeleton />}>
+          <DiscographySection mbid={mbid} type={discographyType} />
+        </Suspense>
+      </section>
 
       <section className="mt-16">
         <h2 className="mb-6 text-sm font-semibold tracking-wide uppercase">
