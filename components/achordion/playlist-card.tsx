@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Lock, Sparkles, Users } from "lucide-react";
+import { Globe, Lock, Sparkles, Users } from "lucide-react";
 import {
   playlistMbidFromIdentifier,
   type LbPlaylistSummary,
@@ -59,13 +59,21 @@ export function PlaylistCard({
         <h3 className="text-foreground truncate text-base font-medium">
           {p.title}
         </h3>
-        {ext?.public === false && (
+        {ext?.public === false ? (
           <span
-            className="text-muted-foreground/70 inline-flex items-center gap-1 text-[10px] tracking-wide uppercase"
+            className="text-muted-foreground/70 inline-flex shrink-0 items-center gap-1 text-[10px] tracking-wide uppercase"
             title="Private playlist"
           >
             <Lock className="size-3" />
             private
+          </span>
+        ) : (
+          <span
+            className="text-muted-foreground/60 inline-flex shrink-0 items-center gap-1 text-[10px] tracking-wide uppercase"
+            title="Public playlist"
+          >
+            <Globe className="size-3" />
+            public
           </span>
         )}
       </div>

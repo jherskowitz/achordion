@@ -1539,6 +1539,63 @@ export async function getPlaylist(mbid: string): Promise<PlaylistDetail | null> 
   }
 }
 
+/**
+ * Edit a playlist's visibility.
+ *
+ * LB exposes `POST /1/playlist/edit/{mbid}` accepting a partial JSPF
+ * body. The handler reads `extension["jspf#playlist"].public` (and a
+ * few other fields) and applies whichever are present. There's a
+ * known sharp edge: the `collaborators` field is rebuilt from
+ * whatever the body contains — sending an extension object without
+ * `collaborators` can clear them. To stay safe we re-send the
+ * existing collaborators list alongside the flipped `public` flag.
+ *
+ * Returns `{ ok: true }` on 200, `{ ok: false, status, message }`
+ * otherwise. 403 = not the owner; 401 = bad/missing token.
+ *
+ * Source: github.com/metabrainz/listenbrainz-server  →
+ *   listenbrainz/webserver/views/playlist_api.py::edit_playlist
+ */
+export async function setPlaylistVisibility(
+  mbid: string,
+  isPublic: boolean,
+  collaborators: string[],
+  token: string,
+): Promise<{ ok: boolean; status: number; message?: string }> {
+  const body = {
+    playlist: {
+      extension: {
+        "https://musicbrainz.org/doc/jspf#playlist": {
+          public: isPublic,
+          collaborators,
+        },
+      },
+    },
+  };
+  const res = await fetch(
+    `${LB_BASE}/playlist/edit/${encodeURIComponent(mbid)}`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Token ${token}`,
+        "Content-Type": "application/json",
+        "User-Agent": USER_AGENT,
+        Accept: "application/json",
+      },
+      body: JSON.stringify(body),
+      cache: "no-store",
+    },
+  );
+  let message: string | undefined;
+  try {
+    const json = (await res.json()) as { error?: string };
+    if (json.error) message = json.error;
+  } catch {
+    // Non-JSON body — fall back to status.
+  }
+  return { ok: res.ok, status: res.status, message };
+}
+
 // ─── Similar artists (LB Labs) ──────────────────────────────────────
 
 const SIMILAR_ARTISTS_ALGORITHM =

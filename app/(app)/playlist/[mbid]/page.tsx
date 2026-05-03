@@ -2,7 +2,8 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
-import { Download, ExternalLink, Users } from "lucide-react";
+import { Download, ExternalLink, Globe, Lock, Users } from "lucide-react";
+import { auth } from "@/auth";
 import { getPlaylist } from "@/lib/clients/listenbrainz";
 import { caaReleaseUrl } from "@/lib/clients/coverart";
 import { parachordPlayTrack, type ParachordTrack } from "@/lib/parachord";
@@ -18,6 +19,7 @@ import { CoverArt } from "@/components/achordion/cover-art";
 import { OpenInParachordButton } from "@/components/achordion/open-in-parachord-button";
 import { PlayOverNumberCell } from "@/components/achordion/parachord-button";
 import { PlaylistCoverMosaic } from "@/components/achordion/playlist-cover-mosaic";
+import { PlaylistVisibilityToggle } from "@/components/achordion/playlist-visibility-toggle";
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface PageProps {
@@ -77,9 +79,14 @@ async function publicUrl(path: string): Promise<string | null> {
 }
 
 async function PlaylistBody({ mbid }: { mbid: string }) {
-  const data = await getPlaylist(mbid);
+  const [data, session] = await Promise.all([getPlaylist(mbid), auth()]);
   if (!data) notFound();
   const xspfUrl = await publicUrl(`/api/playlist/${mbid}/xspf`);
+  const viewer = session?.user?.mbUsername ?? null;
+  const isOwner =
+    !!viewer &&
+    !!data.creator &&
+    viewer.toLowerCase() === data.creator.toLowerCase();
 
   const dateStr = formatDate(data.date);
   const totalDurationMs = data.tracks.reduce(
@@ -133,7 +140,6 @@ async function PlaylistBody({ mbid }: { mbid: string }) {
                 {algorithmLabel(data.algorithmSource)}
               </>
             )}
-            {!data.isPublic && <span className="mx-1.5">· Private</span>}
           </p>
           <h1 className="mt-2 text-3xl font-semibold tracking-tight text-balance sm:text-4xl md:text-5xl">
             {data.title}
@@ -187,6 +193,28 @@ async function PlaylistBody({ mbid }: { mbid: string }) {
             </p>
           )}
           <div className="mt-5 flex flex-wrap items-center gap-3">
+            {isOwner ? (
+              <PlaylistVisibilityToggle
+                mbid={mbid}
+                initialIsPublic={data.isPublic}
+              />
+            ) : (
+              <span
+                className="text-muted-foreground border-border/60 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] tracking-wide uppercase"
+                title={
+                  data.isPublic
+                    ? "Public playlist"
+                    : "Private playlist"
+                }
+              >
+                {data.isPublic ? (
+                  <Globe className="size-3" />
+                ) : (
+                  <Lock className="size-3" />
+                )}
+                {data.isPublic ? "Public" : "Private"}
+              </span>
+            )}
             {data.tracks.length > 0 && (
               // Hand Parachord the public XSPF URL when one is available
               // (production deploy with a real host) so it can fetch the
