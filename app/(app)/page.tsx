@@ -7,18 +7,18 @@ import { Button } from "@/components/ui/button";
 const FEATURES = [
   {
     icon: Globe2,
-    title: "One community, every streaming service",
-    body: "Spotify, Apple Music, Tidal, Bandcamp, the FLAC library on your NAS — every listener's scrobbles flow into the same feed. See what your friend's playing this week even when you don't share a platform.",
+    title: "One community, no matter how you listen",
+    body: "Spotify, Apple Music, Tidal, Bandcamp, the FLAC library on your NAS — every listener's listening data flows into the same feed. See what your friend's playing this week even when you don't share a platform.",
   },
   {
     icon: Play,
     title: "One click plays it, anywhere",
-    body: "Pair Achordion with Parachord and every track row, every album, every recommendation has a Play button that resolves against your authorized services and plays from whichever ranks highest.",
+    body: "Pair Achordion with Parachord and every track row, every album, every recommendation has a Play button that resolves against your music library and services - and plays from whichever ranks highest. Without Parachord you are still provided links to multiple streaming services and storefronts - no matter your preference. ",
   },
   {
     icon: ShieldCheck,
-    title: "Your data stays yours",
-    body: "Achordion is stateless — no Achordion database, no analytics, no profile of you. Your listens, follows, and playlists live in your ListenBrainz account. Leave whenever, take everything with you.",
+    title: "Your data, not ours",
+    body: "Achordion is stateless — there is no Achordion database, no analytics, no profile of you. Your listens, follows, and playlists live in your ListenBrainz account. Leave whenever, take everything with you.",
   },
 ];
 
@@ -34,18 +34,11 @@ export default async function HomePage() {
           The independent music community
         </p>
         <h1 className="font-heading max-w-3xl text-5xl leading-[1.05] font-semibold tracking-tight text-balance sm:text-6xl md:text-7xl">
-          An open music community for listeners on every streaming service.
+          An open music community - no matter where you get your music
         </h1>
         <p className="text-muted-foreground mt-6 max-w-2xl text-lg leading-7">
-          Achordion is the open-source counterpoint to Spotify and Apple
-          Music — a modern front-end for{" "}
-          <Link
-            href="/about"
-            className="hover:text-foreground underline-offset-4 hover:underline"
-          >
-            MusicBrainz and ListenBrainz
-          </Link>
-          , designed to feel like one product with{" "}
+          Achordion is the open-source counterpoint to streaming music silos — and a modern alternative to Last.fm 
+          {" "}and designed to work better with{" "}
           <a
             href="https://github.com/Parachord/parachord"
             target="_blank"
@@ -62,14 +55,14 @@ export default async function HomePage() {
             nativeButton={false}
             render={<Link href="/login" />}
           >
-            Continue with MusicBrainz
+            Login with a MusicBrainz account
             <ArrowRight className="size-4" />
           </Button>
           <Button
             size="lg"
             variant="ghost"
             nativeButton={false}
-            render={<Link href="/explore" />}
+            render={<Link href="/explore/critical-darlings" />}
           >
             Browse without signing in
           </Button>
