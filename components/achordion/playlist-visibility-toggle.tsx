@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { Globe, Loader2, Lock } from "lucide-react";
 import { setPlaylistVisibilityAction } from "@/app/(app)/playlist/[mbid]/actions";
+import { IconTooltip } from "@/components/ui/icon-tooltip";
 import { cn } from "@/lib/utils";
 
 /**
@@ -46,24 +47,25 @@ export function PlaylistVisibilityToggle({
 
   return (
     <span className="inline-flex flex-col items-start gap-1">
-      <button
-        type="button"
-        onClick={flip}
-        disabled={pending}
-        title={title}
-        aria-label={title}
-        className={cn(
-          "border-border/60 hover:border-foreground/40 hover:bg-muted/40 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] tracking-wide uppercase transition-colors disabled:opacity-60",
-          isPublic
-            ? "text-muted-foreground"
-            : "text-foreground bg-muted/30",
-        )}
-      >
-        <Icon
-          className={cn("size-3", pending && "animate-spin")}
-        />
-        {label}
-      </button>
+      <IconTooltip label={title}>
+        <button
+          type="button"
+          onClick={flip}
+          disabled={pending}
+          aria-label={title}
+          className={cn(
+            "border-border/60 hover:border-foreground/40 hover:bg-muted/40 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] tracking-wide uppercase transition-colors disabled:opacity-60",
+            isPublic
+              ? "text-muted-foreground"
+              : "text-foreground bg-muted/30",
+          )}
+        >
+          <Icon
+            className={cn("size-3", pending && "animate-spin")}
+          />
+          {label}
+        </button>
+      </IconTooltip>
       {error && (
         <span className="text-destructive text-[11px]">{error}</span>
       )}

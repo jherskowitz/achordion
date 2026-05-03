@@ -20,6 +20,7 @@ import { OpenInParachordButton } from "@/components/achordion/open-in-parachord-
 import { PlayOverNumberCell } from "@/components/achordion/parachord-button";
 import { PlaylistCoverMosaic } from "@/components/achordion/playlist-cover-mosaic";
 import { PlaylistVisibilityToggle } from "@/components/achordion/playlist-visibility-toggle";
+import { IconTooltip } from "@/components/ui/icon-tooltip";
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface PageProps {
@@ -194,21 +195,22 @@ async function PlaylistBody({ mbid }: { mbid: string }) {
                 initialIsPublic={data.isPublic}
               />
             ) : (
-              <span
-                className="text-muted-foreground border-border/60 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] tracking-wide uppercase"
-                title={
+              <IconTooltip
+                label={
                   data.isPublic
-                    ? "Public playlist"
-                    : "Private playlist"
+                    ? "Public — visible to anyone with the link."
+                    : "Private — only the owner can see this."
                 }
               >
-                {data.isPublic ? (
-                  <Globe className="size-3" />
-                ) : (
-                  <Lock className="size-3" />
-                )}
-                {data.isPublic ? "Public" : "Private"}
-              </span>
+                <span className="text-muted-foreground border-border/60 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] tracking-wide uppercase">
+                  {data.isPublic ? (
+                    <Globe className="size-3" />
+                  ) : (
+                    <Lock className="size-3" />
+                  )}
+                  {data.isPublic ? "Public" : "Private"}
+                </span>
+              </IconTooltip>
             )}
           </div>
           {data.annotation && stripHtml(data.annotation) && (
