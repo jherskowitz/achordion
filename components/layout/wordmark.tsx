@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { cn } from "@/lib/utils";
+import { WordmarkMark } from "./wordmark-mark";
 
 export function Wordmark({
   className,
@@ -18,13 +19,16 @@ export function Wordmark({
       // hydration on every layout-chrome anchor so extension
       // mutations don't break navigation.
       suppressHydrationWarning
+      aria-label="Achordion"
       className={cn(
-        "inline-flex items-baseline gap-1 font-semibold tracking-tight",
+        "text-foreground inline-flex items-center gap-1.5",
         className,
       )}
     >
-      <span className="text-lg">Achordion</span>
-      <span className="text-muted-foreground text-xs font-normal">beta</span>
+      <WordmarkMark className="h-5 w-auto" />
+      <span className="text-muted-foreground text-xs font-normal">
+        beta
+      </span>
     </Link>
   );
 }
