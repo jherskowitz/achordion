@@ -10,8 +10,10 @@ import {
 export const metadata = { title: "Critical Darlings" };
 
 // Match Parachord's `loadCriticsPicks` behaviour: refresh every few hours
-// at the page level too, in case the RSS layer's cache misses.
-export const revalidate = 60 * 60 * 4;
+// at the page level too, in case the RSS layer's cache misses. Next 16's
+// segment-config validator requires a literal number, so 4 hours is
+// expressed as the resolved value rather than `60 * 60 * 4`.
+export const revalidate = 14400;
 
 export default async function CriticalDarlingsPage() {
   const albums = await getCriticalDarlings();
