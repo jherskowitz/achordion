@@ -20,6 +20,7 @@ export const cacheTagsLB = {
   userListens: (name: string) => `lb:user:${name}:listens`,
   userStats: (name: string) => `lb:user:${name}:stats`,
   user: (name: string) => `lb:user:${name}`,
+  recording: (mbid: string) => `lb:recording:${mbid}`,
 };
 
 interface FetchOptions {
@@ -1029,6 +1030,57 @@ export async function getReleaseGroupListeners(
       return null;
     }
     throw err;
+  }
+}
+
+// LB doesn't expose a single-recording listener-count GET; the only
+// path is the POST batch popularity endpoint that takes an array of
+// recording mbids and returns aggregate listen / user counts.
+
+const RecordingPopularityResponseSchema = z.array(
+  z
+    .object({
+      recording_mbid: z.string(),
+      total_listen_count: z.number().optional(),
+      total_user_count: z.number().optional(),
+    })
+    .passthrough(),
+);
+
+export interface RecordingPopularity {
+  totalListenCount: number;
+  totalUserCount: number;
+}
+
+export async function getRecordingPopularity(
+  mbid: string,
+): Promise<RecordingPopularity | null> {
+  try {
+    const url = `${LB_BASE}/popularity/recording`;
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        "User-Agent": USER_AGENT,
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ recording_mbids: [mbid] }),
+      next: {
+        revalidate: 60 * 60 * 6,
+        tags: [cacheTagsLB.recording(mbid)],
+      },
+    });
+    if (!res.ok) return null;
+    const json = await res.json();
+    const parsed = RecordingPopularityResponseSchema.safeParse(json);
+    if (!parsed.success || parsed.data.length === 0) return null;
+    const item = parsed.data[0];
+    return {
+      totalListenCount: item.total_listen_count ?? 0,
+      totalUserCount: item.total_user_count ?? 0,
+    };
+  } catch {
+    return null;
   }
 }
 

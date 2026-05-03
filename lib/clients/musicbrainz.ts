@@ -378,6 +378,93 @@ export async function getRelease(mbid: string): Promise<ReleaseDetail> {
   );
 }
 
+// MB recording: a single performance — distinct from a Track (which is a
+// recording placed on a specific medium of a specific release). A
+// recording can appear on many releases / release-groups.
+
+const RecordingReleaseSchema = z
+  .object({
+    id: z.string(),
+    title: z.string(),
+    status: z.string().nullish(),
+    date: z.string().nullish(),
+    "release-group": ReleaseGroupSchema.nullish(),
+    "artist-credit": ArtistCreditSchema.optional(),
+  })
+  .passthrough();
+
+const RecordingDetailSchema = z
+  .object({
+    id: z.string(),
+    title: z.string(),
+    /** Length in milliseconds; null on incomplete entries. */
+    length: z.number().nullish(),
+    disambiguation: z.string().nullish(),
+    "first-release-date": z.string().nullish(),
+    isrcs: z.array(z.string()).optional(),
+    "artist-credit": ArtistCreditSchema.optional(),
+    releases: z.array(RecordingReleaseSchema).optional(),
+    relations: z
+      .array(z.union([ArtistRelationSchema, UrlRelationSchema]))
+      .optional(),
+    tags: z
+      .array(z.object({ name: z.string(), count: z.number() }))
+      .optional(),
+    genres: z
+      .array(z.object({ name: z.string(), count: z.number() }))
+      .optional(),
+    rating: z
+      .object({
+        value: z.number().nullish(),
+        "votes-count": z.number().optional(),
+      })
+      .partial()
+      .nullish(),
+  })
+  .passthrough();
+
+export type RecordingDetail = z.infer<typeof RecordingDetailSchema>;
+export type RecordingRelease = z.infer<typeof RecordingReleaseSchema>;
+
+export async function getRecording(mbid: string): Promise<RecordingDetail> {
+  return mbFetch(
+    `/recording/${encodeURIComponent(mbid)}?inc=artist-credits+releases+release-groups+tags+genres+url-rels+isrcs+ratings`,
+    RecordingDetailSchema,
+    { tags: [cacheTagsMB.recording(mbid)] },
+  );
+}
+
+/**
+ * Reduce a recording's `releases` array to one entry per
+ * release-group, preferring the earliest official release inside each
+ * group. Used by the recording page to render an "Appears on" list of
+ * canonical albums rather than a flood of CD/vinyl/region variants.
+ */
+export function dedupeReleaseGroups(
+  releases: RecordingRelease[] | undefined,
+): RecordingRelease[] {
+  if (!releases || releases.length === 0) return [];
+  const byGroup = new Map<string, RecordingRelease>();
+  for (const r of releases) {
+    const rgId = r["release-group"]?.id;
+    if (!rgId) continue;
+    const existing = byGroup.get(rgId);
+    if (!existing) {
+      byGroup.set(rgId, r);
+      continue;
+    }
+    // Prefer Official over other statuses, then earlier dates.
+    const isBetter =
+      (r.status === "Official" && existing.status !== "Official") ||
+      (r.status === existing.status &&
+        (r.date ?? "9999") < (existing.date ?? "9999"));
+    if (isBetter) byGroup.set(rgId, r);
+  }
+  return [...byGroup.values()].sort((a, b) =>
+    (a.date ?? "9999").localeCompare(b.date ?? "9999"),
+  );
+}
+
 /**
  * Pick the most representative release from a release group:
  * 1. Status = "Official" preferred
