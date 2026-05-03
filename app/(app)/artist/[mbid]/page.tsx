@@ -20,6 +20,11 @@ import { ArtistAvatar } from "@/components/achordion/artist-avatar";
 import { ArtistInfoSidebar } from "@/components/achordion/artist-info-sidebar";
 import { Biography } from "@/components/achordion/biography";
 import { Discography } from "@/components/achordion/discography";
+import {
+  ExternalLinks,
+  categoriseLinks,
+} from "@/components/achordion/external-links";
+import type { ArtistExternalLink } from "@/lib/clients/musicbrainz";
 import { LbRadioSection } from "@/components/achordion/lb-radio-section";
 import { SimilarArtists } from "@/components/achordion/similar-artists";
 import { TopTracksList } from "@/components/achordion/top-tracks-list";
@@ -31,12 +36,16 @@ interface PageParams {
 
 async function BiographySection({
   source,
+  socialLinks,
 }: {
   source: ReturnType<typeof findBioSource> & object;
+  socialLinks: ArtistExternalLink[];
 }) {
   const bio = await getBiography(source);
-  if (!bio) return null;
-  return <Biography bio={bio} />;
+  const footer =
+    socialLinks.length > 0 ? <ExternalLinks links={socialLinks} /> : null;
+  if (!bio) return footer;
+  return <Biography bio={bio} footer={footer} />;
 }
 
 async function ArtistBody({ mbid }: { mbid: string }) {
@@ -54,6 +63,11 @@ async function ArtistBody({ mbid }: { mbid: string }) {
 
   const { urls } = partitionArtistRelations(artist);
   const bioSource = findBioSource(urls);
+  // External links split three ways:
+  //   streaming → favicon row right under the artist name
+  //   social    → favicon row inside the bio block
+  //   other     → wiki/discogs/lyrics/etc. in the sidebar
+  const { streaming, social, other } = categoriseLinks(urls);
 
   const tags = (artist.genres?.length ? artist.genres : artist.tags ?? [])
     .filter((t) => t.count > 0)
@@ -109,6 +123,11 @@ async function ArtistBody({ mbid }: { mbid: string }) {
           ) : undefined
         }
       />
+      {streaming.length > 0 && (
+        <div className="-mt-2 pb-4">
+          <ExternalLinks links={streaming} />
+        </div>
+      )}
       {tags.length > 0 && (
         <div className="-mt-2 flex flex-wrap gap-1.5 pb-4">
           {tags.map((t) => (
@@ -125,12 +144,18 @@ async function ArtistBody({ mbid }: { mbid: string }) {
 
       <div className="mt-6 grid gap-10 lg:grid-cols-[1fr_240px]">
         <div className="min-w-0 space-y-12">
-          {bioSource && (
+          {bioSource ? (
             <Suspense
               fallback={<Skeleton className="h-32 w-full rounded-xl" />}
             >
-              <BiographySection source={bioSource} />
+              <BiographySection source={bioSource} socialLinks={social} />
             </Suspense>
+          ) : (
+            social.length > 0 && (
+              <div className="border-border/60 bg-card/30 mb-6 rounded-xl border p-5">
+                <ExternalLinks links={social} />
+              </div>
+            )
           )}
 
           <Suspense
@@ -157,7 +182,7 @@ async function ArtistBody({ mbid }: { mbid: string }) {
             </Suspense>
           </section>
         </div>
-        <ArtistInfoSidebar artist={artist} />
+        <ArtistInfoSidebar artist={artist} linksOverride={other} />
       </div>
 
       <section className="mt-16">

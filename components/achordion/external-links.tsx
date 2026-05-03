@@ -21,28 +21,173 @@ const PREFERRED_TYPES = new Set([
   "purchase for download",
 ]);
 
-/** Friendly label used in the tooltip — falls back to the MB rel type. */
+// ─── Categorisation helpers ────────────────────────────────────────
+// The artist page splits external links across three locations
+// (streaming row under the title, social row in the bio block, leftover
+// reference links in the sidebar) — the predicates below make that
+// split deterministic without baking layout decisions into the
+// presentational ExternalLinks component.
+
+const STREAMING_TYPES = new Set([
+  "free streaming",
+  "streaming",
+  "purchase for download",
+  "purchase for mail-order",
+  "download for free",
+]);
+
+const STREAMING_HOST_FRAGMENTS = [
+  "spotify.com",
+  "music.apple.com",
+  "itunes.apple.com",
+  "youtube.com",
+  "music.youtube.com",
+  "bandcamp.com",
+  "soundcloud.com",
+  "tidal.com",
+  "deezer.com",
+  "music.amazon.",
+  "qobuz.com",
+  "beatport.com",
+];
+
+const SOCIAL_TYPES = new Set([
+  "social network",
+  "official homepage",
+  "blog",
+]);
+
+const SOCIAL_HOST_FRAGMENTS = [
+  "twitter.com",
+  "x.com",
+  "instagram.com",
+  "facebook.com",
+  "tiktok.com",
+  "threads.net",
+  "bsky.app",
+  "reddit.com",
+  "mastodon.",
+];
+
+function isStreaming(link: ArtistExternalLink): boolean {
+  if (STREAMING_TYPES.has(link.type)) return true;
+  const u = link.url.toLowerCase();
+  return STREAMING_HOST_FRAGMENTS.some((h) => u.includes(h));
+}
+
+function isSocial(link: ArtistExternalLink): boolean {
+  if (SOCIAL_TYPES.has(link.type)) return true;
+  const u = link.url.toLowerCase();
+  return SOCIAL_HOST_FRAGMENTS.some((h) => u.includes(h));
+}
+
+export interface CategorisedLinks {
+  streaming: ArtistExternalLink[];
+  social: ArtistExternalLink[];
+  other: ArtistExternalLink[];
+}
+
+/**
+ * Split a flat list of MB url-rels into:
+ *   - streaming  → Spotify / Apple Music / YouTube / Bandcamp / etc.
+ *   - social     → Twitter, Instagram, Mastodon, "official homepage", …
+ *   - other      → Wikipedia, Wikidata, Discogs, IMDb, lyrics sites, …
+ *
+ * Streaming wins ties — a `bandcamp.com` URL typed as
+ * "official homepage" should still land in the streaming row.
+ */
+export function categoriseLinks(
+  links: ArtistExternalLink[],
+): CategorisedLinks {
+  const streaming: ArtistExternalLink[] = [];
+  const social: ArtistExternalLink[] = [];
+  const other: ArtistExternalLink[] = [];
+  for (const l of links) {
+    if (isStreaming(l)) streaming.push(l);
+    else if (isSocial(l)) social.push(l);
+    else other.push(l);
+  }
+  return { streaming, social, other };
+}
+
+/**
+ * Fast lookup for tooltip labels keyed by a substring that needs to
+ * appear anywhere in the URL. Order matters — longer / more specific
+ * fragments come first so e.g. `music.apple.com` matches as
+ * "Apple Music" before a future `apple.com` would match as "Apple".
+ */
+const HOST_LABEL_RULES: [string, string][] = [
+  ["music.apple.com", "Apple Music"],
+  ["itunes.apple.com", "iTunes"],
+  ["music.youtube.com", "YouTube Music"],
+  ["music.amazon.", "Amazon Music"],
+  ["bandcamp.com", "Bandcamp"],
+  ["soundcloud.com", "SoundCloud"],
+  ["spotify.com", "Spotify"],
+  ["youtube.com", "YouTube"],
+  ["tidal.com", "Tidal"],
+  ["deezer.com", "Deezer"],
+  ["qobuz.com", "Qobuz"],
+  ["beatport.com", "Beatport"],
+  ["vimeo.com", "Vimeo"],
+  ["wikipedia.org", "Wikipedia"],
+  ["wikidata.org", "Wikidata"],
+  ["discogs.com", "Discogs"],
+  ["genius.com", "Genius"],
+  ["last.fm", "Last.fm"],
+  ["lyrics.com", "Lyrics.com"],
+  ["musixmatch.com", "Musixmatch"],
+  ["azlyrics.com", "AZLyrics"],
+  ["instagram.com", "Instagram"],
+  ["twitter.com", "Twitter"],
+  ["x.com", "Twitter"],
+  ["facebook.com", "Facebook"],
+  ["tiktok.com", "TikTok"],
+  ["threads.net", "Threads"],
+  ["bsky.app", "Bluesky"],
+  ["reddit.com", "Reddit"],
+  ["mastodon.", "Mastodon"],
+  ["allmusic.com", "AllMusic"],
+  ["rateyourmusic.com", "Rate Your Music"],
+  ["setlist.fm", "setlist.fm"],
+  ["imdb.com", "IMDb"],
+  ["pinterest.", "Pinterest"],
+  ["patreon.com", "Patreon"],
+];
+
+/**
+ * Derive a friendly label from the URL hostname when no known pattern
+ * matches. Strips the leading subdomain (`open.`, `www.`, etc.) and
+ * picks the second-level domain, capitalised. Used as a fallback so
+ * the tooltip shows e.g. "Songkick" for songkick.com instead of the
+ * MB rel-type ("purchase for download" / "lyrics" / etc.) which is
+ * jarringly category-like.
+ */
+function siteNameFromHost(url: string): string | null {
+  try {
+    const host = new URL(url).hostname.toLowerCase();
+    // Drop standard-issue subdomains so `open.spotify.com` →
+    // `spotify.com` → `Spotify` (handled by the rule list usually,
+    // this covers the long tail).
+    const stripped = host.replace(/^(www|m|open|music|web|en)\./, "");
+    const root = stripped.split(".")[0];
+    if (!root) return null;
+    return root.charAt(0).toUpperCase() + root.slice(1);
+  } catch {
+    return null;
+  }
+}
+
+/** Friendly label used in the tooltip — never the raw MB rel type. */
 function tooltipLabel(link: ArtistExternalLink): string {
   const u = link.url.toLowerCase();
+  for (const [needle, label] of HOST_LABEL_RULES) {
+    if (u.includes(needle)) return label;
+  }
   if (link.type === "official homepage") return "Official site";
-  if (u.includes("wikipedia.org")) return "Wikipedia";
-  if (u.includes("wikidata.org")) return "Wikidata";
-  if (u.includes("bandcamp.com")) return "Bandcamp";
-  if (u.includes("soundcloud.com")) return "SoundCloud";
-  if (u.includes("spotify.com")) return "Spotify";
-  if (u.includes("music.apple.com")) return "Apple Music";
-  if (u.includes("youtube.com")) return "YouTube";
-  if (u.includes("discogs.com")) return "Discogs";
-  if (u.includes("genius.com")) return "Genius";
-  if (u.includes("last.fm")) return "Last.fm";
-  if (u.includes("instagram.com")) return "Instagram";
-  if (u.includes("twitter.com") || u.includes("x.com")) return "Twitter";
-  if (u.includes("facebook.com")) return "Facebook";
-  if (u.includes("imdb.com")) return "IMDb";
-  // Capitalised type name (`free_streaming` → `Free streaming`).
-  return link.type
-    .replace(/_/g, " ")
-    .replace(/\b\w/g, (c) => c.toUpperCase());
+  // Last resort: derive from the hostname so we never show a rel-type
+  // string like "Purchase For Download" / "Lyrics" / "Free Streaming".
+  return siteNameFromHost(link.url) ?? "External link";
 }
 
 /**

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Pencil } from "lucide-react";
 import type {
   ArtistDetail,
+  ArtistExternalLink,
   ArtistMember,
 } from "@/lib/clients/musicbrainz";
 import { partitionArtistRelations } from "@/lib/clients/musicbrainz";
@@ -53,8 +54,23 @@ function MemberRow({ entry }: { entry: ArtistMember }) {
   );
 }
 
-export function ArtistInfoSidebar({ artist }: { artist: ArtistDetail }) {
-  const { members, memberOf, urls } = partitionArtistRelations(artist);
+export function ArtistInfoSidebar({
+  artist,
+  /**
+   * Pre-filtered Links list — when supplied, replaces the URLs derived
+   * from the artist's relations. The artist page splits relations into
+   * streaming / social / other categories and feeds only the "other"
+   * subset here so the sidebar doesn't double up on what the hero row
+   * and bio block already show.
+   */
+  linksOverride,
+}: {
+  artist: ArtistDetail;
+  linksOverride?: ArtistExternalLink[];
+}) {
+  const partitioned = partitionArtistRelations(artist);
+  const { members, memberOf } = partitioned;
+  const urls = linksOverride ?? partitioned.urls;
   const lifeBegin = artist["life-span"]?.begin;
   const lifeEnd = artist["life-span"]?.end;
   const ended = artist["life-span"]?.ended;
