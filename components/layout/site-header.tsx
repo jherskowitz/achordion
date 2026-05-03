@@ -3,6 +3,7 @@ import { Search } from "lucide-react";
 import { auth } from "@/auth";
 import { Wordmark } from "./wordmark";
 import { ThemeToggle } from "./theme-toggle";
+import { MainNav, type MainNavItem } from "./main-nav";
 import { Button } from "@/components/ui/button";
 import { UserAvatar } from "@/components/achordion/user-avatar";
 
@@ -12,7 +13,7 @@ export async function SiteHeader() {
   const avatarUrl = session?.user?.image ?? undefined;
   const displayName = session?.user?.name ?? username ?? "";
 
-  const nav: { href: string; label: string }[] = [
+  const nav: MainNavItem[] = [
     { href: "/explore", label: "Explore" },
     { href: "/radio", label: "Radio" },
     { href: "/charts", label: "Charts" },
@@ -29,22 +30,7 @@ export async function SiteHeader() {
     <header className="border-border/60 bg-background/80 supports-[backdrop-filter]:bg-background/60 sticky top-0 z-40 w-full border-b backdrop-blur">
       <div className="mx-auto flex h-14 max-w-7xl items-center gap-6 px-4 sm:px-6">
         <Wordmark />
-        <nav className="hidden items-center gap-1 md:flex">
-          {nav.map((item) => (
-            <Button
-              key={item.href}
-              variant="ghost"
-              size="sm"
-              nativeButton={false}
-              // suppressHydrationWarning — see wordmark.tsx for the
-              // Parachord-extension rationale; applied to every layout-
-              // chrome anchor so DOM mutations don't break client nav.
-              render={<Link href={item.href} suppressHydrationWarning />}
-            >
-              {item.label}
-            </Button>
-          ))}
-        </nav>
+        <MainNav items={nav} />
         <div className="ml-auto flex items-center gap-1">
           <Button
             variant="ghost"
