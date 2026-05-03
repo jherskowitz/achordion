@@ -15,6 +15,7 @@ export async function SiteHeader() {
   const nav: { href: string; label: string }[] = [
     { href: "/explore", label: "Explore" },
     { href: "/radio", label: "Radio" },
+    { href: "/charts", label: "Charts" },
   ];
   if (username) {
     nav.push({ href: "/feed", label: "My feed" });
