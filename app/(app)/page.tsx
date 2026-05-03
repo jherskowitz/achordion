@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ArrowRight, Globe2, Play, ShieldCheck } from "lucide-react";
+import { ArrowRight, Globe2, Network, Play, ShieldCheck } from "lucide-react";
 import { auth } from "@/auth";
 import { Button } from "@/components/ui/button";
 
@@ -19,6 +19,11 @@ const FEATURES = [
     icon: ShieldCheck,
     title: "Your listening data, not ours",
     body: "Achordion is stateless — there is no Achordion database, no analytics, no profile of you. Your listens, follows, and playlists live in your ListenBrainz account. Leave whenever, take everything with you.",
+  },
+  {
+    icon: Network,
+    title: "Build the open web of music",
+    body: "Every artist link, every missing relationship, every \"+ Add sources\" tile points back to MusicBrainz — the open-source music database that powers Achordion and every other client like it. Fix something once and the whole open ecosystem gets better.",
   },
 ];
 
@@ -70,7 +75,7 @@ export default async function HomePage() {
       </section>
 
       <section className="border-border/60 border-t">
-        <div className="mx-auto grid max-w-7xl gap-px overflow-hidden px-4 py-16 sm:px-6 md:grid-cols-3 md:gap-8 md:py-20">
+        <div className="mx-auto grid max-w-7xl gap-px overflow-hidden px-4 py-16 sm:grid-cols-2 sm:px-6 md:gap-8 md:py-20 lg:grid-cols-4">
           {FEATURES.map(({ icon: Icon, title, body }) => (
             <div key={title} className="py-2">
               <Icon className="text-muted-foreground size-5" />
