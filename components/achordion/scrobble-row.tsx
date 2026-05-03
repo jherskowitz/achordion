@@ -71,12 +71,12 @@ export function ScrobbleRow({
               {releaseMbid ? (
                 <Link
                   href={`/release/${releaseMbid}`}
-                  className="hover:text-foreground"
+                  className="italic hover:text-foreground"
                 >
                   {meta.release_name}
                 </Link>
               ) : (
-                meta.release_name
+                <span className="italic">{meta.release_name}</span>
               )}
             </>
           )}

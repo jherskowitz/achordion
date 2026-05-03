@@ -1,13 +1,17 @@
 import Link from "next/link";
 import { Suspense } from "react";
-import { Heart } from "lucide-react";
+import { Play } from "lucide-react";
 import {
   getRecordingMetadata,
   getUserFeedback,
   type FeedbackItem,
 } from "@/lib/clients/listenbrainz";
+import { caaReleaseUrl } from "@/lib/clients/coverart";
+import { parachordPlayTrack } from "@/lib/parachord";
 import { ComingSoon } from "@/components/achordion/coming-soon";
+import { CoverArt } from "@/components/achordion/cover-art";
 import { PageShell } from "@/components/achordion/page-shell";
+import { ParachordPlayButton } from "@/components/achordion/parachord-button";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export const metadata = { title: "Loves" };
@@ -32,7 +36,25 @@ interface LovedTrack {
   artistMbid: string | null;
   releaseName: string | null;
   releaseMbid: string | null;
+  /**
+   * Cover URL — preferred archive.org direct URL when LB gave us
+   * caa_id+caa_release_mbid, otherwise fall back to caaReleaseUrl
+   * which 302s to the right size.
+   */
+  cover: string | null;
   lovedAt: number;
+}
+
+function pickCoverUrl(
+  caaReleaseMbid: string | undefined,
+  caaId: number | string | undefined,
+  releaseMbid: string | undefined,
+): string | null {
+  if (caaReleaseMbid && caaId) {
+    return `https://archive.org/download/mbid-${caaReleaseMbid}/mbid-${caaReleaseMbid}-${caaId}_thumb250.jpg`;
+  }
+  if (releaseMbid) return caaReleaseUrl(releaseMbid, 250);
+  return null;
 }
 
 async function LovesBody({ name }: { name: string }) {
@@ -70,6 +92,18 @@ async function LovesBody({ name }: { name: string }) {
       f.track_metadata?.artist_name ??
       null;
     if (!trackName || !artistName) return [];
+    const cover = pickCoverUrl(
+      meta?.release?.caa_release_mbid ??
+        f.track_metadata?.mbid_mapping?.caa_release_mbid ??
+        undefined,
+      meta?.release?.caa_id ??
+        f.track_metadata?.mbid_mapping?.caa_id ??
+        undefined,
+      meta?.release?.mbid ??
+        f.track_metadata?.mbid_mapping?.release_mbid ??
+        f.track_metadata?.additional_info?.release_mbid ??
+        undefined,
+    );
     return [
       {
         trackName,
@@ -79,6 +113,7 @@ async function LovesBody({ name }: { name: string }) {
         releaseName:
           meta?.release?.name ?? f.track_metadata?.release_name ?? null,
         releaseMbid: meta?.release?.mbid ?? null,
+        cover,
         lovedAt: f.created,
       },
     ];
@@ -91,62 +126,86 @@ async function LovesBody({ name }: { name: string }) {
         {feedback.length === 1 ? "" : "s"} · most recent first
       </p>
       <ol className="border-border/60 divide-border/60 divide-y rounded-xl border px-4">
-        {tracks.map((t, i) => (
-          <li
-            key={`${t.recordingMbid ?? t.trackName}-${i}`}
-            className="flex items-center gap-3 py-3"
-          >
-            <Heart className="size-4 shrink-0 fill-rose-500 text-rose-500" />
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium">
-                {t.recordingMbid ? (
-                  <Link
-                    href={`/recording/${t.recordingMbid}`}
-                    className="hover:underline"
-                  >
-                    {t.trackName}
-                  </Link>
-                ) : (
-                  t.trackName
-                )}
-              </p>
-              <p className="text-muted-foreground truncate text-xs">
-                {t.artistMbid ? (
-                  <Link
-                    href={`/artist/${t.artistMbid}`}
-                    className="hover:text-foreground"
-                  >
-                    {t.artistName}
-                  </Link>
-                ) : (
-                  t.artistName
-                )}
-                {t.releaseName && (
-                  <>
-                    <span className="mx-1.5 opacity-50">·</span>
-                    {t.releaseMbid ? (
-                      <Link
-                        href={`/release/${t.releaseMbid}`}
-                        className="italic hover:text-foreground"
-                      >
-                        {t.releaseName}
-                      </Link>
-                    ) : (
-                      <span className="italic">{t.releaseName}</span>
-                    )}
-                  </>
-                )}
-              </p>
-            </div>
-            <time
-              dateTime={new Date(t.lovedAt * 1000).toISOString()}
-              className="text-muted-foreground/70 shrink-0 tabular-nums text-xs"
-              title={new Date(t.lovedAt * 1000).toLocaleString()}
+        {tracks.map((t, i) => {
+          const playHref = parachordPlayTrack({
+            artist: t.artistName,
+            title: t.trackName,
+          });
+          return (
+            <li
+              key={`${t.recordingMbid ?? t.trackName}-${i}`}
+              className="group flex items-center gap-3 py-3"
             >
-              {relativeTimestamp(t.lovedAt)}
-            </time>
-          </li>
-        ))}
+              <a
+                href={playHref}
+                aria-label={`Play "${t.trackName}" by ${t.artistName} in Parachord`}
+                title="Play in Parachord"
+                className="group/cover relative shrink-0 overflow-hidden rounded-md"
+              >
+                <CoverArt
+                  src={t.cover}
+                  alt={t.releaseName ?? t.trackName}
+                  size={40}
+                />
+                <span
+                  aria-hidden
+                  className="absolute inset-0 flex items-center justify-center bg-black/55 opacity-0 transition-opacity group-hover/cover:opacity-100"
+                >
+                  <Play className="size-4 fill-white text-white" />
+                </span>
+              </a>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium">
+                  {t.recordingMbid ? (
+                    <Link
+                      href={`/recording/${t.recordingMbid}`}
+                      className="hover:underline"
+                    >
+                      {t.trackName}
+                    </Link>
+                  ) : (
+                    t.trackName
+                  )}
+                </p>
+                <p className="text-muted-foreground truncate text-xs">
+                  {t.artistMbid ? (
+                    <Link
+                      href={`/artist/${t.artistMbid}`}
+                      className="hover:text-foreground"
+                    >
+                      {t.artistName}
+                    </Link>
+                  ) : (
+                    t.artistName
+                  )}
+                  {t.releaseName && (
+                    <>
+                      <span className="mx-1.5 opacity-50">·</span>
+                      {t.releaseMbid ? (
+                        <Link
+                          href={`/release/${t.releaseMbid}`}
+                          className="italic hover:text-foreground"
+                        >
+                          {t.releaseName}
+                        </Link>
+                      ) : (
+                        <span className="italic">{t.releaseName}</span>
+                      )}
+                    </>
+                  )}
+                </p>
+              </div>
+              <ParachordPlayButton href={playHref} />
+              <time
+                dateTime={new Date(t.lovedAt * 1000).toISOString()}
+                className="text-muted-foreground/70 shrink-0 tabular-nums text-xs"
+                title={new Date(t.lovedAt * 1000).toLocaleString()}
+              >
+                {relativeTimestamp(t.lovedAt)}
+              </time>
+            </li>
+          );
+        })}
       </ol>
     </>
   );
@@ -157,7 +216,7 @@ function LovesSkeleton() {
     <ol className="border-border/60 divide-border/60 divide-y rounded-xl border px-4">
       {Array.from({ length: 8 }).map((_, i) => (
         <li key={i} className="flex items-center gap-3 py-3">
-          <Skeleton className="size-4 shrink-0 rounded" />
+          <Skeleton className="size-10 shrink-0 rounded-md" />
           <div className="flex-1 space-y-1.5">
             <Skeleton className="h-4 w-2/3" />
             <Skeleton className="h-3 w-1/2" />

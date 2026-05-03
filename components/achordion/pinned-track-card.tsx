@@ -47,7 +47,7 @@ function PinnedByline({
       {meta.release_name && (
         <>
           <span className="opacity-50"> · </span>
-          {meta.release_name}
+          <span className="italic">{meta.release_name}</span>
         </>
       )}
     </>

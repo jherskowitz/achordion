@@ -181,7 +181,7 @@ export default async function RewindStationPage({ params }: PageProps) {
                     {t.album && (
                       <>
                         <span className="mx-1.5 opacity-50">·</span>
-                        {t.album}
+                        <span className="italic">{t.album}</span>
                       </>
                     )}
                   </p>
