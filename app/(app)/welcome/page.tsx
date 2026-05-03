@@ -57,10 +57,16 @@ export default async function WelcomePage({ searchParams }: PageProps) {
       </header>
 
       <ol className="mb-8 flex items-center gap-2 text-sm">
-        <StepBubble n={1} active={step === 1} done={tokenConfigured} />
-        <span className="bg-border h-px flex-1" />
-        <StepBubble n={2} active={step === 2} done={false} />
-        <span className="bg-border h-px flex-1" />
+        {/* A bubble flips to "done" once the user has navigated past it
+            (step > n). Step 1 also flips done when the token is saved
+            even while the user is still on step 1 — gives instant
+            confirmation that the form submission landed. The connector
+            lines fill in to match: the line BEFORE bubble n is filled
+            when bubble n's prior step is done. */}
+        <StepBubble n={1} active={step === 1} done={step > 1 || tokenConfigured} />
+        <Connector filled={step > 1 || tokenConfigured} />
+        <StepBubble n={2} active={step === 2} done={step > 2} />
+        <Connector filled={step > 2} />
         <StepBubble n={3} active={step === 3} done={false} />
       </ol>
 
@@ -98,6 +104,18 @@ function StepBubble({
     >
       {done ? <Check className="size-3.5" /> : n}
     </span>
+  );
+}
+
+function Connector({ filled }: { filled: boolean }) {
+  return (
+    <span
+      aria-hidden
+      className={[
+        "h-px flex-1 transition-colors",
+        filled ? "bg-primary" : "bg-border",
+      ].join(" ")}
+    />
   );
 }
 
