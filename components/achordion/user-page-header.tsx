@@ -1,4 +1,4 @@
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { UserAvatar } from "./user-avatar";
 import { auth } from "@/auth";
 import { getFollowing, getPlayingNow } from "@/lib/clients/listenbrainz";
 import { getLbTokenForRequest } from "@/lib/lb-token";
@@ -24,7 +24,6 @@ function userTabs(name: string): SectionTab[] {
 }
 
 export async function UserPageHeader({ name }: { name: string }) {
-  const initial = name.slice(0, 1).toUpperCase();
   const session = await auth();
   const viewer = session?.user?.mbUsername;
   const isOwnProfile =
@@ -59,9 +58,11 @@ export async function UserPageHeader({ name }: { name: string }) {
     <header className="border-border/60 border-b">
       <div className="mx-auto max-w-7xl px-4 pt-10 pb-0 sm:px-6">
         <div className="flex items-center gap-4 pb-6 sm:gap-6">
-          <Avatar className="size-16 sm:size-20">
-            <AvatarFallback className="text-xl">{initial}</AvatarFallback>
-          </Avatar>
+          <UserAvatar
+            username={name}
+            className="size-16 sm:size-20"
+            fallbackClassName="text-xl"
+          />
           <div className="min-w-0 flex-1">
             <p className="text-muted-foreground text-xs tracking-wide uppercase">
               ListenBrainz user

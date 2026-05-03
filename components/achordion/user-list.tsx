@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { OnAirIndicator } from "./on-air-indicator";
+import { UserAvatar } from "./user-avatar";
 
 export function UserList({
   users,
@@ -24,11 +24,7 @@ export function UserList({
           key={name}
           className="border-border/60 hover:border-foreground/30 hover:bg-muted/30 flex items-center gap-3 rounded-xl border px-3 py-2.5 transition-colors"
         >
-          <Avatar className="size-9">
-            <AvatarFallback className="text-sm">
-              {name.slice(0, 1).toUpperCase()}
-            </AvatarFallback>
-          </Avatar>
+          <UserAvatar username={name} className="size-9" fallbackClassName="text-sm" />
           <div className="min-w-0 flex-1">
             <Link
               href={`/user/${encodeURIComponent(name)}`}

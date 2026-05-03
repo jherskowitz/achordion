@@ -4,7 +4,7 @@ import { auth } from "@/auth";
 import { Wordmark } from "./wordmark";
 import { ThemeToggle } from "./theme-toggle";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/achordion/user-avatar";
 
 export async function SiteHeader() {
   const session = await auth();
@@ -64,14 +64,12 @@ export async function SiteHeader() {
               suppressHydrationWarning
               className="hover:ring-ring/40 ml-1 inline-flex rounded-full transition-shadow hover:ring-2"
             >
-              <Avatar className="size-7">
-                {avatarUrl && (
-                  <AvatarImage src={avatarUrl} alt={displayName} />
-                )}
-                <AvatarFallback className="text-xs">
-                  {username.slice(0, 1).toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
+              <UserAvatar
+                username={username}
+                imageUrl={avatarUrl}
+                className="size-7"
+                fallbackClassName="text-xs"
+              />
             </Link>
           ) : (
             <Button

@@ -5,6 +5,7 @@ import { searchArtists, searchReleaseGroups } from "@/lib/clients/musicbrainz";
 import { caaReleaseGroupUrl } from "@/lib/clients/coverart";
 import { CoverArt } from "@/components/achordion/cover-art";
 import { OnAirIndicator } from "@/components/achordion/on-air-indicator";
+import { UserAvatar } from "@/components/achordion/user-avatar";
 import { PageShell } from "@/components/achordion/page-shell";
 import { PageHeader } from "@/components/achordion/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -26,9 +27,11 @@ async function UserResults({ q }: { q: string }) {
             href={`/user/${encodeURIComponent(name)}`}
             className="flex items-center gap-3 text-sm"
           >
-            <span className="bg-muted flex size-8 items-center justify-center rounded-full text-xs font-medium">
-              {name.slice(0, 1).toUpperCase()}
-            </span>
+            <UserAvatar
+              username={name}
+              className="size-8"
+              fallbackClassName="text-xs"
+            />
             {name}
           </Link>
           <Suspense fallback={null}>

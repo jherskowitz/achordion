@@ -1,8 +1,8 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import type { SimilarUser } from "@/lib/clients/listenbrainz";
 import { OnAirIndicator } from "./on-air-indicator";
+import { UserAvatar } from "./user-avatar";
 import { cn } from "@/lib/utils";
 
 interface SimilarUsersListProps {
@@ -39,13 +39,11 @@ export function SimilarUsersList({
               layout === "stack" ? "px-2.5 py-1.5" : "px-3 py-2.5",
             )}
           >
-            <Avatar className={layout === "stack" ? "size-7" : "size-9"}>
-              <AvatarFallback
-                className={layout === "stack" ? "text-xs" : "text-sm"}
-              >
-                {u.user_name.slice(0, 1).toUpperCase()}
-              </AvatarFallback>
-            </Avatar>
+            <UserAvatar
+              username={u.user_name}
+              className={layout === "stack" ? "size-7" : "size-9"}
+              fallbackClassName={layout === "stack" ? "text-xs" : "text-sm"}
+            />
             <div className="min-w-0 flex-1">
               <Link
                 href={`/user/${encodeURIComponent(u.user_name)}`}
