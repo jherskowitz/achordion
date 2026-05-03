@@ -3,10 +3,10 @@ import { SectionTabs, type SectionTab } from "@/components/achordion/section-tab
 
 const EXPLORE_TABS: SectionTab[] = [
   { href: "/explore", label: "Overview" },
-  { href: "/explore/fresh-releases", label: "Fresh releases" },
+  { href: "/explore/fresh-releases", label: "Fresh Releases" },
   { href: "/explore/critical-darlings", label: "Critical Darlings" },
-  { href: "/explore/similar-users", label: "Similar users" },
-  { href: "/explore/year-in-music", label: "Year in Music" },
+  { href: "/explore/similar-users", label: "Similar Users" },
+  { href: "/explore/year-in-music", label: "Year In Music" },
 ];
 
 export default function ExploreLayout({ children }: { children: ReactNode }) {

@@ -18,10 +18,10 @@ export async function SiteHeader() {
     { href: "/charts", label: "Charts" },
   ];
   if (username) {
-    nav.push({ href: "/feed", label: "My feed" });
+    nav.push({ href: "/feed", label: "My Feed" });
     nav.push({
       href: `/user/${encodeURIComponent(username)}`,
-      label: "My profile",
+      label: "My Profile",
     });
   }
 
@@ -79,7 +79,7 @@ export async function SiteHeader() {
               nativeButton={false}
               render={<Link href="/login" suppressHydrationWarning />}
             >
-              Sign in
+              Sign In
             </Button>
           )}
         </div>
