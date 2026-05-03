@@ -1,45 +1,70 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import {
+  getArtist,
+  partitionArtistRelations,
+  type ArtistDetail,
+} from "@/lib/clients/musicbrainz";
 import { getArtistImageFromWikidata } from "@/lib/clients/wikidata";
 import { dicebearShapesUrl } from "@/lib/dicebear-shapes";
 
 interface ArtistAvatarProps {
-  /** Artist MBID — used as the DiceBear seed when Wikidata has nothing. */
+  /** Artist MBID — used as the DiceBear fallback seed and to look up
+   *  Wikidata when no `artist` is passed in. */
   mbid: string;
-  /** Display name used for the alt text and initial fallback. */
+  /** Display name used for alt text and the initial fallback. */
   name: string;
   /**
-   * Wikidata URL pulled from MB's url-rels for this artist. When
-   * present, we fetch the artist's P18 (image) claim and serve a
-   * Commons-hosted thumbnail. Null/undefined skips the lookup.
+   * Pre-fetched MB artist detail. Pass when the caller already has
+   * the full artist (so we share a single MB request via Next's auto-
+   * dedupe) — the artist page does this. Otherwise we fetch on demand.
    */
-  wikidataUrl?: string | null;
-  /** Tailwind sizing class (e.g. "size-20"). */
+  artist?: ArtistDetail | null;
+  /** Tailwind sizing class (e.g. "size-9"). */
   className?: string;
   fallbackClassName?: string;
-  /**
-   * Image width passed to Commons' `Special:FilePath?width=` resizer.
-   * Default 512px is enough for the largest header avatar (80px @ 2x);
-   * smaller call sites can request 256 to keep the payload tight.
-   */
+  /** Width passed to Commons' resizer. Default 512 covers hero avatars. */
   width?: number;
 }
 
+async function resolveImageUrl(
+  mbid: string,
+  artist: ArtistDetail | null | undefined,
+  width: number,
+): Promise<string | null> {
+  let detail = artist;
+  if (!detail) {
+    try {
+      detail = await getArtist(mbid);
+    } catch {
+      return null;
+    }
+  }
+  const { urls } = partitionArtistRelations(detail);
+  const wikidataUrl = urls.find((u) => /wikidata\.org/i.test(u.url))?.url;
+  if (!wikidataUrl) return null;
+  return getArtistImageFromWikidata(wikidataUrl, width);
+}
+
 /**
- * Avatar for artists. Tries Wikidata's P18 → Commons FilePath URL
- * first; falls back to a deterministic DiceBear SVG seeded by the
- * artist's MBID so each artist gets a stable, Parachord-coloured
- * placeholder. Async server component — feel free to wrap in Suspense
- * at the call site if the Wikidata lookup is on the critical path.
+ * Avatar for an MB artist. Self-resolves: looks up the artist's
+ * Wikidata link via MB url-rels, fetches the P18 image filename, and
+ * builds a Commons-hosted thumbnail. Falls back to a DiceBear shape
+ * keyed by MBID when there's no Wikidata image. Always async — wrap
+ * in Suspense at the call site if you don't want to block the parent.
+ *
+ * Next's request-scoped fetch dedupe means multiple ArtistAvatars on
+ * the same page (or page + sidebar) for the same MBID share a single
+ * MB request. The MB and Wikidata caches make repeat visits ~free.
  */
 export async function ArtistAvatar({
   mbid,
   name,
-  wikidataUrl,
+  artist,
   className,
   fallbackClassName,
   width = 512,
 }: ArtistAvatarProps) {
-  const imageUrl = await getArtistImageFromWikidata(wikidataUrl, width);
+  const imageUrl = await resolveImageUrl(mbid, artist, width);
   const src = imageUrl ?? dicebearShapesUrl(mbid);
   const initial = name.slice(0, 1).toUpperCase();
   return (

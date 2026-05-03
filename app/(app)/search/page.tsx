@@ -4,6 +4,7 @@ import { searchUsers } from "@/lib/clients/listenbrainz";
 import { searchArtists, searchReleaseGroups } from "@/lib/clients/musicbrainz";
 import { caaReleaseGroupUrl } from "@/lib/clients/coverart";
 import { CoverArt } from "@/components/achordion/cover-art";
+import { ArtistAvatar } from "@/components/achordion/artist-avatar";
 import { OnAirIndicator } from "@/components/achordion/on-air-indicator";
 import { UserAvatar } from "@/components/achordion/user-avatar";
 import { PageShell } from "@/components/achordion/page-shell";
@@ -52,15 +53,32 @@ async function ArtistResults({ q }: { q: string }) {
         <li key={a.id}>
           <Link
             href={`/artist/${a.id}`}
-            className="hover:bg-muted/50 block rounded-md px-2 py-2"
+            className="hover:bg-muted/50 flex items-center gap-3 rounded-md px-2 py-2"
           >
-            <p className="text-sm font-medium">{a.name}</p>
-            {a.disambiguation && (
-              <p className="text-muted-foreground text-xs">{a.disambiguation}</p>
-            )}
-            <p className="text-muted-foreground/70 text-xs">
-              {[a.type, a.country].filter(Boolean).join(" · ")}
-            </p>
+            <Suspense
+              fallback={
+                <Skeleton className="size-10 shrink-0 rounded-full" />
+              }
+            >
+              <ArtistAvatar
+                mbid={a.id}
+                name={a.name}
+                className="size-10 shrink-0"
+                fallbackClassName="text-xs"
+                width={128}
+              />
+            </Suspense>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-medium">{a.name}</p>
+              {a.disambiguation && (
+                <p className="text-muted-foreground truncate text-xs">
+                  {a.disambiguation}
+                </p>
+              )}
+              <p className="text-muted-foreground/70 truncate text-xs">
+                {[a.type, a.country].filter(Boolean).join(" · ")}
+              </p>
+            </div>
           </Link>
         </li>
       ))}

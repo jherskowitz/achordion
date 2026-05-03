@@ -64,11 +64,6 @@ async function ArtistBody({ mbid }: { mbid: string }) {
   const totalListens = listeners?.total_listen_count;
   const totalListeners = listeners?.total_user_count;
 
-  // Wikidata is the primary source for artist photos — pull whichever
-  // wikidata URL MB has on file (artists may have several language
-  // editions; the first match is fine, they all resolve to the same QID).
-  const wikidataUrl = urls.find((u) => /wikidata\.org/i.test(u.url))?.url;
-
   return (
     <>
       <PageHeader
@@ -76,7 +71,7 @@ async function ArtistBody({ mbid }: { mbid: string }) {
           <ArtistAvatar
             mbid={artist.id}
             name={artist.name}
-            wikidataUrl={wikidataUrl}
+            artist={artist}
             className="size-20 sm:size-24"
             fallbackClassName="text-2xl"
           />
