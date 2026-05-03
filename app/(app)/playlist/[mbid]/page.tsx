@@ -216,6 +216,7 @@ async function PlaylistBody({ mbid }: { mbid: string }) {
             {isOwner && (
               <PlaylistEditButton
                 mbid={mbid}
+                owner={data.creator}
                 initial={{
                   title: data.title,
                   annotation: data.annotation ?? "",

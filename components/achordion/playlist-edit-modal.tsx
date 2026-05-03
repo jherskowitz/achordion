@@ -2,6 +2,7 @@
 
 import {
   useEffect,
+  useRef,
   useState,
   useTransition,
   type FormEvent,
@@ -32,9 +33,13 @@ import { cn } from "@/lib/utils";
  */
 export function PlaylistEditButton({
   mbid,
+  owner,
   initial,
 }: {
   mbid: string;
+  /** Playlist creator — excluded from collaborator suggestions since
+   *  LB doesn't allow self-collab. */
+  owner: string | null;
   initial: {
     title: string;
     annotation: string;
@@ -53,6 +58,48 @@ export function PlaylistEditButton({
   const [collabDraft, setCollabDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  // Typeahead state for collaborator search.
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [activeIdx, setActiveIdx] = useState<number>(-1);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const abortRef = useRef<AbortController | null>(null);
+
+  // Debounced search against `/api/search?q=user:<draft>`. Aborts the
+  // in-flight request on every new keystroke so stale responses can't
+  // overwrite fresher ones, same pattern as the global search bar.
+  useEffect(() => {
+    if (!open) return;
+    const q = collabDraft.trim();
+    if (q.length < 2) {
+      setSuggestions([]);
+      return;
+    }
+    const handle = setTimeout(() => {
+      abortRef.current?.abort();
+      const ac = new AbortController();
+      abortRef.current = ac;
+      fetch(`/api/search?q=${encodeURIComponent(`user:${q}`)}`, {
+        signal: ac.signal,
+      })
+        .then((r) => (r.ok ? r.json() : { users: [] }))
+        .then((data: { users?: { name: string }[] }) => {
+          const taken = new Set(
+            collaborators.map((c) => c.toLowerCase()),
+          );
+          if (owner) taken.add(owner.toLowerCase());
+          const filtered = (data.users ?? [])
+            .map((u) => u.name)
+            .filter((n) => !taken.has(n.toLowerCase()))
+            .slice(0, 6);
+          setSuggestions(filtered);
+          setActiveIdx(filtered.length > 0 ? 0 : -1);
+        })
+        .catch(() => {
+          // Abort or network error — fall through to empty suggestions.
+        });
+    }, 200);
+    return () => clearTimeout(handle);
+  }, [collabDraft, collaborators, owner, open]);
 
   // Re-seed local state when the modal opens, so reopening after a
   // server-side change (or cancel-then-reopen) reflects the latest
@@ -68,19 +115,39 @@ export function PlaylistEditButton({
     }
   }, [open, initial]);
 
-  function addCollaborator() {
-    const trimmed = collabDraft.trim();
+  function addCollaborator(name?: string) {
+    const trimmed = (name ?? collabDraft).trim();
     if (!trimmed) return;
     if (collaborators.some((c) => c.toLowerCase() === trimmed.toLowerCase()))
       return;
     setCollaborators([...collaborators, trimmed]);
     setCollabDraft("");
+    setSuggestions([]);
+    setActiveIdx(-1);
   }
 
   function onCollabKey(e: KeyboardEvent<HTMLInputElement>) {
     if (e.key === "Enter") {
       e.preventDefault();
-      addCollaborator();
+      // Prefer the highlighted suggestion; fall back to raw input so
+      // power users can type a known username and hit Enter without
+      // waiting for the dropdown.
+      if (showSuggestions && activeIdx >= 0 && suggestions[activeIdx]) {
+        addCollaborator(suggestions[activeIdx]);
+      } else {
+        addCollaborator();
+      }
+    } else if (e.key === "ArrowDown" && suggestions.length > 0) {
+      e.preventDefault();
+      setActiveIdx((i) => (i + 1) % suggestions.length);
+    } else if (e.key === "ArrowUp" && suggestions.length > 0) {
+      e.preventDefault();
+      setActiveIdx(
+        (i) => (i - 1 + suggestions.length) % suggestions.length,
+      );
+    } else if (e.key === "Escape" && showSuggestions) {
+      e.preventDefault();
+      setShowSuggestions(false);
     } else if (
       e.key === "Backspace" &&
       collabDraft.length === 0 &&
@@ -177,41 +244,80 @@ export function PlaylistEditButton({
             </label>
 
             <Field label="Collaborators" htmlFor="pl-collab">
-              <div className="border-border/60 focus-within:ring-foreground/30 flex flex-wrap items-center gap-1.5 rounded-md border bg-transparent px-2 py-1.5 focus-within:ring-2">
-                {collaborators.map((c) => (
-                  <span
-                    key={c}
-                    className="bg-muted text-foreground inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs"
-                  >
-                    {c}
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setCollaborators(
-                          collaborators.filter((x) => x !== c),
-                        )
-                      }
-                      className="hover:text-destructive"
-                      aria-label={`Remove ${c}`}
+              <div className="relative">
+                <div className="border-border/60 focus-within:ring-foreground/30 flex flex-wrap items-center gap-1.5 rounded-md border bg-transparent px-2 py-1.5 focus-within:ring-2">
+                  {collaborators.map((c) => (
+                    <span
+                      key={c}
+                      className="bg-muted text-foreground inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs"
                     >
-                      <X className="size-3" />
-                    </button>
-                  </span>
-                ))}
-                <input
-                  id="pl-collab"
-                  type="text"
-                  value={collabDraft}
-                  onChange={(e) => setCollabDraft(e.target.value)}
-                  onKeyDown={onCollabKey}
-                  onBlur={addCollaborator}
-                  placeholder={
-                    collaborators.length === 0
-                      ? "MusicBrainz username, then Enter"
-                      : ""
-                  }
-                  className="placeholder:text-muted-foreground/50 min-w-[8rem] flex-1 bg-transparent px-1 py-0.5 text-sm focus:outline-none"
-                />
+                      {c}
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setCollaborators(
+                            collaborators.filter((x) => x !== c),
+                          )
+                        }
+                        className="hover:text-destructive"
+                        aria-label={`Remove ${c}`}
+                      >
+                        <X className="size-3" />
+                      </button>
+                    </span>
+                  ))}
+                  <input
+                    id="pl-collab"
+                    type="text"
+                    value={collabDraft}
+                    onChange={(e) => {
+                      setCollabDraft(e.target.value);
+                      setShowSuggestions(true);
+                    }}
+                    onKeyDown={onCollabKey}
+                    onFocus={() => setShowSuggestions(true)}
+                    // Delay so a suggestion-row mousedown can land before
+                    // the dropdown unmounts. addCollaborator() on blur
+                    // would race with the click handler otherwise.
+                    onBlur={() =>
+                      setTimeout(() => setShowSuggestions(false), 120)
+                    }
+                    placeholder={
+                      collaborators.length === 0
+                        ? "Search by ListenBrainz username"
+                        : ""
+                    }
+                    autoComplete="off"
+                    className="placeholder:text-muted-foreground/50 min-w-[8rem] flex-1 bg-transparent px-1 py-0.5 text-sm focus:outline-none"
+                  />
+                </div>
+                {showSuggestions && suggestions.length > 0 && (
+                  <ul className="border-border/60 bg-popover absolute top-full right-0 left-0 z-10 mt-1 max-h-56 overflow-auto rounded-md border shadow-lg">
+                    {suggestions.map((name, i) => (
+                      <li key={name}>
+                        <button
+                          type="button"
+                          // Use mousedown rather than click so the option
+                          // is selected before the input blurs (which
+                          // hides the dropdown).
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            addCollaborator(name);
+                          }}
+                          onMouseEnter={() => setActiveIdx(i)}
+                          className={cn(
+                            "block w-full px-3 py-1.5 text-left text-sm",
+                            i === activeIdx
+                              ? "bg-muted"
+                              : "hover:bg-muted/60",
+                          )}
+                        >
+                          {name}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
             </Field>
 
