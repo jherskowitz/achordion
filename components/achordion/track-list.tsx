@@ -35,7 +35,7 @@ function TrackRow({
       <PlayOverNumberCell
         number={track.number ?? track.position ?? ""}
         href={parachordPlayTrack({ artist, title: track.title })}
-        align="right"
+        align="center"
         className="w-8"
       />
       <div className="min-w-0 flex-1">
