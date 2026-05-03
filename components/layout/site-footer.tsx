@@ -3,9 +3,9 @@ import Link from "next/link";
 export function SiteFooter() {
   return (
     <footer className="border-border/60 mt-16 border-t">
-      {/* Three-column grid at sm+: attributions left, byline
-          centered, nav right. Stacks centered on mobile. */}
-      <div className="text-muted-foreground mx-auto grid max-w-7xl grid-cols-1 gap-3 px-4 py-8 text-center text-xs sm:grid-cols-3 sm:items-center sm:gap-6 sm:px-6 sm:text-left">
+      {/* Two-column at sm+: attribution + byline left, nav right.
+          Stacks centered on mobile. */}
+      <div className="text-muted-foreground mx-auto flex max-w-7xl flex-col gap-3 px-4 py-8 text-center text-xs sm:flex-row sm:items-center sm:justify-between sm:gap-6 sm:px-6 sm:text-left">
         <p>
           Built on{" "}
           <Link
@@ -21,10 +21,7 @@ export function SiteFooter() {
           >
             MusicBrainz
           </Link>
-          .
-        </p>
-        <p className="text-center leading-5">
-          Made with ❤️ by{" "}
+          . Made with ❤️ by{" "}
           <Link
             href="https://github.com/jherskowitz"
             target="_blank"
@@ -33,8 +30,7 @@ export function SiteFooter() {
           >
             J Herskowitz
           </Link>
-          <br />
-          (and with cold indifference by 🤖)
+          .
         </p>
         <nav className="flex items-center justify-center gap-4 sm:justify-end">
           <Link href="/about" className="hover:text-foreground">
