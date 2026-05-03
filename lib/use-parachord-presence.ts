@@ -11,58 +11,110 @@ import { useEffect, useState } from "react";
  *
  *   - Desktop app exposes `ws://127.0.0.1:9876`
  *   - Connection open → app is running
- *   - Connection close / error → app is not running; retry every 3s
+ *   - Connection close / error → app is not running; retry on a
+ *     backoff so we eventually pick up the app starting up later
  *
- * Browsers allow `ws://localhost:*` from https pages under the
- * "potentially trustworthy origin" exception, so this works in
- * production deploys too — no mixed-content block.
- *
- * Returns false on the server and on the first client render to keep
- * SSR markup deterministic; flips to true once the socket opens.
+ * Implementation note: many components on a single page can call this
+ * hook (every Play button, every hover-fab, etc.). Naively each hook
+ * instance would open its own WebSocket, which on a 50-card grid
+ * means 50 WS attempts every retry tick — pure console spam and
+ * needless network churn. Instead we share one connection across all
+ * subscribers via a module-level singleton; any component that calls
+ * the hook gets pushed the same `running` state.
+ */
+
+type Listener = (running: boolean) => void;
+
+const WS_URL = "ws://127.0.0.1:9876";
+
+/** Retry schedule in ms — short at first so a freshly-launched
+ *  Parachord is picked up quickly, then backs off so an idle session
+ *  doesn't spam the console. Final value caps the back-off. */
+const BACKOFF_MS = [5_000, 15_000, 60_000, 300_000];
+
+let socket: WebSocket | null = null;
+let retry: ReturnType<typeof setTimeout> | null = null;
+let attempts = 0;
+let currentRunning = false;
+const listeners = new Set<Listener>();
+
+function notify(running: boolean) {
+  if (running === currentRunning) return;
+  currentRunning = running;
+  for (const fn of listeners) fn(running);
+}
+
+function nextDelay(): number {
+  return BACKOFF_MS[Math.min(attempts, BACKOFF_MS.length - 1)];
+}
+
+function connect() {
+  // Don't reconnect if there are no live listeners — fully idle.
+  if (listeners.size === 0) return;
+  try {
+    socket = new WebSocket(WS_URL);
+  } catch {
+    schedule();
+    return;
+  }
+  socket.onopen = () => {
+    attempts = 0;
+    notify(true);
+  };
+  socket.onerror = () => {
+    // onclose runs after onerror; let it handle the retry / state.
+    socket?.close();
+  };
+  socket.onclose = () => {
+    notify(false);
+    socket = null;
+    schedule();
+  };
+}
+
+function schedule() {
+  if (retry) clearTimeout(retry);
+  if (listeners.size === 0) return;
+  attempts++;
+  retry = setTimeout(connect, nextDelay());
+}
+
+function teardownIfIdle() {
+  if (listeners.size > 0) return;
+  if (retry) {
+    clearTimeout(retry);
+    retry = null;
+  }
+  if (socket) {
+    socket.onopen = null;
+    socket.onerror = null;
+    socket.onclose = null;
+    socket.close();
+    socket = null;
+  }
+  attempts = 0;
+}
+
+/**
+ * Returns true when Parachord's desktop app is reachable. The first
+ * client render returns `false` deterministically so SSR and
+ * hydration agree; the value flips once the WebSocket opens.
  */
 export function useParachordPresence(): boolean {
   const [running, setRunning] = useState(false);
 
   useEffect(() => {
-    let ws: WebSocket | null = null;
-    let retry: ReturnType<typeof setTimeout> | null = null;
-    let cancelled = false;
-
-    function connect() {
-      if (cancelled) return;
-      try {
-        ws = new WebSocket("ws://127.0.0.1:9876");
-      } catch {
-        retry = setTimeout(connect, 3000);
-        return;
-      }
-      ws.onopen = () => {
-        if (!cancelled) setRunning(true);
-      };
-      ws.onclose = () => {
-        if (cancelled) return;
-        setRunning(false);
-        retry = setTimeout(connect, 3000);
-      };
-      ws.onerror = () => {
-        // onclose runs after onerror; let it handle the retry.
-        ws?.close();
-      };
-    }
-
-    connect();
+    listeners.add(setRunning);
+    // Sync the new subscriber to whatever the singleton already
+    // knows so they don't get a stale `false` after the connection
+    // already opened for an earlier component.
+    setRunning(currentRunning);
+    // Kick off a connection if this is the first subscriber.
+    if (listeners.size === 1 && !socket && !retry) connect();
 
     return () => {
-      cancelled = true;
-      if (retry) clearTimeout(retry);
-      if (ws) {
-        // Clear handlers so the unmount-triggered close doesn't flip
-        // state on an unmounted component.
-        ws.onopen = null;
-        ws.onclose = null;
-        ws.onerror = null;
-        ws.close();
-      }
+      listeners.delete(setRunning);
+      teardownIfIdle();
     };
   }, []);
 

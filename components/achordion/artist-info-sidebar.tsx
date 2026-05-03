@@ -110,8 +110,15 @@ export function ArtistInfoSidebar({
             Members
           </h3>
           <ul className="space-y-1">
-            {members.slice(0, 12).map((m) => (
-              <MemberRow key={m.artist.id} entry={m} />
+            {/* Composite key (mbid + range) — MB sometimes lists the
+                same person twice as a member with different begin/end
+                spans (e.g. left and re-joined). Plain mbid would
+                collide. */}
+            {members.slice(0, 12).map((m, i) => (
+              <MemberRow
+                key={`${m.artist.id}-${m.begin ?? ""}-${m.end ?? ""}-${i}`}
+                entry={m}
+              />
             ))}
           </ul>
         </div>
@@ -123,8 +130,11 @@ export function ArtistInfoSidebar({
             Member of
           </h3>
           <ul className="space-y-1">
-            {memberOf.slice(0, 12).map((m) => (
-              <MemberRow key={m.artist.id} entry={m} />
+            {memberOf.slice(0, 12).map((m, i) => (
+              <MemberRow
+                key={`${m.artist.id}-${m.begin ?? ""}-${m.end ?? ""}-${i}`}
+                entry={m}
+              />
             ))}
           </ul>
         </div>

@@ -1,7 +1,7 @@
 "use client";
 
-import Link from "next/link";
-import { usePathname, useSearchParams } from "next/navigation";
+import { useTransition } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 
 interface FilterPillsProps<T extends string> {
@@ -25,6 +25,8 @@ export function FilterPills<T extends string>({
 }: FilterPillsProps<T>) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const router = useRouter();
+  const [, startTransition] = useTransition();
 
   function makeHref(value: T) {
     const next = new URLSearchParams(searchParams.toString());
@@ -48,28 +50,38 @@ export function FilterPills<T extends string>({
     >
       {options.map((opt) => {
         const isActive = active === opt.value;
+        const href = makeHref(opt.value);
         return (
-          <Link
+          // <button> (not <a>) on purpose. Browser extensions —
+          // Parachord's, ad-blockers, dark-readers, translators —
+          // routinely mutate anchors after SSR, and any of those
+          // mutations can cost us React's hydrated click handler,
+          // leaving the pill un-clickable. Buttons are basically
+          // never touched, so this is the most defensive shape.
+          // Trade-off: no middle-click open-in-new-tab. Acceptable
+          // for tab-style filter pills.
+          <button
             key={opt.value}
-            href={makeHref(opt.value)}
+            type="button"
             role="tab"
             aria-selected={isActive}
-            scroll={false}
-            // Parachord's browser extension tags <a> elements with
-            // `data-parachord-btn` after SSR but before hydration —
-            // when that fails to round-trip, React skips wiring the
-            // navigation handler and pill clicks become no-ops. Same
-            // suppressHydrationWarning trick we use on layout chrome.
-            suppressHydrationWarning
+            onClick={() => {
+              // Wrap in a transition so the downstream Suspense
+              // boundary (DiscographySection, keyed on type) shows
+              // its skeleton while the server re-renders.
+              startTransition(() => {
+                router.push(href, { scroll: false });
+              });
+            }}
             className={cn(
-              "flex h-7 items-center justify-center rounded-md px-3 text-xs font-medium transition-colors",
+              "flex h-7 cursor-pointer items-center justify-center rounded-md px-3 text-xs font-medium transition-colors",
               isActive
                 ? "bg-background text-foreground shadow-sm"
                 : "text-muted-foreground hover:text-foreground",
             )}
           >
             {opt.label}
-          </Link>
+          </button>
         );
       })}
     </div>
