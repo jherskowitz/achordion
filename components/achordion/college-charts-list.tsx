@@ -1,8 +1,8 @@
 import Link from "next/link";
-import Image from "next/image";
 import { parachordPlayAlbum } from "@/lib/parachord";
 import { artistHref, releaseGroupHref } from "@/lib/entity-links";
 import { PlayOnHoverFab } from "./play-on-hover-fab";
+import { LazyAlbumCover } from "./lazy-album-cover";
 import type { EarshotChartItem } from "@/lib/clients/earshot";
 
 /**
@@ -23,24 +23,16 @@ function CollegeAlbumCard({ item }: { item: EarshotChartItem }) {
     title: item.album,
   });
 
-  const cover = item.coverArtUrl ? (
-    <Image
-      src={item.coverArtUrl}
-      alt={item.album}
-      width={500}
-      height={500}
-      className="aspect-square w-full object-cover transition-opacity group-hover:opacity-90"
-      unoptimized
-    />
-  ) : (
-    <div className="bg-muted aspect-square w-full transition-opacity group-hover:opacity-90" />
-  );
-
   return (
     <li className="min-w-0">
       <div className="group relative overflow-hidden rounded-md">
         <Link href={albumHref} className="block">
-          {cover}
+          <LazyAlbumCover
+            artist={item.artist}
+            album={item.album}
+            alt={item.album}
+            initialSrc={item.coverArtUrl}
+          />
         </Link>
         <span
           aria-hidden

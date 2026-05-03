@@ -48,6 +48,14 @@ export interface EarshotChartItem {
   coverArtUrl: string | null;
 }
 
+export interface EarshotChart {
+  /** "Tuesday, April 28, 2026" — quoted from the page. Null if the
+   *  date heading wasn't found (rare but possible if Earshot ever
+   *  changes their template). */
+  weekEnding: string | null;
+  items: EarshotChartItem[];
+}
+
 /** Strip HTML tags and decode common entities to plain text. */
 function clean(html: string): string {
   return html
@@ -72,7 +80,7 @@ function clean(html: string): string {
  * each is independently cached by Next (per-URL cache key with 24h
  * revalidate), so warm pages cost zero outbound requests.
  */
-export async function getEarshotTop50(): Promise<EarshotChartItem[] | null> {
+export async function getEarshotTop50(): Promise<EarshotChart | null> {
   try {
     const res = await fetch(EARSHOT_TOP50_URL, {
       headers: { "User-Agent": UA },
@@ -81,6 +89,7 @@ export async function getEarshotTop50(): Promise<EarshotChartItem[] | null> {
     if (!res.ok) return null;
     const html = await res.text();
     const items = parseTop50(html);
+    const weekEnding = parseWeekEnding(html);
 
     // Resolve cover art in parallel with a small concurrency window
     // — 50 simultaneous requests to the same ColdFusion server is
@@ -91,10 +100,21 @@ export async function getEarshotTop50(): Promise<EarshotChartItem[] | null> {
       const url = await resolveCoverUrl(it.findImageId);
       return { ...it, coverArtUrl: url };
     });
-    return resolved;
+    return { weekEnding, items: resolved };
   } catch {
     return null;
   }
+}
+
+/** Pull the "For the Week Ending: Tuesday, April 28, 2026" string out
+ *  of the Earshot HTML hero. The date appears twice in the page; we
+ *  take the first match. Returns null if the template ever drops the
+ *  bold-date pattern. */
+export function parseWeekEnding(html: string): string | null {
+  const m = html.match(
+    /For\s+the\s+Week\s+Ending:\s*<strong>\s*([^<]+?)\s*<\/strong>/i,
+  );
+  return m ? clean(m[1]) : null;
 }
 
 /**

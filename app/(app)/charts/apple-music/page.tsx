@@ -14,6 +14,7 @@ import {
   ChartsAlbumsGrid,
   ChartsSongsList,
 } from "@/components/achordion/charts-list";
+import { CountryPicker } from "@/components/achordion/country-picker";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
@@ -53,8 +54,26 @@ async function ChartsBody({
       </p>
     );
   }
-  if (tab === "songs") return <ChartsSongsList items={items} />;
-  return <ChartsAlbumsGrid items={items} />;
+  return (
+    <>
+      <p className="text-muted-foreground/70 mb-4 text-xs tracking-wide uppercase">
+        Updated daily ·{" "}
+        <Link
+          href="https://music.apple.com/charts"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="hover:text-foreground underline-offset-4 hover:underline"
+        >
+          Apple Music charts →
+        </Link>
+      </p>
+      {tab === "songs" ? (
+        <ChartsSongsList items={items} />
+      ) : (
+        <ChartsAlbumsGrid items={items} />
+      )}
+    </>
+  );
 }
 
 function SongsSkeleton() {
@@ -144,48 +163,11 @@ export default async function AppleMusicChartsPage({
           })}
         </div>
 
-        <details className="border-border/60 relative ml-auto rounded-xl border">
-          <summary className="hover:bg-muted/40 inline-flex h-8 cursor-pointer list-none items-center gap-1.5 rounded-xl px-3 text-sm select-none">
-            <span aria-hidden>{countryInfo.flag}</span>
-            {countryInfo.name}
-            <span aria-hidden className="text-muted-foreground/70">
-              ▾
-            </span>
-          </summary>
-          {/* Anchor the dropdown to the <details> element with absolute
-              positioning + a high z-index so it floats above the album
-              art grid below. */}
-          <ul className="border-border/60 bg-background absolute right-0 z-50 mt-2 max-h-[60vh] w-56 overflow-y-auto rounded-xl border p-1 shadow-lg">
-            {CHARTS_COUNTRIES.map((c) => {
-              const active = c.code === country;
-              return (
-                <li key={c.code}>
-                  <Link
-                    href={chartsHref({ tab, country: c.code })}
-                    suppressHydrationWarning
-                    className={cn(
-                      "flex items-center gap-2 rounded-md px-2.5 py-1.5 text-sm",
-                      active
-                        ? "bg-muted text-foreground"
-                        : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
-                    )}
-                  >
-                    <span aria-hidden>{c.flag}</span>
-                    <span className="flex-1">{c.name}</span>
-                    {active && (
-                      <span
-                        aria-hidden
-                        className="text-foreground/70 text-xs"
-                      >
-                        ✓
-                      </span>
-                    )}
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        </details>
+        <CountryPicker
+          current={countryInfo}
+          options={CHARTS_COUNTRIES}
+          hrefFor={(code) => chartsHref({ tab, country: code })}
+        />
       </div>
 
       <Suspense
