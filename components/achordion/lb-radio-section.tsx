@@ -2,12 +2,17 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ChevronDown, Radio } from "lucide-react";
+import { ChevronDown, Play, Radio } from "lucide-react";
 import type { LbRadioTrack } from "@/lib/clients/listenbrainz";
 import { CoverArt } from "./cover-art";
 import { caaReleaseUrl } from "@/lib/clients/coverart";
-import { parachordPlayTrack, type ParachordTrack } from "@/lib/parachord";
-import { OpenInParachordButton } from "./open-in-parachord-button";
+import {
+  parachordPlayRadio,
+  parachordPlayTrack,
+  type ParachordTrack,
+} from "@/lib/parachord";
+import { useParachordPresence } from "@/lib/use-parachord-presence";
+import { IconTooltip } from "@/components/ui/icon-tooltip";
 import { PlayOverNumberCell } from "./parachord-button";
 import { artistHref, recordingHref } from "@/lib/entity-links";
 import { cn } from "@/lib/utils";
@@ -30,6 +35,7 @@ export function LbRadioSection({
   refillUrl,
 }: LbRadioSectionProps) {
   const [expanded, setExpanded] = useState(false);
+  const parachordRunning = useParachordPresence();
 
   // No token / fetch failure → don't render the section. There's nothing
   // to queue into Parachord without a tracklist, and the section is
@@ -43,13 +49,66 @@ export function LbRadioSection({
     ...(t.durationMs ? { duration: Math.round(t.durationMs / 1000) } : {}),
   }));
 
+  const playHref = parachordPlayRadio({
+    tracks: parachordTracks,
+    ...(refillUrl ? { refill: refillUrl } : {}),
+    displayName: `${seedLabel} Radio`,
+  });
+
+  // The icon doubles as the "Play in Parachord" affordance — Radio
+  // icon by default, Play icon on hover, brand-purple background
+  // when Parachord is up. When Parachord isn't running we keep the
+  // Radio glyph and let the IconTooltip surface that fact.
+  const iconButtonBase =
+    "group/playbtn flex size-9 shrink-0 items-center justify-center rounded-full transition-colors";
+  const iconWrap = parachordRunning ? (
+    <a
+      href={playHref}
+      aria-label={`Play ${seedLabel} Radio in Parachord`}
+      className={cn(
+        iconButtonBase,
+        "bg-foreground/10 hover:text-white",
+      )}
+      style={{
+        // Inline so :hover swaps cleanly to brand purple regardless
+        // of the surrounding theme tokens.
+        ["--play-bg" as string]: "#8b5cf6",
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.backgroundColor = "var(--play-bg)";
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.backgroundColor = "";
+      }}
+    >
+      <Radio className="size-4 group-hover/playbtn:hidden" />
+      <Play className="size-4 hidden fill-current group-hover/playbtn:block" />
+    </a>
+  ) : (
+    <span
+      aria-disabled
+      className={cn(
+        iconButtonBase,
+        "bg-muted text-muted-foreground cursor-not-allowed",
+      )}
+    >
+      <Radio className="size-4" />
+    </span>
+  );
+
   return (
     <div className="border-border/60 overflow-hidden rounded-2xl border">
       <div className="flex flex-wrap items-center gap-3 p-5">
         <div className="flex flex-1 items-center gap-3">
-          <div className="bg-foreground/10 flex size-9 items-center justify-center rounded-full">
-            <Radio className="size-4" />
-          </div>
+          <IconTooltip
+            label={
+              parachordRunning
+                ? `Play ${seedLabel} Radio in Parachord`
+                : "Parachord isn't running"
+            }
+          >
+            {iconWrap}
+          </IconTooltip>
           <div className="min-w-0">
             <h2 className="text-sm font-semibold tracking-wide uppercase">
               {seedLabel} Radio
@@ -59,12 +118,6 @@ export function LbRadioSection({
             </p>
           </div>
         </div>
-        <OpenInParachordButton
-          kind="radio"
-          tracks={parachordTracks}
-          refill={refillUrl}
-          title={`${seedLabel} Radio`}
-        />
         <button
           type="button"
           onClick={() => setExpanded((v) => !v)}
