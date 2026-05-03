@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { auth } from "@/auth";
 import { ThemeRadio } from "@/components/achordion/theme-radio";
+import { UserAvatar } from "@/components/achordion/user-avatar";
 import { signOutAction } from "./actions";
 
 export const metadata = { title: "Profile" };
@@ -26,12 +26,12 @@ export default async function SettingsProfilePage() {
 
       <section className="space-y-4">
         <div className="flex items-center gap-4">
-          <Avatar className="size-14">
-            {avatarUrl && <AvatarImage src={avatarUrl} alt={displayName} />}
-            <AvatarFallback className="text-lg">
-              {username.slice(0, 1).toUpperCase()}
-            </AvatarFallback>
-          </Avatar>
+          <UserAvatar
+            username={username}
+            imageUrl={avatarUrl}
+            className="size-14"
+            fallbackClassName="text-lg"
+          />
           <div className="min-w-0">
             <p className="truncate text-base font-medium">{displayName}</p>
             <p className="text-muted-foreground text-sm">
