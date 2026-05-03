@@ -1,4 +1,9 @@
 import type { ArtistExternalLink } from "@/lib/clients/musicbrainz";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 /**
  * Curated set of "useful" url-rel types that appear on artist /
@@ -228,24 +233,28 @@ export function ExternalLinks({ links }: { links: ArtistExternalLink[] }) {
         const src = faviconUrl(link.url);
         return (
           <li key={link.url}>
-            <a
-              href={link.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              title={label}
-              aria-label={label}
-              className="border-border/60 hover:border-foreground/40 hover:bg-muted/40 group inline-flex size-9 items-center justify-center rounded-md border transition-colors"
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={src}
-                alt=""
-                width={16}
-                height={16}
-                loading="lazy"
-                className="size-4 opacity-80 transition-opacity group-hover:opacity-100"
-              />
-            </a>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <a
+                  href={link.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={label}
+                  className="border-border/60 hover:border-foreground/40 hover:bg-muted/40 group inline-flex size-9 items-center justify-center rounded-md border transition-colors"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={src}
+                    alt=""
+                    width={16}
+                    height={16}
+                    loading="lazy"
+                    className="size-4 opacity-80 transition-opacity group-hover:opacity-100"
+                  />
+                </a>
+              </TooltipTrigger>
+              <TooltipContent>{label}</TooltipContent>
+            </Tooltip>
           </li>
         );
       })}
