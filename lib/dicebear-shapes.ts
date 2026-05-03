@@ -1,27 +1,44 @@
 /**
- * Deterministic DiceBear `shapes` URL builder pinned to Parachord's
- * brand palette. Same colours used by both the user-avatar and
- * artist-avatar fallbacks so generated avatars look like one family.
+ * Deterministic DiceBear `shapes` URL builder pinned to a calm,
+ * editorial palette: deep slates + warm earth tones + cool greens.
  *
- * DiceBear picks one entry from each comma-separated list deterministi-
- * cally by seed, so the look is varied between seeds but always sits
- * inside the Parachord palette.
+ * Why this palette: Achordion's UI is largely monochrome with a single
+ * accent — Parachord brand purple (`#8b5cf6`) used on the running-state
+ * Play buttons. If avatars also lived in the violet family they'd
+ * compete with the play CTAs and pull the eye away from the primary
+ * action. Picking from a non-violet palette keeps avatars visually
+ * "in the family" of the site without fighting the accent.
+ *
+ * DiceBear picks one entry from each comma-separated list
+ * deterministically by seed, so each avatar is varied and stable
+ * across renders, but always sits inside this curated set.
  */
 
+// Backgrounds: a mix of dark slates, soft off-whites, deep teals,
+// warm clays, and a deep ink-blue. Roughly even split between dark
+// and light so seed variety isn't biased toward one tone.
 const BG_COLORS = [
-  "7c3aed", // Parachord primary purple
-  "a78bfa", // dark-mode primary
-  "ede9fe", // accent surface
-  "c4b5fd", // mid lavender
-  "1e1e1e", // dark bg
-  "f3f4f6", // light inset
+  "0f172a", // slate 900 — near-black ink
+  "1e293b", // slate 800
+  "334155", // slate 700
+  "e2e8f0", // slate 200 — paper
+  "f8fafc", // slate 50  — paper highlight
+  "065f46", // emerald 800 — deep forest
+  "0f766e", // teal 700
+  "7c2d12", // clay-red 800 — terracotta
+  "92400e", // amber 800 — ochre
+  "1e3a8a", // blue 900 — ink blue
 ].join(",");
 
+// Shape fills picked for high contrast against any of the backgrounds
+// above. White and near-black anchor the legibility; warm gold and
+// clay add a hand-printed, editorial feel without leaning purple.
 const SHAPE_COLORS = [
-  "6d28d9", // primary hover (deep purple)
-  "ffffff",
-  "111827", // text-primary
-  "9ca3af", // text-tertiary
+  "f8fafc", // paper white
+  "0f172a", // ink black
+  "fbbf24", // amber 400 — warm gold accent
+  "7c2d12", // clay-red — same as one bg, intentional for tonal echos
+  "94a3b8", // slate 400 — quiet neutral
 ].join(",");
 
 const DICEBEAR_BASE = "https://api.dicebear.com/9.x/shapes/svg";

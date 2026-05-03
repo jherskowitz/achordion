@@ -90,6 +90,9 @@ export default async function UserOverviewPage({ params }: PageParams) {
           </Suspense>
         </div>
         <aside className="space-y-4">
+          <h2 className="text-sm font-semibold tracking-wide uppercase">
+            In Heavy Rotation
+          </h2>
           <Suspense fallback={<WeeklyStatsSidebarSkeleton />}>
             <WeeklyStatsSidebar name={name} />
           </Suspense>
