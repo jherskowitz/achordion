@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Check, ExternalLink, Sparkles } from "lucide-react";
+import { Check, ExternalLink, Play, Sparkles } from "lucide-react";
 import { auth } from "@/auth";
 import { hasUserLbToken } from "@/lib/lb-token";
 import { LbTokenForm } from "@/components/achordion/lb-token-form";
@@ -25,7 +25,7 @@ export default async function WelcomePage({ searchParams }: PageProps) {
   // than re-showing the (now-completed) step 1.
   const requested = Number(sp.step);
   const step =
-    requested === 1 || requested === 2
+    requested === 1 || requested === 2 || requested === 3
       ? requested
       : tokenConfigured
         ? 2
@@ -60,12 +60,16 @@ export default async function WelcomePage({ searchParams }: PageProps) {
         <StepBubble n={1} active={step === 1} done={tokenConfigured} />
         <span className="bg-border h-px flex-1" />
         <StepBubble n={2} active={step === 2} done={false} />
+        <span className="bg-border h-px flex-1" />
+        <StepBubble n={3} active={step === 3} done={false} />
       </ol>
 
       {step === 1 ? (
         <Step1LbToken tokenConfigured={tokenConfigured} />
-      ) : (
+      ) : step === 2 ? (
         <Step2Services />
+      ) : (
+        <Step3Parachord />
       )}
     </PageShell>
   );
@@ -201,6 +205,82 @@ function Step2Services() {
       <div className="flex items-center justify-between">
         <Link
           href="/welcome?step=1"
+          className="text-muted-foreground hover:text-foreground text-sm underline-offset-4 hover:underline"
+        >
+          ← Back
+        </Link>
+        <Link
+          href="/welcome?step=3"
+          className="bg-primary text-primary-foreground inline-flex h-9 items-center gap-2 rounded-lg px-4 text-sm font-medium transition-opacity hover:opacity-90"
+        >
+          Next: install Parachord
+        </Link>
+      </div>
+    </section>
+  );
+}
+
+function Step3Parachord() {
+  return (
+    <section className="space-y-6">
+      <div className="border-border/60 bg-card/40 rounded-2xl border p-6">
+        <h2 className="text-lg font-semibold tracking-tight">
+          Step 3 · Install Parachord
+        </h2>
+        <p className="text-muted-foreground mt-2 text-sm leading-6">
+          Achordion is the data layer; Parachord is the player. Every Play
+          button on a track row, album cover, chart entry, and friend&apos;s
+          feed hands a tracklist off via a{" "}
+          <code className="bg-muted text-foreground rounded px-1 py-0.5 text-[12px]">
+            parachord://
+          </code>{" "}
+          deep link — Parachord wakes (if it isn&apos;t running), resolves the
+          tracks against your authorized services, and plays from whichever
+          source ranks highest in your priority order.
+        </p>
+
+        <div className="mt-5 flex flex-wrap items-center gap-3">
+          <a
+            href="https://parachord.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="bg-foreground text-background inline-flex h-9 items-center gap-2 rounded-lg px-4 text-sm font-medium transition-opacity hover:opacity-90"
+          >
+            <Play className="size-3.5 fill-current" />
+            Get Parachord
+            <ExternalLink className="size-3" />
+          </a>
+          <a
+            href="https://github.com/Parachord/parachord"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-xs underline-offset-4 hover:underline"
+          >
+            Source on GitHub
+            <ExternalLink className="size-3" />
+          </a>
+        </div>
+
+        <div className="border-border/60 mt-6 rounded-xl border p-4">
+          <p className="text-foreground inline-flex items-center gap-1.5 text-xs font-medium tracking-wide uppercase">
+            <Sparkles className="size-3" />
+            What to expect
+          </p>
+          <p className="text-muted-foreground/90 mt-2 text-sm leading-6">
+            The first time you click a Play button on Achordion, your browser
+            asks <em>&ldquo;achordion.xyz wants to access other apps and
+            services on this device.&rdquo;</em> That&apos;s the browser&apos;s
+            generic phrasing — what it&apos;s actually asking is whether
+            Achordion can hand <code className="bg-muted text-foreground rounded px-1 py-0.5 text-[11px]">parachord://</code>{" "}
+            links off to Parachord. Click <strong>Allow</strong> and Play
+            buttons work site-wide from then on.
+          </p>
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between">
+        <Link
+          href="/welcome?step=2"
           className="text-muted-foreground hover:text-foreground text-sm underline-offset-4 hover:underline"
         >
           ← Back
