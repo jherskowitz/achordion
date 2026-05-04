@@ -34,9 +34,35 @@ When an MBID is on hand → direct link. When it isn't → the helper falls thro
 
 **Never render a name as plain text.** Don't write `recordingMbid ? <Link>…</Link> : t.title` — use the helper. The whole codebase has been swept for this; if you add a new surface, follow the pattern.
 
-### 2. Lookup-at-click, not at render
+### 2. Lookup-at-click *or* piggyback on the cover-art lookup — never N synchronous MB calls per render
 
-MusicBrainz allows ≤ 1 request/second. **Never do N MB lookups per render** — that's how the Apple Music chart used to wedge for ~50s of streaming RSC. Resolve at click time via the lookup routes above.
+MusicBrainz allows ≤ 1 request/second. **Never do N MB lookups per render** — that's how the Apple Music chart used to wedge for ~50s of streaming RSC. Two acceptable patterns:
+
+**(a) Click-time lookup** — `releaseGroupHref({artist, title})`, `artistHref({name})`, `recordingHref({artist, title})` produce `/release-group/lookup?…` etc. The user's click triggers one server-side MB search + 302. Cheap on first paint, slightly slower on click.
+
+**(b) Piggyback on the cover-art lookup** (the better choice anywhere `<LazyAlbumCover>` / `<LazyTrackCover>` is already firing). `/api/track-cover` returns `{ url, mbid }` — the resolved release-group MBID rides along with the cover URL at no extra MB cost. The lazy components expose this via an `onResolved({url, mbid})` callback. Capture it in a `useState` and swap the album href from the lookup fallback to a direct `/release-group/<mbid>` once it arrives.
+
+```tsx
+const [resolvedMbid, setResolvedMbid] = useState<string | null>(null);
+const albumHref = resolvedMbid
+  ? `/release-group/${resolvedMbid}`
+  : releaseGroupHref({ artist, title });
+
+<LazyAlbumCover
+  artist={artist}
+  album={title}
+  alt={title}
+  initialSrc={inlineCover}
+  onResolved={({ mbid }) => mbid && setResolvedMbid(mbid)}
+/>
+```
+
+**When to choose which:**
+- Cover lookup is already firing for cover art (NACC, !earshot, Critical Darlings, Radio Rewinds, LB Sitewide fallback) → use (b). The MBID is a free byproduct. Surfaces that already pay the MB cost shouldn't pay it again on click.
+- Cover lookup is **not** otherwise firing (Apple Music — ships its own artwork URL) → trade-off: opt into (b) only if the page's expected click-through rate justifies adding N MB calls per cold-cache page load. The Apple Music chart pages opted in (50 calls per cold visit, cached 1h, faster album clicks). For lower-engagement surfaces, (a) is fine.
+- Source already supplies the MBID (LB sitewide top-release-groups, LB playlist tracks via `release_mbid`) → use the MBID directly, no lookup needed. Only fall through to (b) for the rare missing-MBID entry.
+
+**Don't add (b) on top of (a) when LB already provides the MBID.** Pass the existing MBID into `*Href` and the helper returns a direct URL. The lookup-href fallback is for cases where neither the source nor the cover-resolver has produced an MBID yet.
 
 ### 3. Two-state Play buttons via shared presence
 
@@ -99,6 +125,8 @@ If you find yourself adding `import "server-only"` to a module that already expo
 
 `<CoverArt>` has built-in `onError` swap-to-`Disc3`-placeholder, so a 404 from Cover Art Archive (which is *common* for older / niche releases) never paints the browser's broken-image glyph + alt text. Even when you have a known-good URL, use `<CoverArt>` — the consistency means a downstream API regression doesn't surface as broken images on your page.
 
+`<CoverArt>` also handles the **300ms ease-out load fade**. So does `<LazyAlbumCover>` (full-bleed tiles), `<FadeInImage>` (drop-in for raw `<Image>` when CoverArt's shape doesn't fit — e.g. Apple Music's inline `artworkUrl`), and `<AvatarImage>` (artist / user avatars, fades in via `animate-in fade-in duration-300` since base-ui only mounts the `<img>` once loaded). Use one of these for **every async image surface** so the whole app's image swaps share the same calm motion vocabulary. Don't introduce raw `<Image>` for cover art / artwork without one of them wrapping it.
+
 ### 10. Don't block first paint on slow lookups — paint placeholder, swap in
 
 Wikidata image resolution (artists), MB recording-metadata (track covers), CAA URL resolution (radio rewind tracklists) all involve external round-trips that should never block initial render. The pattern:
@@ -106,9 +134,9 @@ Wikidata image resolution (artists), MB recording-metadata (track covers), CAA U
 1. Server component (or server fetch) returns the page with placeholder identifiers.
 2. Client component paints a fast-rendering placeholder (DiceBear avatar, neutral muted square, Disc3 glyph).
 3. After mount, client fires a fetch to the appropriate `/api/...` route.
-4. On success, swap the placeholder for the real image.
+4. On success, swap the placeholder for the real image, **and surface the resolved MBID** (rule #2 path b) so the row's links stop rounding-tripping through `/release-group/lookup` on click.
 
-Examples: `<LazyArtistAvatar>` (in search typeahead), `<LazyTrackCover>` (in radio rewind), the artist images that lazy-load in `<SearchTypeahead>` rows.
+Examples: `<LazyArtistAvatar>` (in search typeahead), `<LazyTrackCover>` / `<LazyAlbumCover>` (radio rewinds, charts), the artist images that lazy-load in `<SearchTypeahead>` rows. The lazy cover components both expose an `onResolved({ url, mbid })` callback. When LB / source data didn't already ship the MBID, capture it via `useState` and use it for the album href + Parachord play target. See `CollegeAlbumCard`, `RadioRewindRow`, `ChartsAlbumCard` (Apple Music) for the canonical implementations.
 
 ---
 
