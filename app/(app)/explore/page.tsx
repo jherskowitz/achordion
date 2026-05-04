@@ -219,7 +219,7 @@ async function WeeklyAlgoSection({
   }
   return (
     <ul className="grid gap-3 md:grid-cols-2">
-      {matches.map((entry, i) => (
+      {matches.map((entry) => (
         <li key={entry.playlist.identifier}>
           <Suspense
             fallback={
@@ -234,9 +234,6 @@ async function WeeklyAlgoSection({
           >
             <CardWithCovers entry={entry} />
           </Suspense>
-          <p className="text-muted-foreground/70 mt-1 px-1 text-[11px] tracking-wide uppercase">
-            {i === 0 ? "This week" : "Last week"}
-          </p>
         </li>
       ))}
     </ul>
