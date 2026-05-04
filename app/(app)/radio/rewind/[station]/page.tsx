@@ -4,6 +4,11 @@ import { ArrowLeft, ExternalLink, Play } from "lucide-react";
 import { getSpinbinPlaylist } from "@/lib/clients/spinbin";
 import { getSpinbinStation } from "@/lib/spinbin-stations";
 import { parachordPlayTrack } from "@/lib/parachord";
+import {
+  artistHref,
+  recordingHref,
+  releaseGroupHref,
+} from "@/lib/entity-links";
 import { LazyTrackCover } from "@/components/achordion/lazy-track-cover";
 import { OpenInParachordButton } from "@/components/achordion/open-in-parachord-button";
 import { PageShell } from "@/components/achordion/page-shell";
@@ -186,13 +191,39 @@ export default async function RewindStationPage({ params }: PageProps) {
                   </span>
                 </a>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium">{t.title}</p>
+                  <p className="truncate text-sm font-medium">
+                    {/* No MBIDs from the spinbin feed — recordingHref
+                        falls through to /recording/lookup which
+                        resolves canonically server-side. */}
+                    <Link
+                      href={recordingHref({
+                        artist: t.creator,
+                        title: t.title,
+                      })}
+                      className="hover:underline"
+                    >
+                      {t.title}
+                    </Link>
+                  </p>
                   <p className="text-muted-foreground truncate text-xs">
-                    {t.creator}
+                    <Link
+                      href={artistHref({ name: t.creator })}
+                      className="hover:text-foreground"
+                    >
+                      {t.creator}
+                    </Link>
                     {t.album && (
                       <>
                         <span className="mx-1.5 opacity-50">·</span>
-                        <span className="italic">{t.album}</span>
+                        <Link
+                          href={releaseGroupHref({
+                            artist: t.creator,
+                            title: t.album,
+                          })}
+                          className="hover:text-foreground italic"
+                        >
+                          {t.album}
+                        </Link>
                       </>
                     )}
                   </p>
