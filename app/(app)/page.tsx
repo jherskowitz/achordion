@@ -93,41 +93,74 @@ export default async function HomePage() {
   return (
     <>
       <section className="mx-auto max-w-7xl px-4 pt-20 pb-16 sm:px-6 sm:pt-28 sm:pb-24">
-        <p className="text-muted-foreground mb-6 text-sm tracking-wide uppercase">
-          The independent music community
-        </p>
-        <h1 className="font-heading max-w-3xl text-5xl leading-[1.05] font-semibold tracking-tight text-balance sm:text-6xl md:text-7xl">
-          People-Powered Music Discovery
-        </h1>
-        <p className="text-muted-foreground mt-6 max-w-2xl text-lg leading-7">
-        Music discovery felt a lot more meaningful (and fun) when we weren&apos;t all trapped in our own algorithmic bubbles — locked away inside corporate silos. </p>
- <p className="text-muted-foreground mt-6 max-w-2xl text-lg leading-7">Achordion is part of an open community, powered by <Ext href="https://listenbrainz.org">ListenBrainz</Ext>, that puts listeners first — no matter how or where they listen. Connect with like-minded listeners across the globe to discover music that transcends services, platforms, and programming.
-        </p>
-        <div className="mt-10 flex flex-wrap items-center gap-3">
-          <Button
-            size="lg"
-            nativeButton={false}
-            render={<Link href="/login" />}
-          >
+        {/* Two-column hero on lg+: copy on the left, product
+            screenshot on the right. Below lg the screenshot stacks
+            below the CTAs so the text + sign-in button stay above
+            the fold on mobile. The right column is fixed at the
+            screenshot's display size; the left column flexes. */}
+        <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,560px)] lg:items-center lg:gap-12">
+          <div>
+            <p className="text-muted-foreground mb-6 text-sm tracking-wide uppercase">
+              The independent music community
+            </p>
+            <h1 className="font-heading max-w-3xl text-5xl leading-[1.05] font-semibold tracking-tight text-balance sm:text-6xl md:text-7xl">
+              People-Powered Music Discovery
+            </h1>
+            <p className="text-muted-foreground mt-6 max-w-2xl text-lg leading-7">
+              Music discovery felt a lot more meaningful (and fun) when we
+              weren&apos;t all trapped in our own algorithmic bubbles — locked
+              away inside corporate silos.
+            </p>
+            <p className="text-muted-foreground mt-6 max-w-2xl text-lg leading-7">
+              Achordion is part of an open community, powered by{" "}
+              <Ext href="https://listenbrainz.org">ListenBrainz</Ext>, that
+              puts listeners first — no matter how or where they listen.
+              Connect with like-minded listeners across the globe to discover
+              music that transcends services, platforms, and programming.
+            </p>
+            <div className="mt-10 flex flex-wrap items-center gap-3">
+              <Button
+                size="lg"
+                nativeButton={false}
+                render={<Link href="/login" />}
+              >
+                <Image
+                  src="/musicbrainz-logo.svg"
+                  alt=""
+                  width={16}
+                  height={18}
+                  aria-hidden
+                  className="size-4"
+                />
+                Login with a MusicBrainz account
+                <ArrowRight className="size-4" />
+              </Button>
+              <Button
+                size="lg"
+                variant="ghost"
+                nativeButton={false}
+                render={<Link href="/explore/critical-darlings" />}
+              >
+                Browse without signing in
+              </Button>
+            </div>
+          </div>
+
+          {/* Product screenshot. Sized at its intrinsic aspect
+              ratio (2280×1350 ≈ 1.69:1). On mobile/tablet the
+              content is unreadable at tile size, so hide below md.
+              At md+ it sits below the CTAs; at lg+ it shifts to
+              the right column. */}
+          <div className="hidden md:block">
             <Image
-              src="/musicbrainz-logo.svg"
-              alt=""
-              width={16}
-              height={18}
-              aria-hidden
-              className="size-4"
+              src="/achordion-hero.png"
+              alt="Achordion user profile screenshot showing pinned listen, recent listens, and Heavy Rotation sidebar"
+              width={2280}
+              height={1350}
+              priority
+              className="border-border/60 w-full rounded-xl border shadow-2xl shadow-black/10 dark:shadow-black/40"
             />
-            Login with a MusicBrainz account
-            <ArrowRight className="size-4" />
-          </Button>
-          <Button
-            size="lg"
-            variant="ghost"
-            nativeButton={false}
-            render={<Link href="/explore/critical-darlings" />}
-          >
-            Browse without signing in
-          </Button>
+          </div>
         </div>
       </section>
 
