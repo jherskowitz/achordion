@@ -7,8 +7,14 @@ import { Button } from "@/components/ui/button";
 
 // Inline-link styling for external references on the home page —
 // matches the about/donate pages' sky-blue editorial links.
+//
+// `underline` is permanent (not hover-only) so links inside running
+// text are distinguishable by something other than color alone — WCAG
+// 1.4.1 (Use of Color) requires this for prose links. The sky-600
+// color still differentiates from black body text; underline is the
+// secondary cue.
 const LINK_CLASS =
-  "text-sky-600 hover:text-sky-700 dark:text-sky-400 dark:hover:text-sky-300 hover:underline underline-offset-4";
+  "text-sky-600 hover:text-sky-700 dark:text-sky-400 dark:hover:text-sky-300 underline underline-offset-4 decoration-sky-600/40 hover:decoration-current dark:decoration-sky-400/40";
 
 function Ext({ href, children }: { href: string; children: React.ReactNode }) {
   return (
@@ -130,9 +136,13 @@ export default async function HomePage() {
           {FEATURES.map(({ icon: Icon, title, body }) => (
             <div key={title} className="py-2">
               <Icon className="text-muted-foreground size-5" />
-              <h3 className="mt-4 text-lg font-semibold tracking-tight">
+              {/* h2 (not h3) so the heading hierarchy from the hero
+                  <h1> down through these feature cards is sequentially
+                  descending — Lighthouse + screen readers both flag a
+                  jump from h1 → h3 as a real a11y issue. */}
+              <h2 className="mt-4 text-lg font-semibold tracking-tight">
                 {title}
-              </h3>
+              </h2>
               <p className="text-muted-foreground mt-2 max-w-sm text-sm leading-6">
                 {body}
               </p>

@@ -17,7 +17,11 @@ interface FactProps {
 function Fact({ label, children }: FactProps) {
   return (
     <div>
-      <dt className="text-muted-foreground/70 text-xs tracking-wide uppercase">
+      {/* Drop the /70 opacity on these definition-list labels —
+          combined with text-xs they were failing WCAG AA contrast
+          (Lighthouse a11y flag). Plain text-muted-foreground passes
+          while staying visually quieter than the dd value. */}
+      <dt className="text-muted-foreground text-xs tracking-wide uppercase">
         {label}
       </dt>
       <dd className="text-foreground mt-0.5 text-sm">{children}</dd>
@@ -110,7 +114,10 @@ function MemberRow({ entry }: { entry: CollapsedMember }) {
         </span>
       )}
       {entry.spans.length > 0 && (
-        <span className="text-muted-foreground/70 text-xs">
+        // Same WCAG-AA contrast fix as the Fact label above — text-xs
+        // at /70 opacity falls below threshold; plain muted color
+        // passes.
+        <span className="text-muted-foreground text-xs">
           {" "}({entry.spans.join(", ")})
         </span>
       )}
