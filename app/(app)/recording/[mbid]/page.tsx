@@ -11,6 +11,7 @@ import {
 import {
   getRecordingPopularity,
   getReleaseGroupListeners,
+  type ReleaseGroupListeners,
 } from "@/lib/clients/listenbrainz";
 import { caaReleaseUrl } from "@/lib/clients/coverart";
 import { parachordPlayAlbum, parachordPlayTrack } from "@/lib/parachord";
@@ -25,6 +26,7 @@ import { OdesliLinks } from "@/components/achordion/odesli-links";
 import { PageHeader } from "@/components/achordion/page-header";
 import { PageShell } from "@/components/achordion/page-shell";
 import { TopListenersList } from "@/components/achordion/top-listeners-list";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface PageProps {
   params: Promise<{ mbid: string }>;
@@ -65,16 +67,18 @@ async function RecordingBody({ mbid }: { mbid: string }) {
     (r) => r["release-group"]?.id !== heroReleaseGroup?.id,
   );
   const length = formatLength(recording.length);
-  // Recording popularity totals + the album's top-listeners list
-  // (LB has no per-recording top-listeners endpoint — the hero
-  // album's listeners is the closest proxy and is a strict superset
-  // of users who'd have logged this track).
-  const [popularity, albumListeners] = await Promise.all([
-    getRecordingPopularity(mbid).catch(() => null),
+  // Stream the LB calls — recording popularity (header stats block)
+  // and the hero album's listeners (sidebar Top Listeners). LB has
+  // no per-recording top-listeners endpoint, so the hero album's
+  // listeners is the closest proxy. Don't await here — hand the
+  // promises to Suspense'd children so the header + breadcrumb +
+  // "Also appears on" grid can paint immediately on getRecording's
+  // return.
+  const popularityPromise = getRecordingPopularity(mbid).catch(() => null);
+  const albumListenersPromise: Promise<ReleaseGroupListeners | null> =
     heroReleaseGroup
       ? getReleaseGroupListeners(heroReleaseGroup.id).catch(() => null)
-      : Promise.resolve(null),
-  ]);
+      : Promise.resolve(null);
   const cover = heroRelease ? caaReleaseUrl(heroRelease.id, 500) : null;
   const { urls } = partitionArtistRelations({
     relations: recording.relations,
@@ -213,26 +217,9 @@ async function RecordingBody({ mbid }: { mbid: string }) {
           </Suspense>
         }
         actions={
-          popularity ? (
-            <div className="flex items-baseline gap-6 text-right">
-              <div>
-                <p className="text-foreground text-2xl font-semibold tabular-nums">
-                  {popularity.totalListenCount.toLocaleString()}
-                </p>
-                <p className="text-muted-foreground text-xs tracking-wide uppercase">
-                  listens
-                </p>
-              </div>
-              <div>
-                <p className="text-foreground text-2xl font-semibold tabular-nums">
-                  {popularity.totalUserCount.toLocaleString()}
-                </p>
-                <p className="text-muted-foreground text-xs tracking-wide uppercase">
-                  listeners
-                </p>
-              </div>
-            </div>
-          ) : undefined
+          <Suspense fallback={<PopularityStatsSkeleton />}>
+            <PopularityStats promise={popularityPromise} />
+          </Suspense>
         }
       />
 
@@ -310,14 +297,9 @@ async function RecordingBody({ mbid }: { mbid: string }) {
           )}
         </div>
         <aside className="space-y-8">
-          {albumListeners?.listeners && albumListeners.listeners.length > 0 && (
-            <div>
-              <h3 className="mb-3 text-xs tracking-wide uppercase text-muted-foreground">
-                Top listeners
-              </h3>
-              <TopListenersList listeners={albumListeners.listeners} />
-            </div>
-          )}
+          <Suspense fallback={null}>
+            <AlbumTopListenersStream promise={albumListenersPromise} />
+          </Suspense>
           {otherUrls.length > 0 && (
             <div>
               <h3 className="mb-3 text-xs tracking-wide uppercase text-muted-foreground">
@@ -329,6 +311,109 @@ async function RecordingBody({ mbid }: { mbid: string }) {
         </aside>
       </div>
     </>
+  );
+}
+
+/** Streams the listens / listeners stats block in the page header. */
+async function PopularityStats({
+  promise,
+}: {
+  promise: Promise<{ totalListenCount: number; totalUserCount: number } | null>;
+}) {
+  const popularity = await promise;
+  if (!popularity) return null;
+  return (
+    <div className="flex items-baseline gap-6 text-right">
+      <div>
+        <p className="text-foreground text-2xl font-semibold tabular-nums">
+          {popularity.totalListenCount.toLocaleString()}
+        </p>
+        <p className="text-muted-foreground text-xs tracking-wide uppercase">
+          listens
+        </p>
+      </div>
+      <div>
+        <p className="text-foreground text-2xl font-semibold tabular-nums">
+          {popularity.totalUserCount.toLocaleString()}
+        </p>
+        <p className="text-muted-foreground text-xs tracking-wide uppercase">
+          listeners
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function PopularityStatsSkeleton() {
+  return (
+    <div className="flex items-baseline gap-6 text-right">
+      {[0, 1].map((i) => (
+        <div key={i} className="space-y-1">
+          <Skeleton className="ml-auto h-7 w-20" />
+          <Skeleton className="ml-auto h-3 w-14" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** Streams the sidebar Top Listeners list (sourced from the hero
+ *  album's listeners — LB has no per-recording listeners endpoint). */
+async function AlbumTopListenersStream({
+  promise,
+}: {
+  promise: Promise<ReleaseGroupListeners | null>;
+}) {
+  const listeners = await promise;
+  if (!listeners?.listeners || listeners.listeners.length === 0) return null;
+  return (
+    <div>
+      <h3 className="mb-3 text-xs tracking-wide uppercase text-muted-foreground">
+        Top listeners
+      </h3>
+      <TopListenersList listeners={listeners.listeners} />
+    </div>
+  );
+}
+
+function RecordingPageSkeleton() {
+  return (
+    <div className="space-y-10 pt-8">
+      <div className="flex items-start gap-5">
+        <Skeleton className="aspect-square w-32 shrink-0 rounded-md sm:w-40" />
+        <div className="min-w-0 flex-1 space-y-2">
+          <Skeleton className="h-3 w-16" />
+          <Skeleton className="h-9 w-72 max-w-full" />
+          <Skeleton className="h-4 w-64" />
+          <div className="flex flex-wrap gap-1.5 pt-2">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <Skeleton key={i} className="h-6 w-16 rounded-full" />
+            ))}
+          </div>
+        </div>
+      </div>
+      <div className="grid gap-10 lg:grid-cols-[1fr_240px]">
+        <div className="min-w-0">
+          <Skeleton className="mb-4 h-3 w-32" />
+          <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5 xl:grid-cols-6">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="space-y-2">
+                <Skeleton className="aspect-square w-full rounded-md" />
+                <Skeleton className="h-3 w-3/4" />
+              </div>
+            ))}
+          </div>
+        </div>
+        <aside className="space-y-6">
+          {Array.from({ length: 2 }).map((_, i) => (
+            <div key={i} className="space-y-2">
+              <Skeleton className="h-3 w-20" />
+              <Skeleton className="h-4 w-full" />
+            </div>
+          ))}
+        </aside>
+      </div>
+    </div>
   );
 }
 
@@ -349,7 +434,7 @@ export default async function RecordingPage({ params }: PageProps) {
   const { mbid } = await params;
   return (
     <PageShell>
-      <Suspense fallback={null}>
+      <Suspense fallback={<RecordingPageSkeleton />}>
         <RecordingBody mbid={mbid} />
       </Suspense>
     </PageShell>

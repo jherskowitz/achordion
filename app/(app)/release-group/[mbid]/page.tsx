@@ -12,6 +12,7 @@ import type { ParachordTrack } from "@/lib/parachord";
 import {
   getReleaseGroupListeners,
   getTopRecordingsForArtist,
+  type ReleaseGroupListeners,
 } from "@/lib/clients/listenbrainz";
 import { PageShell } from "@/components/achordion/page-shell";
 import { AlbumHeader } from "@/components/achordion/album-header";
@@ -61,10 +62,16 @@ async function AlbumBody({ mbid }: { mbid: string }) {
   const credit = formatArtistCredit(rg["artist-credit"]);
   const canonical = pickCanonicalRelease(rg);
 
-  const [release, listeners] = await Promise.all([
-    canonical ? getRelease(canonical.id).catch(() => null) : Promise.resolve(null),
-    getReleaseGroupListeners(mbid).catch(() => null),
-  ]);
+  // Stream the LB listener stats — the album header paints with rg
+  // data immediately; the listens / listeners number block fills in
+  // via Suspense once LB returns. Same posture for the sidebar's
+  // Top Listeners list. `release` (an MB call) is still awaited
+  // synchronously since the streaming-services row in the header AND
+  // the tracklist both need it.
+  const listenersPromise = getReleaseGroupListeners(mbid).catch(() => null);
+  const release = canonical
+    ? await getRelease(canonical.id).catch(() => null)
+    : null;
 
   // Merge url-rels from both the release group AND the canonical
   // release. MB editors often attach Spotify / Apple Music to a
@@ -128,10 +135,13 @@ async function AlbumBody({ mbid }: { mbid: string }) {
       )}
       <AlbumHeader
         rg={rg}
-        totalListens={listeners?.total_listen_count}
-        totalListeners={listeners?.total_user_count}
         parachordTracks={parachordTracks}
         streamingLinks={streamingUrls}
+        statsSlot={
+          <Suspense fallback={<HeaderStatsSkeleton />}>
+            <HeaderStats promise={listenersPromise} />
+          </Suspense>
+        }
       />
 
       <div className="grid gap-10 lg:grid-cols-[1fr_240px]">
@@ -153,14 +163,9 @@ async function AlbumBody({ mbid }: { mbid: string }) {
         </div>
 
         <aside className="space-y-8">
-          {listeners?.listeners && listeners.listeners.length > 0 && (
-            <div>
-              <h3 className="mb-3 text-xs tracking-wide uppercase text-muted-foreground">
-                Top listeners
-              </h3>
-              <TopListenersList listeners={listeners.listeners} />
-            </div>
-          )}
+          <Suspense fallback={null}>
+            <TopListenersStream promise={listenersPromise} />
+          </Suspense>
           {otherUrls.length > 0 && (
             <div>
               <h3 className="mb-3 text-xs tracking-wide uppercase text-muted-foreground">
@@ -175,15 +180,58 @@ async function AlbumBody({ mbid }: { mbid: string }) {
   );
 }
 
-function HeaderSkeleton() {
+/** Streams the listens / listeners line in the album header. */
+async function HeaderStats({
+  promise,
+}: {
+  promise: Promise<ReleaseGroupListeners | null>;
+}) {
+  const listeners = await promise;
+  const totalListens = listeners?.total_listen_count;
+  const totalListeners = listeners?.total_user_count;
+  if (totalListens === undefined && totalListeners === undefined) return null;
   return (
-    <div className="mt-8 mb-10 grid gap-6 sm:grid-cols-[200px_1fr] sm:gap-8">
-      <Skeleton className="aspect-square w-full max-w-[280px] rounded-md sm:max-w-none" />
-      <div className="space-y-3">
-        <Skeleton className="h-3 w-24" />
-        <Skeleton className="h-10 w-72" />
-        <Skeleton className="h-4 w-40" />
-      </div>
+    <p className="text-muted-foreground text-sm tabular-nums">
+      {totalListens !== undefined && (
+        <>
+          <span className="text-foreground font-medium">
+            {totalListens.toLocaleString()}
+          </span>{" "}
+          listens
+        </>
+      )}
+      {totalListeners !== undefined && totalListens !== undefined && " · "}
+      {totalListeners !== undefined && (
+        <>
+          <span className="text-foreground font-medium">
+            {totalListeners.toLocaleString()}
+          </span>{" "}
+          listeners
+        </>
+      )}
+    </p>
+  );
+}
+
+function HeaderStatsSkeleton() {
+  return <Skeleton className="h-4 w-44" />;
+}
+
+/** Streams the sidebar's Top Listeners list. Renders nothing when the
+ *  album has no listener stats (LB endpoint 204/404'd). */
+async function TopListenersStream({
+  promise,
+}: {
+  promise: Promise<ReleaseGroupListeners | null>;
+}) {
+  const listeners = await promise;
+  if (!listeners?.listeners || listeners.listeners.length === 0) return null;
+  return (
+    <div>
+      <h3 className="mb-3 text-xs tracking-wide uppercase text-muted-foreground">
+        Top listeners
+      </h3>
+      <TopListenersList listeners={listeners.listeners} />
     </div>
   );
 }
@@ -192,9 +240,59 @@ export default async function ReleaseGroupPage({ params }: PageParams) {
   const { mbid } = await params;
   return (
     <PageShell>
-      <Suspense fallback={<HeaderSkeleton />}>
+      <Suspense fallback={<AlbumPageSkeleton />}>
         <AlbumBody mbid={mbid} />
       </Suspense>
     </PageShell>
+  );
+}
+
+/** Full-page skeleton during the initial `getReleaseGroup` wait.
+ *  Mirrors the real layout — cover + title block, two-column body
+ *  with tracklist on the left and sidebar on the right — so the
+ *  user sees the page shape immediately rather than a blank canvas
+ *  when MB is rate-limited. */
+function AlbumPageSkeleton() {
+  return (
+    <div className="space-y-10 pt-8">
+      {/* Header: cover + breadcrumb / title / artist / stats */}
+      <div className="grid gap-6 sm:grid-cols-[200px_1fr] sm:gap-8">
+        <Skeleton className="aspect-square w-full max-w-[280px] rounded-md sm:max-w-none" />
+        <div className="space-y-3">
+          <Skeleton className="h-3 w-32" />
+          <Skeleton className="h-10 w-80 max-w-full" />
+          <Skeleton className="h-4 w-48" />
+          <Skeleton className="h-4 w-44" />
+          <div className="flex flex-wrap gap-1.5 pt-2">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <Skeleton key={i} className="h-6 w-16 rounded-full" />
+            ))}
+          </div>
+        </div>
+      </div>
+      {/* Body grid */}
+      <div className="grid gap-10 lg:grid-cols-[1fr_240px]">
+        <div className="min-w-0">
+          <Skeleton className="mb-4 h-3 w-16" />
+          <div className="border-border/60 divide-border/60 divide-y rounded-xl border px-4">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-3 py-3">
+                <Skeleton className="size-4" />
+                <Skeleton className="h-4 flex-1" />
+                <Skeleton className="h-3 w-12" />
+              </div>
+            ))}
+          </div>
+        </div>
+        <aside className="space-y-6">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="space-y-2">
+              <Skeleton className="h-3 w-20" />
+              <Skeleton className="h-4 w-full" />
+            </div>
+          ))}
+        </aside>
+      </div>
+    </div>
   );
 }

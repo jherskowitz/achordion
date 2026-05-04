@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { CoverArt } from "./cover-art";
 import { caaReleaseGroupUrl } from "@/lib/clients/coverart";
@@ -21,6 +22,13 @@ interface AlbumHeaderProps {
    * button. Pass the merged rg-level + release-level streaming subset.
    */
   streamingLinks?: ArtistExternalLink[];
+  /**
+   * When provided, replaces the inline `totalListens / totalListeners`
+   * stats block with this node. Lets the page wrap a Suspense around
+   * the LB stats fetch so the rest of the header paints without
+   * waiting on it.
+   */
+  statsSlot?: ReactNode;
 }
 
 function ArtistByline({
@@ -56,6 +64,7 @@ export function AlbumHeader({
   totalListeners,
   parachordTracks,
   streamingLinks,
+  statsSlot,
 }: AlbumHeaderProps) {
   const credit = formatArtistCredit(rg["artist-credit"]);
   const year = rg["first-release-date"]?.slice(0, 4);
@@ -93,26 +102,34 @@ export function AlbumHeader({
             {rg.disambiguation}
           </p>
         )}
-        {(totalListens !== undefined || totalListeners !== undefined) && (
-          <p className="text-muted-foreground mt-4 text-sm tabular-nums">
-            {totalListens !== undefined && (
-              <>
-                <span className="text-foreground font-medium">
-                  {totalListens.toLocaleString()}
-                </span>{" "}
-                listens
-              </>
-            )}
-            {totalListeners !== undefined && totalListens !== undefined && " · "}
-            {totalListeners !== undefined && (
-              <>
-                <span className="text-foreground font-medium">
-                  {totalListeners.toLocaleString()}
-                </span>{" "}
-                listeners
-              </>
-            )}
-          </p>
+        {/* Stats: prefer the slot when the page passes one (so a
+            Suspense'd LB stats fetch can stream into the header
+            without blocking initial paint); fall back to the inline
+            block when the page resolves stats synchronously. */}
+        {statsSlot ? (
+          <div className="mt-4">{statsSlot}</div>
+        ) : (
+          (totalListens !== undefined || totalListeners !== undefined) && (
+            <p className="text-muted-foreground mt-4 text-sm tabular-nums">
+              {totalListens !== undefined && (
+                <>
+                  <span className="text-foreground font-medium">
+                    {totalListens.toLocaleString()}
+                  </span>{" "}
+                  listens
+                </>
+              )}
+              {totalListeners !== undefined && totalListens !== undefined && " · "}
+              {totalListeners !== undefined && (
+                <>
+                  <span className="text-foreground font-medium">
+                    {totalListeners.toLocaleString()}
+                  </span>{" "}
+                  listeners
+                </>
+              )}
+            </p>
+          )
         )}
         {tags.length > 0 && (
           <div className="mt-4 flex flex-wrap gap-1.5">
