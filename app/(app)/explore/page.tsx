@@ -115,24 +115,29 @@ function GridSkeleton({ cols = 4, rows = 8 }: { cols?: number; rows?: number }) 
   );
 }
 
-function thisWeekRange(now = new Date()): { startIso: string; endIso: string } {
-  // Monday-anchored ISO week.
+/** Trailing-7-days window — releases that have *already come out* in
+ *  the past week. The previous behavior (forward-looking ISO week)
+ *  surfaced albums announced for later in the week, which read like
+ *  upcoming-release teasers rather than "go listen now." Showing
+ *  already-released albums in the trailing 7-day window matches what
+ *  most users mean by "what's new this week." */
+function pastWeekRange(now = new Date()): { startIso: string; endIso: string } {
   const utc = new Date(
     Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
   );
-  const dow = utc.getUTCDay(); // 0 = Sun
-  const diff = (dow + 6) % 7;
+  const end = new Date(utc);
+  // `endIso` is the day after today so the comparison `< endIso`
+  // includes everything released today (release_date is YYYY-MM-DD).
+  end.setUTCDate(end.getUTCDate() + 1);
   const start = new Date(utc);
-  start.setUTCDate(start.getUTCDate() - diff);
-  const end = new Date(start);
-  end.setUTCDate(end.getUTCDate() + 7);
+  start.setUTCDate(start.getUTCDate() - 7);
   return {
     startIso: start.toISOString().slice(0, 10),
     endIso: end.toISOString().slice(0, 10),
   };
 }
 
-function inThisWeek(r: FreshRelease, range: { startIso: string; endIso: string }) {
+function inPastWeek(r: FreshRelease, range: { startIso: string; endIso: string }) {
   return r.release_date >= range.startIso && r.release_date < range.endIso;
 }
 
@@ -143,23 +148,24 @@ function isStudioRelease(r: FreshRelease): boolean {
 }
 
 async function ThisWeekReleasesSection({ username }: { username: string }) {
-  // Grab a 14-day window so we have enough material to filter to this calendar
-  // week even on Sundays.
+  // Past-only — already-released albums in the trailing 7-day window.
+  // Pad the fetch to 10 days back to absorb any timezone drift between
+  // our local "today" and LB's release_date precision.
   const releases = await getUserFreshReleases(username, {
-    days: 14,
+    days: 10,
     past: true,
-    future: true,
+    future: false,
     sort: "release_date",
   }).catch(() => [] as FreshRelease[]);
-  const range = thisWeekRange();
+  const range = pastWeekRange();
   const thisWeek = releases.filter(
-    (r) => inThisWeek(r, range) && isStudioRelease(r),
+    (r) => inPastWeek(r, range) && isStudioRelease(r),
   );
   if (thisWeek.length === 0) {
     return (
       <p className="text-muted-foreground text-sm">
-        No new releases from your artists this week — check back soon, or see
-        all{" "}
+        No new releases from your artists in the last 7 days — check back
+        soon, or see all{" "}
         <Link
           href="/explore/fresh-releases"
           className="hover:text-foreground underline-offset-4 hover:underline"
@@ -427,7 +433,7 @@ export default async function ExploreOverviewPage({
           <section>
             <SectionHeader
               title="New this week"
-              hint="Just-released albums from artists you listen to."
+              hint="Albums released in the last 7 days, from artists you listen to."
               seeAllHref="/explore/fresh-releases"
             />
             <Suspense fallback={<FreshReleaseSkeleton />}>

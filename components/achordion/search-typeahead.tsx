@@ -6,9 +6,11 @@ import { useRouter } from "next/navigation";
 import { Loader2, Search } from "lucide-react";
 import { CoverArt } from "./cover-art";
 import { LazyArtistAvatar } from "./lazy-artist-avatar";
+import { RecentSearchesRow } from "./recent-searches";
 import { UserAvatar } from "./user-avatar";
 import { caaReleaseGroupUrl } from "@/lib/clients/coverart";
 import { artistHref } from "@/lib/entity-links";
+import { recordRecentSearch } from "@/lib/recent-searches";
 
 /**
  * Client-side type-ahead search.
@@ -147,13 +149,19 @@ export function SearchTypeahead({ initialQuery }: { initialQuery: string }) {
         )}
       </div>
 
-      {/* Power-filter hint, shown only when the box is empty. */}
+      {/* Power-filter hint + recent searches, shown only when the
+          box is empty. RecentSearchesRow renders nothing if the user
+          hasn't clicked any results yet, so first-time visitors see
+          just the hint. */}
       {!q.trim() && (
-        <p className="text-muted-foreground/80 text-xs">
-          Tip: prefix with <code>artist:</code>, <code>album:</code>,{" "}
-          <code>song:</code>, or <code>user:</code> to limit the search to
-          one kind. (e.g. <code>artist:hozier</code>.)
-        </p>
+        <>
+          <p className="text-muted-foreground/80 text-xs">
+            Tip: prefix with <code>artist:</code>, <code>album:</code>,{" "}
+            <code>song:</code>, or <code>user:</code> to limit the search to
+            one kind. (e.g. <code>artist:hozier</code>.)
+          </p>
+          <RecentSearchesRow />
+        </>
       )}
 
       {q.trim() && results === null && !loading && null}
@@ -240,6 +248,15 @@ function ArtistRow({ row }: { row: ArtistRow }) {
     <li>
       <Link
         href={`/artist/${row.id}`}
+        // Fire-and-forget: localStorage write is sync, finishes
+        // before Next.js processes the click → navigation.
+        onClick={() =>
+          recordRecentSearch({
+            kind: "artist",
+            id: row.id,
+            label: row.name,
+          })
+        }
         className="hover:bg-muted/50 flex items-center gap-3 rounded-md p-2"
       >
         <LazyArtistAvatar mbid={row.id} name={row.name} />
@@ -311,11 +328,22 @@ function songCoverUrl(row: SongRow): string | null {
  * links separately without nesting anchors.
  */
 function AlbumRowComponent({ row }: { row: AlbumRow }) {
+  // Both the cover Link and the title Link route to the same album,
+  // so either click should record the same entry. Helper closes over
+  // the row so we don't repeat the recordRecentSearch shape.
+  const recordClick = () =>
+    recordRecentSearch({
+      kind: "album",
+      id: row.id,
+      label: row.title,
+      sublabel: row.artists.map((a) => a.name).join(", ") || undefined,
+    });
   return (
     <li>
       <div className="hover:bg-muted/50 flex items-center gap-3 rounded-md p-2">
         <Link
           href={`/release-group/${row.id}`}
+          onClick={recordClick}
           className="shrink-0"
           aria-label={row.title}
         >
@@ -329,6 +357,7 @@ function AlbumRowComponent({ row }: { row: AlbumRow }) {
           <p className="truncate text-sm font-medium">
             <Link
               href={`/release-group/${row.id}`}
+              onClick={recordClick}
               className="hover:underline"
             >
               {row.title}
@@ -349,11 +378,19 @@ function AlbumRowComponent({ row }: { row: AlbumRow }) {
 }
 
 function SongRowComponent({ row }: { row: SongRow }) {
+  const recordClick = () =>
+    recordRecentSearch({
+      kind: "song",
+      id: row.id,
+      label: row.title,
+      sublabel: row.artists.map((a) => a.name).join(", ") || undefined,
+    });
   return (
     <li>
       <div className="hover:bg-muted/50 flex items-center gap-3 rounded-md p-2">
         <Link
           href={`/recording/${row.id}`}
+          onClick={recordClick}
           className="shrink-0"
           aria-label={row.title}
         >
@@ -368,6 +405,7 @@ function SongRowComponent({ row }: { row: SongRow }) {
           <p className="truncate text-sm font-medium">
             <Link
               href={`/recording/${row.id}`}
+              onClick={recordClick}
               className="hover:underline"
             >
               {row.title}
@@ -387,6 +425,13 @@ function UserRowComponent({ row }: { row: UserRow }) {
     <li className="hover:bg-muted/50 rounded-md px-2 py-2">
       <Link
         href={`/user/${encodeURIComponent(row.name)}`}
+        onClick={() =>
+          recordRecentSearch({
+            kind: "user",
+            id: row.name,
+            label: row.name,
+          })
+        }
         className="flex items-center gap-3 text-sm"
       >
         <UserAvatar
