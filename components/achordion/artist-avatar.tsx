@@ -62,7 +62,16 @@ export async function ArtistAvatar({
   artist,
   className,
   fallbackClassName,
-  width = 512,
+  // 256px covers the largest place we render this avatar (the artist
+  // page hero at size-24 = 96px CSS, which is 288px on a 3× mobile)
+  // with a small headroom for retina, and Wikipedia/Wikidata round-
+  // up to ~320px on the standard thumbnail ladder. Asking for 512
+  // here was triggering Wikipedia to serve the 960px cached variant
+  // — ~280KB instead of ~30KB on artist hero loads. Lighthouse
+  // image-delivery-insight flagged this as ~95% wasted bytes on the
+  // largest image on the artist page. Callers that legitimately need
+  // a bigger size (none today) can override via the `width` prop.
+  width = 256,
 }: ArtistAvatarProps) {
   const imageUrl = await resolveImageUrl(mbid, artist, width);
   const src = imageUrl ?? dicebearShapesUrl(mbid);
