@@ -6,12 +6,14 @@ import {
   getArtist,
   getArtistReleaseGroups,
   partitionArtistRelations,
+  type ArtistDetail,
 } from "@/lib/clients/musicbrainz";
 import {
   getArtistListeners,
   getLbRadio,
   getSimilarArtists,
   getTopRecordingsForArtist,
+  type ArtistListeners,
 } from "@/lib/clients/listenbrainz";
 import { findBioSource, getBiography } from "@/lib/clients/wikipedia";
 import { PageShell } from "@/components/achordion/page-shell";
@@ -82,9 +84,11 @@ async function ArtistBody({
     notFound();
   }
 
-  // Listener counts are best-effort — most artists have them, but the
-  // endpoint can 204/404 for niche/new artists. Fetch in parallel with
-  // the rest of the page so it doesn't block first paint.
+  // Listener counts are best-effort and live behind a separate
+  // ListenBrainz call. Don't block the header render on it — pass
+  // the unawaited promise to a child Suspense boundary so the artist
+  // name + avatar paints as soon as `getArtist` returns; the
+  // numbers and the sidebar's top-listeners list fill in later.
   const listenersPromise = getArtistListeners(mbid).catch(() => null);
 
   const { urls } = partitionArtistRelations(artist);
@@ -112,10 +116,6 @@ async function ArtistBody({
     .sort((a, b) => b.count - a.count)
     .slice(0, 8);
 
-  const listeners = await listenersPromise;
-  const totalListens = listeners?.total_listen_count;
-  const totalListeners = listeners?.total_user_count;
-
   return (
     <>
       <PageHeader
@@ -137,30 +137,9 @@ async function ArtistBody({
         // we don't have an /artists directory page to crumb back to.
         // The "Artist" eyebrow already labels what kind of page this is.
         actions={
-          totalListens !== undefined || totalListeners !== undefined ? (
-            <div className="flex items-baseline gap-6 text-right">
-              {totalListens !== undefined && (
-                <div>
-                  <p className="text-foreground text-2xl font-semibold tabular-nums">
-                    {totalListens.toLocaleString()}
-                  </p>
-                  <p className="text-muted-foreground text-xs tracking-wide uppercase">
-                    listens
-                  </p>
-                </div>
-              )}
-              {totalListeners !== undefined && (
-                <div>
-                  <p className="text-foreground text-2xl font-semibold tabular-nums">
-                    {totalListeners.toLocaleString()}
-                  </p>
-                  <p className="text-muted-foreground text-xs tracking-wide uppercase">
-                    listeners
-                  </p>
-                </div>
-              )}
-            </div>
-          ) : undefined
+          <Suspense fallback={<ListenerStatsSkeleton />}>
+            <ListenerStats promise={listenersPromise} />
+          </Suspense>
         }
         afterTitle={
           /* Always render the streaming row so the "+ Add sources"
@@ -221,11 +200,22 @@ async function ArtistBody({
             </Suspense>
           </section>
         </div>
-        <ArtistInfoSidebar
-          artist={artist}
-          linksOverride={other}
-          topListeners={listeners?.listeners}
-        />
+        <Suspense
+          fallback={
+            <ArtistInfoSidebar
+              artist={artist}
+              linksOverride={other}
+              // No topListeners during the initial paint — the section
+              // gets hidden, fills in below when listeners resolves.
+            />
+          }
+        >
+          <SidebarWithListeners
+            artist={artist}
+            other={other}
+            promise={listenersPromise}
+          />
+        </Suspense>
       </div>
 
       {/* Full-width sections — out of the 1fr/240px grid since the
@@ -254,6 +244,82 @@ async function ArtistBody({
         <SimilarArtistsSection mbid={mbid} />
       </Suspense>
     </>
+  );
+}
+
+/** Streams the listens / listeners stat block in the page header.
+ *  Decoupled so the artist name + avatar can paint the moment
+ *  `getArtist` resolves; the numbers fill in once the LB stats call
+ *  returns. */
+async function ListenerStats({
+  promise,
+}: {
+  promise: Promise<ArtistListeners | null>;
+}) {
+  const listeners = await promise;
+  const totalListens = listeners?.total_listen_count;
+  const totalListeners = listeners?.total_user_count;
+  if (totalListens === undefined && totalListeners === undefined) return null;
+  return (
+    <div className="flex items-baseline gap-6 text-right">
+      {totalListens !== undefined && (
+        <div>
+          <p className="text-foreground text-2xl font-semibold tabular-nums">
+            {totalListens.toLocaleString()}
+          </p>
+          <p className="text-muted-foreground text-xs tracking-wide uppercase">
+            listens
+          </p>
+        </div>
+      )}
+      {totalListeners !== undefined && (
+        <div>
+          <p className="text-foreground text-2xl font-semibold tabular-nums">
+            {totalListeners.toLocaleString()}
+          </p>
+          <p className="text-muted-foreground text-xs tracking-wide uppercase">
+            listeners
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ListenerStatsSkeleton() {
+  return (
+    <div className="flex items-baseline gap-6 text-right">
+      {[0, 1].map((i) => (
+        <div key={i} className="space-y-1">
+          <Skeleton className="ml-auto h-7 w-20" />
+          <Skeleton className="ml-auto h-3 w-14" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** Awaits `listenersPromise` and renders the full sidebar including
+ *  the top-listeners list. The Suspense fallback at the call site
+ *  renders `<ArtistInfoSidebar>` with everything except the listeners
+ *  list, so all the artist-info facts (life-span, members, links)
+ *  paint immediately — only the top-listeners section streams in. */
+async function SidebarWithListeners({
+  artist,
+  other,
+  promise,
+}: {
+  artist: ArtistDetail;
+  other: ArtistExternalLink[];
+  promise: Promise<ArtistListeners | null>;
+}) {
+  const listeners = await promise;
+  return (
+    <ArtistInfoSidebar
+      artist={artist}
+      linksOverride={other}
+      topListeners={listeners?.listeners}
+    />
   );
 }
 
@@ -436,17 +502,77 @@ export default async function ArtistPage({
   const discographyType = parseDiscographyType(sp.type);
   return (
     <PageShell>
-      <Suspense
-        fallback={
-          <div className="space-y-3 pt-8 pb-6">
-            <Skeleton className="h-3 w-24" />
-            <Skeleton className="h-10 w-72" />
-            <Skeleton className="h-4 w-40" />
-          </div>
-        }
-      >
+      <Suspense fallback={<ArtistPageSkeleton />}>
         <ArtistBody mbid={mbid} discographyType={discographyType} />
       </Suspense>
     </PageShell>
+  );
+}
+
+/** Full-page skeleton shown during the initial `getArtist` wait.
+ *  Mirrors the real layout (avatar circle + title block, sidebar,
+ *  discography grid, similar-artists row) so the user sees the page
+ *  shape immediately — perceived load time drops even when MB is
+ *  rate-limited and the actual artist data is 10+ seconds out. */
+function ArtistPageSkeleton() {
+  return (
+    <div className="space-y-12 pt-8">
+      {/* Header: avatar + eyebrow / title / disambiguation + actions */}
+      <div className="flex items-start gap-5">
+        <Skeleton className="size-20 shrink-0 rounded-full sm:size-24" />
+        <div className="min-w-0 flex-1 space-y-2">
+          <Skeleton className="h-3 w-20" />
+          <Skeleton className="h-9 w-72 max-w-full" />
+          <Skeleton className="h-4 w-48" />
+          <div className="flex flex-wrap gap-1.5 pt-2">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <Skeleton key={i} className="h-6 w-16 rounded-full" />
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Body grid — bio + radio + popular tracks on the left, sidebar
+          on the right, mirroring the real lg:grid-cols-[1fr_240px]. */}
+      <div className="grid gap-10 lg:grid-cols-[1fr_240px]">
+        <div className="min-w-0 space-y-12">
+          <Skeleton className="h-32 w-full rounded-xl" />
+          <Skeleton className="h-24 w-full rounded-2xl" />
+          <div>
+            <Skeleton className="mb-4 h-3 w-32" />
+            <div className="border-border/60 divide-border/60 divide-y rounded-xl border px-4">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="flex items-center gap-3 py-3">
+                  <Skeleton className="size-4" />
+                  <Skeleton className="size-10 rounded-md" />
+                  <Skeleton className="h-4 flex-1" />
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+        <aside className="space-y-6">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="space-y-2">
+              <Skeleton className="h-3 w-20" />
+              <Skeleton className="h-4 w-full" />
+            </div>
+          ))}
+        </aside>
+      </div>
+
+      {/* Discography */}
+      <div>
+        <Skeleton className="mb-4 h-3 w-32" />
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="space-y-2">
+              <Skeleton className="aspect-square w-full rounded-md" />
+              <Skeleton className="h-3 w-3/4" />
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
   );
 }
