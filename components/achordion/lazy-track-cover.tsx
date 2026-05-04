@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CoverArt } from "./cover-art";
 
 /**
@@ -31,6 +31,7 @@ export function LazyTrackCover({
   alt,
   size = 40,
   initialSrc,
+  onResolved,
 }: {
   artist: string;
   title: string;
@@ -38,18 +39,32 @@ export function LazyTrackCover({
   alt: string;
   size?: number;
   initialSrc?: string | null;
+  /** Fires once when the lookup completes (resolved or null). Use
+   *  the `mbid` to swap a lookup-href for a direct
+   *  `/release-group/<mbid>` link. Same callback semantics as
+   *  `<LazyAlbumCover>` — see that file for details. */
+  onResolved?: (data: { url: string | null; mbid: string | null }) => void;
 }) {
   const [src, setSrc] = useState<string | null>(initialSrc ?? null);
+  const onResolvedRef = useRef(onResolved);
+  onResolvedRef.current = onResolved;
 
   useEffect(() => {
-    if (initialSrc) return;
+    // Skip the network call only when we already have a known cover
+    // URL AND nobody is asking for the MBID — otherwise even sources
+    // that ship a cover (spinbin) would never learn the MBID.
+    const callback = onResolvedRef.current;
+    if (initialSrc && !callback) return;
+
     let cancelled = false;
     const params = new URLSearchParams({ artist, title });
     if (album) params.set("album", album);
     fetch(`/api/track-cover?${params}`)
-      .then((r) => (r.ok ? r.json() : { url: null }))
-      .then((data: { url: string | null }) => {
-        if (!cancelled && data.url) setSrc(data.url);
+      .then((r) => (r.ok ? r.json() : { url: null, mbid: null }))
+      .then((data: { url: string | null; mbid: string | null }) => {
+        if (cancelled) return;
+        if (data.url && !initialSrc) setSrc(data.url);
+        callback?.({ url: data.url ?? null, mbid: data.mbid ?? null });
       })
       .catch(() => {
         // Silent — CoverArt placeholder stays.

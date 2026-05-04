@@ -1,3 +1,6 @@
+"use client";
+
+import { useState } from "react";
 import Link from "next/link";
 import { parachordPlayAlbum, parachordPlayTrack } from "@/lib/parachord";
 import {
@@ -45,6 +48,86 @@ function trackCoverUrl(item: SitewideTopRecording): string | null {
   return null;
 }
 
+/** Single album card. Extracted from the grid so it can hold the
+ *  resolved-MBID state for entries where LB didn't ship one — most
+ *  of the time `release_group_mbid` is in the LB payload and we
+ *  short-circuit, but the fallback path captures whatever the
+ *  cover lookup returns. */
+function LbAlbumCard({
+  item,
+  rank,
+}: {
+  item: SitewideTopReleaseGroup;
+  rank: number;
+}) {
+  const [resolvedMbid, setResolvedMbid] = useState<string | null>(null);
+  const effectiveMbid = item.release_group_mbid ?? resolvedMbid;
+  const albumLink = effectiveMbid
+    ? `/release-group/${effectiveMbid}`
+    : releaseGroupHref({
+        artist: item.artist_name,
+        title: item.release_group_name,
+      });
+  const playHref = effectiveMbid
+    ? parachordPlayAlbum({ mbid: effectiveMbid })
+    : parachordPlayAlbum({
+        artist: item.artist_name,
+        title: item.release_group_name,
+      });
+  const inlineCover = rgCoverUrl(item);
+
+  return (
+    <li className="min-w-0">
+      <div className="group relative overflow-hidden rounded-md">
+        <Link href={albumLink} className="block">
+          <LazyAlbumCover
+            artist={item.artist_name}
+            album={item.release_group_name}
+            alt={item.release_group_name}
+            initialSrc={inlineCover}
+            // Only ask for an MBID when LB didn't already ship one —
+            // saves the parallel /api/track-cover call for the
+            // already-resolved happy path.
+            onResolved={
+              item.release_group_mbid
+                ? undefined
+                : ({ mbid }) => {
+                    if (mbid) setResolvedMbid(mbid);
+                  }
+            }
+          />
+        </Link>
+        <span
+          aria-hidden
+          className="bg-foreground/85 text-background pointer-events-none absolute top-2 left-2 inline-flex h-6 min-w-6 items-center justify-center rounded-full px-2 text-[10px] font-semibold tabular-nums"
+        >
+          {rank}
+        </span>
+        <PlayOnHoverFab
+          href={playHref}
+          label={`Play "${item.release_group_name}" by ${item.artist_name} in Parachord`}
+        />
+      </div>
+      <p className="mt-2 truncate text-sm font-medium">
+        <Link href={albumLink} className="italic hover:underline">
+          {item.release_group_name}
+        </Link>
+      </p>
+      <p className="text-muted-foreground truncate text-xs">
+        <Link
+          href={artistHref({
+            mbid: item.artist_mbids[0],
+            name: item.artist_name,
+          })}
+          className="hover:text-foreground hover:underline"
+        >
+          {item.artist_name}
+        </Link>
+      </p>
+    </li>
+  );
+}
+
 export function LbAlbumsChartGrid({
   items,
 }: {
@@ -59,63 +142,13 @@ export function LbAlbumsChartGrid({
   }
   return (
     <ol className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
-      {items.map((item, i) => {
-        const rank = i + 1;
-        const albumLink = releaseGroupHref({
-          mbid: item.release_group_mbid,
-          artist: item.artist_name,
-          title: item.release_group_name,
-        });
-        const playHref = parachordPlayAlbum(
-          item.release_group_mbid
-            ? { mbid: item.release_group_mbid }
-            : { artist: item.artist_name, title: item.release_group_name },
-        );
-        const inlineCover = rgCoverUrl(item);
-        return (
-          <li
-            key={`${rank}-${item.release_group_mbid ?? item.release_group_name}`}
-            className="min-w-0"
-          >
-            <div className="group relative overflow-hidden rounded-md">
-              <Link href={albumLink} className="block">
-                <LazyAlbumCover
-                  artist={item.artist_name}
-                  album={item.release_group_name}
-                  alt={item.release_group_name}
-                  initialSrc={inlineCover}
-                />
-              </Link>
-              <span
-                aria-hidden
-                className="bg-foreground/85 text-background pointer-events-none absolute top-2 left-2 inline-flex h-6 min-w-6 items-center justify-center rounded-full px-2 text-[10px] font-semibold tabular-nums"
-              >
-                {rank}
-              </span>
-              <PlayOnHoverFab
-                href={playHref}
-                label={`Play "${item.release_group_name}" by ${item.artist_name} in Parachord`}
-              />
-            </div>
-            <p className="mt-2 truncate text-sm font-medium">
-              <Link href={albumLink} className="italic hover:underline">
-                {item.release_group_name}
-              </Link>
-            </p>
-            <p className="text-muted-foreground truncate text-xs">
-              <Link
-                href={artistHref({
-                  mbid: item.artist_mbids[0],
-                  name: item.artist_name,
-                })}
-                className="hover:text-foreground hover:underline"
-              >
-                {item.artist_name}
-              </Link>
-            </p>
-          </li>
-        );
-      })}
+      {items.map((item, i) => (
+        <LbAlbumCard
+          key={`${i + 1}-${item.release_group_mbid ?? item.release_group_name}`}
+          item={item}
+          rank={i + 1}
+        />
+      ))}
     </ol>
   );
 }

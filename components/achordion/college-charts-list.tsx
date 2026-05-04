@@ -1,3 +1,6 @@
+"use client";
+
+import { useState } from "react";
 import Link from "next/link";
 import { parachordPlayAlbum } from "@/lib/parachord";
 import { artistHref, releaseGroupHref } from "@/lib/entity-links";
@@ -6,22 +9,27 @@ import { LazyAlbumCover } from "./lazy-album-cover";
 import type { EarshotChartItem } from "@/lib/clients/earshot";
 
 /**
- * !earshot Top 50 — an *album* chart. Rendered as a cover-art tile
- * grid that mirrors the Apple Music Albums layout for visual parity
- * across charts. Cover-art URLs come from Earshot's cover-art dialog
- * endpoint (resolved server-side at fetch time and cached); when a
- * disc has no image on file, we fall back to a neutral placeholder
- * tile rather than padding it with text.
+ * !earshot Top 50 / NACC Top 30 — album charts. Cover-art tiles
+ * mirror the Apple Music Albums layout for visual parity.
+ *
+ * Cover lookups already hit `/api/track-cover` (MB release-group
+ * search), and that endpoint surfaces the resolved MBID alongside
+ * the cover URL. Capture the MBID via `<LazyAlbumCover>`'s
+ * `onResolved` callback so the album link upgrades from a
+ * `/release-group/lookup?artist=…&title=…` round-trip to a direct
+ * `/release-group/<mbid>` link the moment the cover resolves.
+ * Pre-resolution (or when MB has no match), the lookup URL is the
+ * server-rendered fallback.
  */
 function CollegeAlbumCard({ item }: { item: EarshotChartItem }) {
-  const albumHref = releaseGroupHref({
-    artist: item.artist,
-    title: item.album,
-  });
-  const playHref = parachordPlayAlbum({
-    artist: item.artist,
-    title: item.album,
-  });
+  const [resolvedMbid, setResolvedMbid] = useState<string | null>(null);
+
+  const albumHref = resolvedMbid
+    ? `/release-group/${resolvedMbid}`
+    : releaseGroupHref({ artist: item.artist, title: item.album });
+  const playHref = resolvedMbid
+    ? parachordPlayAlbum({ mbid: resolvedMbid })
+    : parachordPlayAlbum({ artist: item.artist, title: item.album });
 
   return (
     <li className="min-w-0">
@@ -32,6 +40,9 @@ function CollegeAlbumCard({ item }: { item: EarshotChartItem }) {
             album={item.album}
             alt={item.album}
             initialSrc={item.coverArtUrl}
+            onResolved={({ mbid }) => {
+              if (mbid) setResolvedMbid(mbid);
+            }}
           />
         </Link>
         <span

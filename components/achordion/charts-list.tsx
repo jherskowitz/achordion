@@ -1,6 +1,10 @@
+"use client";
+
+import { useState } from "react";
 import Link from "next/link";
 import { Play } from "lucide-react";
 import { FadeInImage } from "./fade-in-image";
+import { LazyAlbumCover } from "./lazy-album-cover";
 import {
   parachordPlayAlbum,
   parachordPlayTrack,
@@ -91,25 +95,30 @@ export function ChartsSongsList({ items }: { items: AppleChartItem[] }) {
 }
 
 function ChartsAlbumCard({ item }: { item: AppleChartItem }) {
-  // Click-time MBID resolution via /release-group/lookup — avoids
-  // burning MB's 1 req/sec rate limit on 50 chart entries at render.
-  const albumHref = releaseGroupHref({
-    artist: item.artistName,
-    title: item.name,
-  });
-  const playHref = parachordPlayAlbum({
-    artist: item.artistName,
-    title: item.name,
-  });
+  // Apple ships the cover URL inline (no MB call needed for cover),
+  // but we still want the resolved release-group MBID so album +
+  // play hrefs go directly to /release-group/<mbid> instead of
+  // round-tripping through /release-group/lookup on click. Hand
+  // Apple's URL to LazyAlbumCover as `initialSrc` so the cover
+  // paints instantly, AND wire `onResolved` to capture the MBID
+  // from the parallel `/api/track-cover` resolver.
+  const [resolvedMbid, setResolvedMbid] = useState<string | null>(null);
+  const albumHref = resolvedMbid
+    ? `/release-group/${resolvedMbid}`
+    : releaseGroupHref({ artist: item.artistName, title: item.name });
+  const playHref = resolvedMbid
+    ? parachordPlayAlbum({ mbid: resolvedMbid })
+    : parachordPlayAlbum({ artist: item.artistName, title: item.name });
 
   const cover = item.artworkUrl ? (
-    <FadeInImage
-      src={item.artworkUrl}
+    <LazyAlbumCover
+      artist={item.artistName}
+      album={item.name}
       alt={item.name}
-      width={500}
-      height={500}
-      className="aspect-square w-full object-cover group-hover:opacity-90"
-      unoptimized
+      initialSrc={item.artworkUrl}
+      onResolved={({ mbid }) => {
+        if (mbid) setResolvedMbid(mbid);
+      }}
     />
   ) : (
     <div className="bg-muted aspect-square w-full" />

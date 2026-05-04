@@ -1,17 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, ExternalLink, Play } from "lucide-react";
+import { ArrowLeft, ExternalLink } from "lucide-react";
 import { getSpinbinPlaylist } from "@/lib/clients/spinbin";
 import { getSpinbinStation } from "@/lib/spinbin-stations";
-import { parachordPlayTrack } from "@/lib/parachord";
-import {
-  artistHref,
-  recordingHref,
-  releaseGroupHref,
-} from "@/lib/entity-links";
-import { LazyTrackCover } from "@/components/achordion/lazy-track-cover";
 import { OpenInParachordButton } from "@/components/achordion/open-in-parachord-button";
 import { PageShell } from "@/components/achordion/page-shell";
+import { RadioRewindRow } from "@/components/achordion/radio-rewind-row";
 
 // User asked for "refreshes on each load" — opt every render of this
 // route into dynamic mode, even with future caching changes upstream.
@@ -151,86 +145,16 @@ export default async function RewindStationPage({ params }: PageProps) {
         </p>
       ) : (
         <ol className="border-border/60 divide-border/60 divide-y rounded-xl border px-4">
-          {tracks.map((t, i) => {
-            return (
-              <li
-                key={`${t.title}-${i}`}
-                className="group flex items-center gap-3 py-3"
-              >
-                <span className="text-muted-foreground w-6 shrink-0 text-xs tabular-nums">
-                  {i + 1}
-                </span>
-                <a
-                  href={parachordPlayTrack({
-                    artist: t.creator,
-                    title: t.title,
-                  })}
-                  aria-label={`Play "${t.title}" by ${t.creator} in Parachord`}
-                  title="Play in Parachord"
-                  className="group/cover relative shrink-0 overflow-hidden rounded-md"
-                >
-                  {/* Lazy CAA lookup when spinbin didn't include a
-                      cover URL on its feed. Page paints instantly
-                      with placeholders; covers stream in over the
-                      next several seconds as MB / CAA round-trips
-                      complete. Cached server-side so subsequent
-                      visits are fast. */}
-                  <LazyTrackCover
-                    artist={t.creator}
-                    title={t.title}
-                    album={t.album}
-                    alt={t.album ?? t.title}
-                    size={40}
-                    initialSrc={t.image}
-                  />
-                  <span
-                    aria-hidden
-                    className="absolute inset-0 flex items-center justify-center bg-black/55 opacity-0 transition-opacity group-hover/cover:opacity-100"
-                  >
-                    <Play className="size-4 fill-white text-white" />
-                  </span>
-                </a>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium">
-                    {/* No MBIDs from the spinbin feed — recordingHref
-                        falls through to /recording/lookup which
-                        resolves canonically server-side. */}
-                    <Link
-                      href={recordingHref({
-                        artist: t.creator,
-                        title: t.title,
-                      })}
-                      className="hover:underline"
-                    >
-                      {t.title}
-                    </Link>
-                  </p>
-                  <p className="text-muted-foreground truncate text-xs">
-                    <Link
-                      href={artistHref({ name: t.creator })}
-                      className="hover:text-foreground"
-                    >
-                      {t.creator}
-                    </Link>
-                    {t.album && (
-                      <>
-                        <span className="mx-1.5 opacity-50">·</span>
-                        <Link
-                          href={releaseGroupHref({
-                            artist: t.creator,
-                            title: t.album,
-                          })}
-                          className="hover:text-foreground italic"
-                        >
-                          {t.album}
-                        </Link>
-                      </>
-                    )}
-                  </p>
-                </div>
-              </li>
-            );
-          })}
+          {tracks.map((t, i) => (
+            <RadioRewindRow
+              key={`${t.title}-${i}`}
+              index={i}
+              title={t.title}
+              creator={t.creator}
+              album={t.album}
+              initialCover={t.image}
+            />
+          ))}
         </ol>
       )}
     </PageShell>
