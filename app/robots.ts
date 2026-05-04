@@ -37,7 +37,13 @@ export default function robots(): MetadataRoute.Robots {
           "Applebot-Extended",
           "Bytespider",
           "Amazonbot",
-          "FacebookBot",
+          // NOTE: do NOT add "FacebookBot" here. Meta treats a block
+          // on FacebookBot as applying to the whole Meta property
+          // family — including `facebookexternalhit`, the link-
+          // preview scraper that powers Threads / IG / FB unfurls.
+          // Blocking it = no preview cards on Threads. Meta-
+          // ExternalAgent is the right name for the AI training
+          // crawler we actually want to keep out.
           "Meta-ExternalAgent",
           "DuckAssistBot",
           "Diffbot",

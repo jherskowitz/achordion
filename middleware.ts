@@ -22,8 +22,14 @@ import { checkRateLimit } from "@/lib/rate-limit";
  *      Backed by Upstash Redis so the budget is shared across all
  *      Vercel instances.
  */
+// IMPORTANT: do NOT add "FacebookBot" or "facebookexternalhit" here.
+// Both names get used by Meta's link-preview scraper — the thing that
+// generates the OG / Twitter card unfurl on Threads / IG / FB / Messenger.
+// Blocking either one = no preview cards across the entire Meta family.
+// `Meta-ExternalAgent` is the right token for Meta's AI training
+// crawler, which is the one we actually want to keep out.
 const BLOCKED_UA =
-  /(GPTBot|ChatGPT-User|OAI-SearchBot|ClaudeBot|Claude-Web|anthropic-ai|CCBot|PerplexityBot|Google-Extended|Applebot-Extended|Bytespider|Amazonbot|FacebookBot|Meta-ExternalAgent|DuckAssistBot|Diffbot|AhrefsBot|SemrushBot|MJ12bot|DotBot|PetalBot|DataForSeoBot|BLEXBot|SeekportBot|Barkrowler)/i;
+  /(GPTBot|ChatGPT-User|OAI-SearchBot|ClaudeBot|Claude-Web|anthropic-ai|CCBot|PerplexityBot|Google-Extended|Applebot-Extended|Bytespider|Amazonbot|Meta-ExternalAgent|DuckAssistBot|Diffbot|AhrefsBot|SemrushBot|MJ12bot|DotBot|PetalBot|DataForSeoBot|BLEXBot|SeekportBot|Barkrowler)/i;
 
 /**
  * AS numbers (without the "AS" prefix) of cloud providers + bot
