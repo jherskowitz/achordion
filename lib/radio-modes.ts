@@ -11,7 +11,7 @@
  *
  * Wire-format mode tokens ("easy" / "medium" / "hard") are
  * unchanged — that's what the LB Radio API speaks. The user-facing
- * labels are the new "Narrow / Standard / Tight" radius vocabulary.
+ * labels are the new "Narrow / Standard / Wide" radius vocabulary.
  */
 
 export type RadioMode = "easy" | "medium" | "hard";
@@ -43,7 +43,7 @@ export const RADIO_MODE_STEPS: readonly RadioModeStep[] = [
   {
     value: 100,
     mode: "hard",
-    label: "Tight",
+    label: "Wide",
     blurb: "Wide net — bigger jumps from the seed.",
   },
 ] as const;

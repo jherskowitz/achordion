@@ -20,7 +20,7 @@ import {
  *
  *   0  → "easy"   → "Narrow"   — stay close, tracks similar to seed
  *   50 → "medium" → "Standard" — adjacent artists / styles
- *   100 → "hard"  → "Tight"    — bigger jumps from the seed
+ *   100 → "hard"  → "Wide"     — bigger jumps from the seed
  *
  * Step data + helpers (mode→value, value→step, label lookup) live in
  * `lib/radio-modes.ts` so server components can read the labels too
