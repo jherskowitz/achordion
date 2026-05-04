@@ -1,5 +1,7 @@
 import "server-only";
 
+import { Ratelimit } from "@upstash/ratelimit";
+import { Redis } from "@upstash/redis";
 import { z } from "zod";
 
 const MB_BASE = "https://musicbrainz.org/ws/2";
@@ -8,15 +10,39 @@ const USER_AGENT = "Achordion/0.1 (jherskow@gmail.com)";
 const MIN_INTERVAL_MS = 1000;
 
 class MusicBrainzError extends Error {
+  // Next.js preserves `digest` across the server→client error boundary
+  // even in production (where the message is sanitized), so we tag
+  // 429s with a known string and let `app/(app)/error.tsx` show
+  // a rate-limit-specific page instead of the generic fallback.
+  digest?: string;
   constructor(
     public status: number,
     message: string,
   ) {
     super(message);
+    if (status === 429) {
+      this.digest = "MB_RATE_LIMITED";
+    }
   }
 }
 
-const queue = (() => {
+// Shared token bucket across all serverless instances. Without this,
+// each Vercel invocation has its own in-process queue and N concurrent
+// instances blast N req/sec at MB, blowing past their ~1 req/sec cap
+// and getting us 429d. Falls back to the in-process queue when Upstash
+// env vars aren't set (local dev, tests).
+const sharedLimiter = (() => {
+  const url = process.env.UPSTASH_REDIS_REST_URL;
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+  if (!url || !token) return null;
+  return new Ratelimit({
+    redis: new Redis({ url, token }),
+    limiter: Ratelimit.slidingWindow(1, "1 s"),
+    prefix: "mb",
+  });
+})();
+
+const localQueue = (() => {
   let lastCallAt = 0;
   let chain: Promise<unknown> = Promise.resolve();
   return async function schedule<T>(fn: () => Promise<T>): Promise<T> {
@@ -32,6 +58,17 @@ const queue = (() => {
     return fn();
   };
 })();
+
+async function queue<T>(fn: () => Promise<T>): Promise<T> {
+  if (sharedLimiter) {
+    const result = await sharedLimiter.blockUntilReady("global", 30_000);
+    if (!result.success) {
+      throw new MusicBrainzError(429, "MB rate limit: timed out waiting for token");
+    }
+    return fn();
+  }
+  return localQueue(fn);
+}
 
 export const cacheTagsMB = {
   artist: (mbid: string) => `mb:artist:${mbid}`,
