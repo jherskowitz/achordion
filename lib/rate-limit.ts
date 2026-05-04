@@ -36,6 +36,11 @@ function makeLimiter(prefix: string, limit: number, window: `${number} ${"s" | "
 
 const coverLimiter = makeLimiter("ip:cover", 60, "60 s");
 const imageLimiter = makeLimiter("ip:image", 60, "60 s");
+// Page-route limiter is roomier than the API ones — a real user can
+// open 4-5 tabs in quick succession and we don't want to 429 them.
+// 120/min cuts off a crawler walking the catalog at full tilt within
+// the first minute, which is the actual goal.
+const pageLimiter = makeLimiter("ip:page", 120, "60 s");
 
 /** Best-effort client-IP extraction from forwarded headers. */
 export function getClientIp(request: Request): string {
@@ -50,10 +55,15 @@ export function getClientIp(request: Request): string {
  * when the IP is over its budget.
  */
 export async function checkRateLimit(
-  kind: "cover" | "image",
+  kind: "cover" | "image" | "page",
   request: Request,
 ): Promise<{ ok: boolean }> {
-  const limiter = kind === "cover" ? coverLimiter : imageLimiter;
+  const limiter =
+    kind === "cover"
+      ? coverLimiter
+      : kind === "image"
+        ? imageLimiter
+        : pageLimiter;
   if (!limiter) return { ok: true };
   const ip = getClientIp(request);
   const result = await limiter.limit(ip);
