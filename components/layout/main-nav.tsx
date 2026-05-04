@@ -4,6 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Menu } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -34,7 +35,30 @@ export interface MainNavItem {
   label: string;
 }
 
-export function MainNav({ items }: { items: MainNavItem[] }) {
+/**
+ * Items only shown in the mobile sheet (e.g., Search, Settings,
+ * Sign In) — on desktop these live as icon buttons in the header
+ * trailing region, but the hamburger sheet is the only nav surface
+ * mobile users have, so they need to appear there too.
+ */
+export interface MobileExtraItem {
+  href: string;
+  label: string;
+  icon?: LucideIcon;
+}
+
+export function MainNav({
+  items,
+  mobileExtras,
+  mobileFooter,
+}: {
+  items: MainNavItem[];
+  /** Auth / search / settings links surfaced inside the mobile sheet only. */
+  mobileExtras?: MobileExtraItem[];
+  /** Slot for non-link controls (e.g., theme toggle) rendered at the
+   *  bottom of the mobile sheet. */
+  mobileFooter?: React.ReactNode;
+}) {
   const pathname = usePathname();
   const [open, setOpen] = React.useState(false);
 
@@ -121,6 +145,43 @@ export function MainNav({ items }: { items: MainNavItem[] }) {
                 </Link>
               );
             })}
+            {mobileExtras && mobileExtras.length > 0 && (
+              <>
+                <div className="border-border/60 my-2 border-t" />
+                {mobileExtras.map((item) => {
+                  const isActive =
+                    pathname === item.href ||
+                    pathname.startsWith(`${item.href}/`);
+                  const Icon = item.icon;
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      suppressHydrationWarning
+                      aria-current={isActive ? "page" : undefined}
+                      onClick={() => setOpen(false)}
+                      className={cn(
+                        "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                        isActive
+                          ? "bg-muted text-foreground"
+                          : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                      )}
+                    >
+                      {Icon && <Icon className="size-4 shrink-0" />}
+                      {item.label}
+                    </Link>
+                  );
+                })}
+              </>
+            )}
+            {mobileFooter && (
+              <>
+                <div className="border-border/60 my-2 border-t" />
+                <div className="flex items-center justify-between px-3 py-2">
+                  {mobileFooter}
+                </div>
+              </>
+            )}
           </nav>
         </SheetContent>
       </Sheet>

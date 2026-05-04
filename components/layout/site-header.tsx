@@ -1,9 +1,13 @@
 import Link from "next/link";
-import { Search } from "lucide-react";
+import { LogIn, Search, Settings } from "lucide-react";
 import { auth } from "@/auth";
 import { Wordmark } from "./wordmark";
 import { ThemeToggle } from "./theme-toggle";
-import { MainNav, type MainNavItem } from "./main-nav";
+import {
+  MainNav,
+  type MainNavItem,
+  type MobileExtraItem,
+} from "./main-nav";
 import { Button } from "@/components/ui/button";
 import { UserAvatar } from "@/components/achordion/user-avatar";
 
@@ -26,11 +30,32 @@ export async function SiteHeader() {
     });
   }
 
+  // Items that live in the desktop header trailing region as icon
+  // buttons (search) or via the avatar (settings) — but mobile only
+  // has the hamburger sheet, so they need a labeled row in there too.
+  const mobileExtras: MobileExtraItem[] = [
+    { href: "/search", label: "Search", icon: Search },
+  ];
+  if (username) {
+    mobileExtras.push({ href: "/settings", label: "Settings", icon: Settings });
+  } else {
+    mobileExtras.push({ href: "/login", label: "Sign In", icon: LogIn });
+  }
+
   return (
     <header className="border-border/60 bg-background/80 supports-[backdrop-filter]:bg-background/60 sticky top-0 z-40 w-full border-b backdrop-blur">
       <div className="mx-auto flex h-14 max-w-7xl items-center gap-6 px-4 sm:px-6">
         <Wordmark />
-        <MainNav items={nav} />
+        <MainNav
+          items={nav}
+          mobileExtras={mobileExtras}
+          mobileFooter={
+            <>
+              <span className="text-muted-foreground text-sm">Theme</span>
+              <ThemeToggle />
+            </>
+          }
+        />
         <div className="ml-auto flex items-center gap-1">
           <Button
             variant="ghost"
