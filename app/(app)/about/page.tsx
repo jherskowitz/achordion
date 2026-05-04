@@ -45,15 +45,35 @@ export default function AboutPage() {
   return (
     <PageShell>
       <PageHeader
-        eyebrow="About"
-        title="What Achordion is"
-        description="The independent music community and data layer. An open-source front-end for ListenBrainz, designed to feel like one product with Parachord, the universal music player."
+        eyebrow="The independent music community"
+        title="People-Powered Music Discovery"
+        description="Music discovery felt a lot more meaningful (and fun) when we weren't all trapped in our own algorithmic bubbles — locked away inside corporate silos. Achordion is part of an open community, powered by ListenBrainz, that puts listeners first — no matter how or where they listen."
       />
 
       {/* Same `max-w-2xl` as the PageHeader's description, left-
           aligned at the page edge — keeps the subhead and the
           section bodies on the same left rail. */}
       <div className="max-w-2xl space-y-12 pb-12">
+        <Section title="The pitch">
+          <p>
+            Connect with like-minded listeners across the globe to discover
+            music that transcends services, platforms, and programming.
+            Whether you stream from Spotify or Apple Music or Tidal, buy from
+            Bandcamp, watch on YouTube, or play FLAC files off a NAS — your
+            listening data flows into the same feed as everyone else&apos;s,
+            and you can finally see what your friend is playing this week
+            even if she&apos;s on Apple Music and you&apos;re on Spotify.
+          </p>
+          <p>
+            Achordion is the front-door web experience.{" "}
+            <Out href="https://github.com/Parachord/parachord">Parachord</Out>{" "}
+            is the player every Play button hands off to. ListenBrainz is the
+            ledger your listens live in. MusicBrainz is the encyclopedia
+            underneath it all. Four independent, open-source, non-corporate
+            layers — one coherent experience.
+          </p>
+        </Section>
+
         <Section title="The two-project tldr">
           <p>
             <strong>
