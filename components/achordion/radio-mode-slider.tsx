@@ -77,26 +77,47 @@ export function RadioModeSlider({
       </button>
 
       {open && (
-        <div className="border-border/60 bg-muted/30 mt-2 rounded-lg border px-3 py-2">
-          <div className="flex items-center gap-3">
-            <span className="text-muted-foreground/70 shrink-0 text-[10px] tracking-wide uppercase">
-              {RADIO_MODE_STEPS[0].label}
-            </span>
-            <input
-              type="range"
-              min={0}
-              max={100}
-              step={50}
-              value={v}
-              onChange={(e) => setV(Number(e.target.value))}
-              aria-label="Mode"
-              className="accent-foreground h-1 w-full cursor-pointer"
-            />
-            <span className="text-muted-foreground/70 shrink-0 text-[10px] tracking-wide uppercase">
-              {RADIO_MODE_STEPS[RADIO_MODE_STEPS.length - 1].label}
-            </span>
+        <div className="border-border/60 bg-muted/30 mt-2 rounded-lg border px-3 py-3">
+          {/* Slider track — keep the native <input type="range"> so
+              keyboard navigation (arrow keys, Home/End) keeps working.
+              Click on the track auto-snaps to the nearest step (0/50/
+              100) thanks to step=50. */}
+          <input
+            type="range"
+            min={0}
+            max={100}
+            step={50}
+            value={v}
+            onChange={(e) => setV(Number(e.target.value))}
+            aria-label="Mode"
+            className="accent-foreground h-1 w-full cursor-pointer"
+          />
+          {/* Step labels — discoverable AND clickable. Without these,
+              users couldn't see where the three positions were and had
+              to guess by clicking the track. Now each label is a
+              jump-to-step button. */}
+          <div className="mt-2 flex items-center justify-between">
+            {RADIO_MODE_STEPS.map((step) => {
+              const active = step.mode === current.mode;
+              return (
+                <button
+                  key={step.mode}
+                  type="button"
+                  onClick={() => setV(step.value)}
+                  aria-pressed={active}
+                  className={cn(
+                    "rounded px-1 py-0.5 text-[10px] tracking-wide uppercase transition-colors",
+                    active
+                      ? "text-foreground"
+                      : "text-muted-foreground/70 hover:text-foreground",
+                  )}
+                >
+                  {step.label}
+                </button>
+              );
+            })}
           </div>
-          <p className="text-muted-foreground/80 mt-1 text-[11px]">
+          <p className="text-muted-foreground/80 mt-2 text-[11px]">
             <span className="text-foreground font-medium">{current.label}</span>
             {" — "}
             {current.blurb}
