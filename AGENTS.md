@@ -127,7 +127,18 @@ If you find yourself adding `import "server-only"` to a module that already expo
 
 `<CoverArt>` also handles the **300ms ease-out load fade**. So does `<LazyAlbumCover>` (full-bleed tiles), `<FadeInImage>` (drop-in for raw `<Image>` when CoverArt's shape doesn't fit — e.g. Apple Music's inline `artworkUrl`), and `<AvatarImage>` (artist / user avatars, fades in via `animate-in fade-in duration-300` since base-ui only mounts the `<img>` once loaded). Use one of these for **every async image surface** so the whole app's image swaps share the same calm motion vocabulary. Don't introduce raw `<Image>` for cover art / artwork without one of them wrapping it.
 
-### 10. Don't block first paint on slow lookups — paint placeholder, swap in
+### 10. Never abbreviate ListenBrainz / MusicBrainz / MetaBrainz in user-facing copy
+
+In code comments, identifiers, and internal docs, "MB" / "LB" are fine shorthand. **In any string a user could read** — page copy, headings, button labels, alt text, metadata titles, error messages, feature-flag descriptions — write the brand names out in full: **ListenBrainz**, **MusicBrainz**, **MetaBrainz**. New users have no idea what "LB Radio" or "the MB artist page" means; the friction is real.
+
+Exceptions, both narrow:
+
+- **MBID** is the canonical term for a MusicBrainz Identifier and appears that way in MetaBrainz's own docs. Leave it.
+- **ISRC** / **ISWC** / **EAN** are industry standards, not abbreviations of our own. Leave them.
+
+If you're tempted to write "LB" or "MB" anywhere a user could see it, expand it. If the sentence reads awkwardly with the full name twice, restructure rather than abbreviate.
+
+### 11. Don't block first paint on slow lookups — paint placeholder, swap in
 
 Wikidata image resolution (artists), MB recording-metadata (track covers), CAA URL resolution (radio rewind tracklists) all involve external round-trips that should never block initial render. The pattern:
 

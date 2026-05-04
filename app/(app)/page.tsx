@@ -1,29 +1,81 @@
+import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ArrowRight, Globe2, Network, Play, ShieldCheck } from "lucide-react";
 import { auth } from "@/auth";
 import { Button } from "@/components/ui/button";
 
-const FEATURES = [
+// Inline-link styling for external references on the home page —
+// matches the about/donate pages' sky-blue editorial links.
+const LINK_CLASS =
+  "text-sky-600 hover:text-sky-700 dark:text-sky-400 dark:hover:text-sky-300 hover:underline underline-offset-4";
+
+function Ext({ href, children }: { href: string; children: React.ReactNode }) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={LINK_CLASS}
+    >
+      {children}
+    </a>
+  );
+}
+
+const FEATURES: Array<{
+  icon: typeof Globe2;
+  title: string;
+  body: React.ReactNode;
+}> = [
   {
     icon: Globe2,
     title: "One community, no matter how you listen",
-    body: "Spotify, Apple Music, Tidal, Bandcamp, the FLAC library on your NAS — every listener's listening data flows into the same feed. See what your friend's playing this week even when you don't share a platform.",
+    body: "Spotify, Apple Music, Tidal, Bandcamp, the FLAC library on your NAS — every member's listening data can flow into the same feed. See what your friend's playing this week, or listen along in real-time, even when you don't share a platform.",
   },
   {
     icon: Play,
     title: "One click plays it, anywhere",
-    body: "Pair Achordion with Parachord and every track row, every album, every recommendation has a Play button that resolves against your music library and services - and plays from whichever ranks highest. Without Parachord you are still provided links to multiple streaming services and storefronts - no matter your preference. ",
+    body: (
+      <>
+        Pair Achordion with{" "}
+        <Ext href="https://parachord.com">Parachord</Ext> and every track row,
+        every album, every recommendation has a Play button that resolves
+        against your music library and services - and plays from whichever
+        ranks highest. Without{" "}
+        <Ext href="https://parachord.com">Parachord</Ext> you are still
+        provided links to multiple streaming services and storefronts - no
+        matter your preference.{" "}
+      </>
+    ),
   },
   {
     icon: ShieldCheck,
     title: "Your listening data, not ours",
-    body: "Achordion is stateless — there is no Achordion database, no analytics, no profile of you. Your listens, follows, and playlists live in your ListenBrainz account. Leave whenever, take everything with you.",
+    body: (
+      <>
+        Achordion doesn&apos;t store your listening data. There&apos;s no
+        Achordion-side profile of you, no record of what you&apos;ve played,
+        no record of who you follow. Your listens, follows, and playlists
+        live in your{" "}
+        <Ext href="https://listenbrainz.org">ListenBrainz</Ext> account.
+        Leave whenever, take everything with you.
+      </>
+    ),
   },
   {
     icon: Network,
-    title: "Build the open web of music",
-    body: "Every artist link, every missing relationship, every \"+ Add sources\" tile points back to MusicBrainz — the open-source music database that powers Achordion and every other client like it. Fix something once and the whole open ecosystem gets better.",
+    title: "Help build the open web of music",
+    body: (
+      <>
+        Every artist link, every missing relationship, every &quot;+ Add
+        sources&quot; tile points back to{" "}
+        <Ext href="https://musicbrainz.org">MusicBrainz</Ext> — the
+        open-source music database that powers Achordion and every other
+        client like it. Fix something once and the whole open ecosystem gets
+        better.
+      </>
+    ),
   },
 ];
 
@@ -39,20 +91,11 @@ export default async function HomePage() {
           The independent music community
         </p>
         <h1 className="font-heading max-w-3xl text-5xl leading-[1.05] font-semibold tracking-tight text-balance sm:text-6xl md:text-7xl">
-          An open music community - no matter where you get your music
+          People-Powered Music Discovery
         </h1>
         <p className="text-muted-foreground mt-6 max-w-2xl text-lg leading-7">
-          Achordion is the open-source counterpoint to streaming music silos — and a modern alternative to Last.fm 
-          {" "}and designed to work better with{" "}
-          <a
-            href="https://github.com/Parachord/parachord"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="hover:text-foreground underline-offset-4 hover:underline"
-          >
-            Parachord
-          </a>
-          , the universal music player.
+        Music discovery felt a lot more meaningful (and fun) when we weren't all trapped in our own algorithmic bubbles — locked away inside corporate silos. </p>
+ <p className="text-muted-foreground mt-6 max-w-2xl text-lg leading-7">Achordion is part of an open community, powered by <Ext href="https://listenbrainz.org">ListenBrainz</Ext>, that puts listeners first — no matter how or where they listen. Connect with like-minded listeners across the globe to discover music that transcends services, platforms, and programming.
         </p>
         <div className="mt-10 flex flex-wrap items-center gap-3">
           <Button
@@ -60,6 +103,14 @@ export default async function HomePage() {
             nativeButton={false}
             render={<Link href="/login" />}
           >
+            <Image
+              src="/musicbrainz-logo.svg"
+              alt=""
+              width={16}
+              height={18}
+              aria-hidden
+              className="size-4"
+            />
             Login with a MusicBrainz account
             <ArrowRight className="size-4" />
           </Button>

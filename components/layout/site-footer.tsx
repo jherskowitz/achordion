@@ -22,25 +22,34 @@ export function SiteFooter() {
             MusicBrainz
           </Link>
           . Made with ❤️ by{" "}
-          <Link
-            href="https://github.com/jherskowitz"
-            target="_blank"
-            rel="noopener noreferrer"
+          <a
+            href="mailto:j@parachord.com"
             className="hover:text-foreground underline-offset-4 hover:underline"
           >
             J Herskowitz
-          </Link>
+          </a>
           .
         </p>
         <nav className="flex items-center justify-center gap-4 sm:justify-end">
           <Link href="/about" className="hover:text-foreground">
             About
           </Link>
+          <Link href="/faq" className="hover:text-foreground">
+            FAQ
+          </Link>
           <Link href="/donate" className="hover:text-foreground">
             Donate
           </Link>
           {/* External — explicit anchor so prefetch / Link doesn't try
               to hit the GitHub host as a Next route. */}
+          <a
+            href="https://github.com/jherskowitz/achordion/discussions"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:text-foreground"
+          >
+            Discussions
+          </a>
           <a
             href="https://github.com/jherskowitz/achordion"
             target="_blank"
