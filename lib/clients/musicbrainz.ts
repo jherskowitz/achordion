@@ -10,11 +10,19 @@ const USER_AGENT = "Achordion/0.1 (jherskow@gmail.com)";
 const MIN_INTERVAL_MS = 1000;
 
 class MusicBrainzError extends Error {
+  // Next.js preserves `digest` across the server→client error boundary
+  // even in production (where the message is sanitized), so we tag
+  // 429s with a known string and let `app/(app)/error.tsx` show
+  // a rate-limit-specific page instead of the generic fallback.
+  digest?: string;
   constructor(
     public status: number,
     message: string,
   ) {
     super(message);
+    if (status === 429) {
+      this.digest = "MB_RATE_LIMITED";
+    }
   }
 }
 
