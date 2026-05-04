@@ -38,16 +38,13 @@ export interface MainNavItem {
  * Items only shown in the mobile sheet (e.g., Search, Settings,
  * Sign In) — on desktop these live as icon buttons in the header
  * trailing region, but the hamburger sheet is the only nav surface
- * mobile users have, so they need to appear there too.
+ * mobile users have, so they need to appear there too. Rendered with
+ * the same row styling as primary nav items so the whole list reads
+ * as one uniform group.
  */
 export interface MobileExtraItem {
   href: string;
   label: string;
-  /** Pre-rendered icon element (e.g., `<Search className="size-4 shrink-0" />`).
-   *  Passed as a serialized React element so this client component
-   *  doesn't have to import a non-serializable component reference
-   *  across the RSC boundary. */
-  icon?: React.ReactNode;
 }
 
 export function MainNav({
@@ -148,41 +145,32 @@ export function MainNav({
                 </Link>
               );
             })}
-            {mobileExtras && mobileExtras.length > 0 && (
-              <>
-                <div className="border-border/60 my-2 border-t" />
-                {mobileExtras.map((item) => {
-                  const isActive =
-                    pathname === item.href ||
-                    pathname.startsWith(`${item.href}/`);
-                  return (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      suppressHydrationWarning
-                      aria-current={isActive ? "page" : undefined}
-                      onClick={() => setOpen(false)}
-                      className={cn(
-                        "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-                        isActive
-                          ? "bg-muted text-foreground"
-                          : "text-muted-foreground hover:bg-muted hover:text-foreground",
-                      )}
-                    >
-                      {item.icon}
-                      {item.label}
-                    </Link>
-                  );
-                })}
-              </>
-            )}
+            {mobileExtras?.map((item) => {
+              const isActive =
+                pathname === item.href ||
+                pathname.startsWith(`${item.href}/`);
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  suppressHydrationWarning
+                  aria-current={isActive ? "page" : undefined}
+                  onClick={() => setOpen(false)}
+                  className={cn(
+                    "rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                    isActive
+                      ? "bg-muted text-foreground"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                  )}
+                >
+                  {item.label}
+                </Link>
+              );
+            })}
             {mobileFooter && (
-              <>
-                <div className="border-border/60 my-2 border-t" />
-                <div className="flex items-center justify-between px-3 py-2">
-                  {mobileFooter}
-                </div>
-              </>
+              <div className="flex items-center justify-between px-3 py-2 text-muted-foreground text-sm font-medium">
+                {mobileFooter}
+              </div>
             )}
           </nav>
         </SheetContent>
