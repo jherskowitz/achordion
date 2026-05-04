@@ -3,6 +3,7 @@ import {
   searchReleaseGroups,
 } from "@/lib/clients/musicbrainz";
 import { caaReleaseGroupUrl } from "@/lib/clients/coverart";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 /**
  * Resolve `(artist, title, optional album)` to a Cover Art Archive
@@ -42,6 +43,13 @@ const CACHE_HEADERS = {
 };
 
 export async function GET(request: Request) {
+  // Per-IP rate limit before any work — a single client can't burn
+  // our MB queue with 1000 cover lookups in a few seconds.
+  const limit = await checkRateLimit("cover", request);
+  if (!limit.ok) {
+    return Response.json({ url: null }, { status: 429 });
+  }
+
   const url = new URL(request.url);
   const artist = url.searchParams.get("artist")?.trim() ?? "";
   const title = url.searchParams.get("title")?.trim() ?? "";

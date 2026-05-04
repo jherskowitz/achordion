@@ -1,5 +1,6 @@
 import { getArtist, partitionArtistRelations } from "@/lib/clients/musicbrainz";
 import { getArtistImageFromWikidata } from "@/lib/clients/wikidata";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 // Browser cache: 1h fresh, 24h stale-while-revalidate. Wikidata
 // images change rarely; a stale response in flight is fine.
@@ -24,6 +25,11 @@ const CACHE_HEADERS = {
  * the placeholder.
  */
 export async function GET(request: Request) {
+  const limit = await checkRateLimit("image", request);
+  if (!limit.ok) {
+    return Response.json({ url: null }, { status: 429 });
+  }
+
   const url = new URL(request.url);
   const mbid = url.searchParams.get("mbid")?.trim() ?? "";
   const widthRaw = url.searchParams.get("width");
