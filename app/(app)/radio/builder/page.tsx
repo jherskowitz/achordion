@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import { tryGetLbRadio } from "@/lib/clients/listenbrainz";
+import { resolveArtistNamesInPrompt } from "@/lib/lb-radio-prompt";
 import { PageShell } from "@/components/achordion/page-shell";
 import { LbRadioSection } from "@/components/achordion/lb-radio-section";
 import {
@@ -27,7 +28,12 @@ async function StationResults({
   prompt: string;
   mode: RadioMode;
 }) {
-  const result = await tryGetLbRadio(prompt, mode);
+  // LB Radio's `artist:(...)` requires an MBID. Let users paste a
+  // human artist name instead — we MB-search it server-side and
+  // rewrite the prompt before handing it upstream. Pass-through when
+  // every artist chunk is already an MBID.
+  const resolvedPrompt = await resolveArtistNamesInPrompt(prompt);
+  const result = await tryGetLbRadio(resolvedPrompt, mode);
   if (!result.ok) {
     return (
       <div className="border-border/60 bg-card/40 rounded-xl border p-4">
@@ -68,7 +74,7 @@ async function StationResults({
     <LbRadioSection
       seedLabel={prompt}
       tracks={result.tracks}
-      refillUrl={radioRefillUrl(prompt, mode)}
+      refillUrl={radioRefillUrl(resolvedPrompt, mode)}
     />
   );
 }

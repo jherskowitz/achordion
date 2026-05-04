@@ -25,6 +25,11 @@ const PRESETS: PresetExample[] = [
   },
   { label: "Krautrock", prompt: "tag:(krautrock)", mode: "hard" },
   { label: "Cool jazz", prompt: "tag:(cool jazz)", mode: "easy" },
+  // Artist-by-name presets exercise the MB resolution path —
+  // helpful as a discoverability hint, since the placeholder
+  // already mentions `artist:(Alex G)`.
+  { label: "Around Alex G", prompt: "artist:(Alex G)", mode: "easy" },
+  { label: "Around Big Thief", prompt: "artist:(Big Thief)", mode: "medium" },
 ];
 
 function presetHref(p: PresetExample): string {
@@ -68,9 +73,9 @@ export function StationBuilder({
           <p className="text-muted-foreground mt-3 text-xs leading-5">
             What should it play? Try a genre like{" "}
             <code className="bg-muted/70 rounded px-1 py-0.5">tag:(jazz)</code>,
-            an artist by MBID like{" "}
+            an artist by name like{" "}
             <code className="bg-muted/70 rounded px-1 py-0.5">
-              artist:(&lt;mbid&gt;)
+              artist:(Alex G)
             </code>
             , or music from a country like{" "}
             <code className="bg-muted/70 rounded px-1 py-0.5">
@@ -83,7 +88,7 @@ export function StationBuilder({
             name="prompt"
             type="text"
             required
-            placeholder="tag:(shoegaze) or artist:(b95ce3ff-3d05-4e87-9e01-c97b66af13d4)"
+            placeholder="tag:(shoegaze) or artist:(Alex G)"
             defaultValue={prompt}
             className="border-border/60 bg-background placeholder:text-muted-foreground/70 focus:ring-ring/30 mt-3 h-11 w-full rounded-lg border px-3 text-sm outline-none focus:ring-2"
           />
