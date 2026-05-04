@@ -94,7 +94,7 @@ export default async function HomePage() {
           People-Powered Music Discovery
         </h1>
         <p className="text-muted-foreground mt-6 max-w-2xl text-lg leading-7">
-        Music discovery felt a lot more meaningful (and fun) when we weren't all trapped in our own algorithmic bubbles — locked away inside corporate silos. </p>
+        Music discovery felt a lot more meaningful (and fun) when we weren&apos;t all trapped in our own algorithmic bubbles — locked away inside corporate silos. </p>
  <p className="text-muted-foreground mt-6 max-w-2xl text-lg leading-7">Achordion is part of an open community, powered by <Ext href="https://listenbrainz.org">ListenBrainz</Ext>, that puts listeners first — no matter how or where they listen. Connect with like-minded listeners across the globe to discover music that transcends services, platforms, and programming.
         </p>
         <div className="mt-10 flex flex-wrap items-center gap-3">
