@@ -187,21 +187,31 @@ export default function AboutPage() {
 
         <Section title="Your data stays yours">
           <p>
-            <strong>Achordion is stateless.</strong>{" "}
-            It doesn&apos;t see, store, or own your listening data in any
-            way. There&apos;s no Achordion database, no Achordion analytics,
-            no Achordion-side profile of you. When you sign in, Achordion
-            authenticates you against MusicBrainz and then queries your
-            data live from ListenBrainz on each page view — the same way
-            opening listenbrainz.org would.
+            <strong>
+              Achordion doesn&apos;t store your listening data.
+            </strong>{" "}
+            There&apos;s no Achordion-side profile of you, no record of
+            what you&apos;ve played, no record of who you follow — all of
+            that lives in your ListenBrainz account and is queried live
+            on each page view. Sign-in is OAuth against MusicBrainz, the
+            same way opening listenbrainz.org would authenticate you.
+          </p>
+          <p>
+            The only Achordion-side state is operational: a Redis cache
+            that memoizes public ListenBrainz API responses (so we&apos;re
+            polite to MetaBrainz&apos;s servers and pages stay fast),
+            and Vercel&apos;s privacy-focused Web Analytics for
+            aggregate page-view counts. Neither one builds a profile of
+            you, and neither one stores anything you&apos;d consider
+            yours.
           </p>
           <p>
             Your listens, loves, pins, follows, playlists, and stats all
             live in your ListenBrainz account, run by the MetaBrainz
             Foundation. Your identity lives at MusicBrainz. If Achordion
-            disappeared tomorrow, none of your data would go with it —
-            you&apos;d just point a different ListenBrainz client at the
-            same account and pick up where you left off.
+            disappeared tomorrow, none of <em>your</em> data would go
+            with it — you&apos;d just point a different ListenBrainz
+            client at the same account and pick up where you left off.
           </p>
         </Section>
 
