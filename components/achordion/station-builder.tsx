@@ -28,8 +28,8 @@ const PRESETS: PresetExample[] = [
   // Artist-by-name presets exercise the MB resolution path —
   // helpful as a discoverability hint, since the placeholder
   // already mentions `artist:(Alex G)`.
-  { label: "Around Alex G", prompt: "artist:(Alex G)", mode: "easy" },
-  { label: "Around Big Thief", prompt: "artist:(Big Thief)", mode: "medium" },
+  { label: "Alex G", prompt: "artist:(Alex G)", mode: "easy" },
+  { label: "Big Thief", prompt: "artist:(Big Thief)", mode: "medium" },
 ];
 
 function presetHref(p: PresetExample): string {
