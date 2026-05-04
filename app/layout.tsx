@@ -14,13 +14,58 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+// Canonical site origin used to absolutize relative URLs in
+// metadata (OpenGraph images, twitter cards). Override in preview
+// deployments via `NEXT_PUBLIC_SITE_URL`.
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://achordion.xyz";
+
+const SITE_DESCRIPTION =
+  "The independent music community and data layer. An open-source front-end for ListenBrainz with one-click playback through Parachord.";
+
 export const metadata: Metadata = {
+  metadataBase: new URL(SITE_URL),
   title: {
     default: "Achordion",
     template: "%s · Achordion",
   },
-  description:
-    "A modern alternative front-end for ListenBrainz. Browse listens, stats, charts, and recommendations.",
+  description: SITE_DESCRIPTION,
+  applicationName: "Achordion",
+  keywords: [
+    "ListenBrainz",
+    "MusicBrainz",
+    "music",
+    "scrobbling",
+    "music discovery",
+    "open source",
+    "Parachord",
+  ],
+  authors: [{ name: "J Herskowitz", url: "https://github.com/jherskowitz" }],
+  creator: "J Herskowitz",
+  publisher: "J Herskowitz",
+  openGraph: {
+    type: "website",
+    url: SITE_URL,
+    siteName: "Achordion",
+    title: "Achordion",
+    description: SITE_DESCRIPTION,
+    locale: "en_US",
+    // The OG image is generated at request time by
+    // `app/opengraph-image.tsx`; Next auto-injects it into the
+    // openGraph.images list when this metadata is rendered.
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Achordion",
+    description: SITE_DESCRIPTION,
+    creator: "@jherskowitz",
+  },
+  robots: {
+    // Page-level <meta name="robots"> hint. The actual crawler
+    // policy is enforced by `app/robots.ts` + `middleware.ts`
+    // (UA / ASN blocking).
+    index: true,
+    follow: true,
+  },
 };
 
 export default function RootLayout({
