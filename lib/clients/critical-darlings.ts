@@ -121,9 +121,16 @@ function parseRss(xml: string): CriticsPickAlbum[] {
 }
 
 /**
- * Fetch the Critical Darlings RSS feed. Cached for 4 hours (matching
- * Parachord's TTL). Returns [] on any network/parse failure — the
- * caller decides how to render the empty state.
+ * Fetch the Critical Darlings RSS feed. Cached for 12 hours — the
+ * upstream RSS is published throughout the week but practically the
+ * list of "what critics are loving right now" doesn't move fast
+ * enough that mid-day refreshes earn their keep, and the per-card
+ * MB cover lookups (searchReleaseGroups, then `mbFetch`'s 1-req/sec
+ * gate) are expensive on cold revalidation. Two refreshes a day is
+ * enough to keep the surface fresh and friendly to the source feed.
+ *
+ * Returns [] on any network/parse failure — the caller decides how
+ * to render the empty state.
  */
 export async function getCriticalDarlings(): Promise<CriticsPickAlbum[]> {
   try {
@@ -132,7 +139,7 @@ export async function getCriticalDarlings(): Promise<CriticsPickAlbum[]> {
         "User-Agent": "Achordion/0.1 (jherskow@gmail.com)",
         Accept: "application/rss+xml, application/xml, text/xml",
       },
-      next: { revalidate: 60 * 60 * 4, tags: ["critical-darlings"] },
+      next: { revalidate: 60 * 60 * 12, tags: ["critical-darlings"] },
     });
     if (!res.ok) return [];
     const xml = await res.text();
