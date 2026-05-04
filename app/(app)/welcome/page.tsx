@@ -43,9 +43,9 @@ export default async function WelcomePage({ searchParams }: PageProps) {
         </h1>
         <p className="text-muted-foreground mt-2 max-w-2xl text-sm leading-6">
           Hi, <span className="text-foreground">{session.user.mbUsername}</span>{" "}
-          — a couple of minutes of setup will unlock LB Radio embedding,
-          fresh-release filtering, your feed, and listening-along on user
-          profiles. You can always finish later in{" "}
+          — a couple of minutes of setup will unlock ListenBrainz Radio
+          embedding, fresh-release filtering, your feed, and listening-along
+          on user profiles. You can always finish later in{" "}
           <Link
             href="/settings/connections"
             className="text-foreground underline-offset-4 hover:underline"
@@ -67,7 +67,10 @@ export default async function WelcomePage({ searchParams }: PageProps) {
         <Connector filled={step > 1 || tokenConfigured} />
         <StepBubble n={2} active={step === 2} done={step > 2} />
         <Connector filled={step > 2} />
-        <StepBubble n={3} active={step === 3} done={false} />
+        <StepBubble n={3} active={step === 3} done={false} optional />
+        <span className="text-muted-foreground text-xs">
+          (optional)
+        </span>
       </ol>
 
       {step === 1 ? (
@@ -85,10 +88,12 @@ function StepBubble({
   n,
   active,
   done,
+  optional,
 }: {
   n: number;
   active: boolean;
   done: boolean;
+  optional?: boolean;
 }) {
   return (
     <span
@@ -98,7 +103,9 @@ function StepBubble({
           ? "bg-primary text-primary-foreground"
           : active
             ? "border-foreground/40 text-foreground border"
-            : "border-border/60 text-muted-foreground border",
+            : optional
+              ? "border-border/60 border-dashed text-muted-foreground border"
+              : "border-border/60 text-muted-foreground border",
       ].join(" ")}
       aria-current={active ? "step" : undefined}
     >
@@ -127,7 +134,7 @@ function Step1LbToken({ tokenConfigured }: { tokenConfigured: boolean }) {
           Step 1 · Paste your ListenBrainz token
         </h2>
         <p className="text-muted-foreground mt-2 text-sm leading-6">
-          A user token unlocks LB Radio playlists, fresh releases filtered
+          A user token unlocks ListenBrainz Radio playlists, fresh releases filtered
           to your library, and writing actions later (pins, edits). Find
           yours on your{" "}
           <a
@@ -227,12 +234,20 @@ function Step2Services() {
         >
           ← Back
         </Link>
-        <Link
-          href="/welcome?step=3"
-          className="bg-primary text-primary-foreground inline-flex h-9 items-center gap-2 rounded-lg px-4 text-sm font-medium transition-opacity hover:opacity-90"
-        >
-          Next: install Parachord
-        </Link>
+        <div className="flex items-center gap-3">
+          <Link
+            href="/me"
+            className="bg-primary text-primary-foreground inline-flex h-9 items-center gap-2 rounded-lg px-4 text-sm font-medium transition-opacity hover:opacity-90"
+          >
+            Done — take me to Achordion
+          </Link>
+          <Link
+            href="/welcome?step=3"
+            className="text-muted-foreground hover:text-foreground inline-flex h-9 items-center gap-2 text-sm underline-offset-4 hover:underline"
+          >
+            Optional: install Parachord →
+          </Link>
+        </div>
       </div>
     </section>
   );
@@ -242,19 +257,31 @@ function Step3Parachord() {
   return (
     <section className="space-y-6">
       <div className="border-border/60 bg-card/40 overflow-hidden rounded-2xl border p-6">
-        <h2 className="text-lg font-semibold tracking-tight">
-          Step 3 · Install Parachord
-        </h2>
-        <p className="text-muted-foreground mt-2 text-sm leading-6">
-          Achordion is the data layer; Parachord is the player. Every Play
-          button on a track row, album cover, chart entry, and friend&apos;s
-          feed hands a tracklist off via a{" "}
+        <div className="flex flex-wrap items-center gap-2">
+          <h2 className="text-lg font-semibold tracking-tight">
+            Step 3 · Install Parachord
+          </h2>
+          <span className="border-border/60 text-muted-foreground inline-flex items-center rounded-full border border-dashed px-2 py-0.5 text-[11px] font-medium tracking-wide uppercase">
+            Optional
+          </span>
+        </div>
+        <p className="text-foreground mt-3 text-sm leading-6">
+          <strong>This step is completely optional — Achordion works
+          great without it.</strong> Every page, chart, feed, and stat
+          you came here for is fully functional with just steps 1 and 2.
+          Parachord is the icing: install it and every Play button on the
+          site can launch instantly, so you can hear what you&apos;re
+          looking at without leaving the page.
+        </p>
+        <p className="text-muted-foreground mt-3 text-sm leading-6">
+          Under the hood: Achordion is the data layer; Parachord is the
+          player. Every Play button hands a tracklist off via a{" "}
           <code className="bg-muted text-foreground rounded px-1 py-0.5 text-[12px]">
             parachord://
           </code>{" "}
-          deep link — Parachord wakes (if it isn&apos;t running), resolves the
-          tracks against your authorized services, and plays from whichever
-          source ranks highest in your priority order.
+          deep link — Parachord wakes (if it isn&apos;t running), resolves
+          the tracks against your authorized services, and plays from
+          whichever source ranks highest in your priority order.
         </p>
 
         <div className="mt-5 flex flex-wrap items-center gap-3">
