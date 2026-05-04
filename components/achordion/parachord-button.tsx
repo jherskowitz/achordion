@@ -300,7 +300,7 @@ export function PlayOverCover({
  * Two visual states, swapped by `useParachordPresence` (which probes
  * the desktop app's `ws://127.0.0.1:9876` listener):
  *
- *   • CONNECTED — Parachord brand purple `#8b5cf6`, pulsing green
+ *   • CONNECTED — Parachord brand purple `#7c3aed`, pulsing green
  *     status dot, anchor that opens the parachord:// URL. Matches the
  *     button style on go.parachord.com smart-link pages.
  *
@@ -342,7 +342,7 @@ export function ParachordCtaButton({
           sizing,
           className,
         )}
-        style={{ backgroundColor: "#8b5cf6" }}
+        style={{ backgroundColor: "#7c3aed" }}
       >
         <span
           aria-hidden

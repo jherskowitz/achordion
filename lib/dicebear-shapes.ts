@@ -3,7 +3,7 @@
  * editorial palette: deep slates + warm earth tones + cool greens.
  *
  * Why this palette: Achordion's UI is largely monochrome with a single
- * accent — Parachord brand purple (`#8b5cf6`) used on the running-state
+ * accent — Parachord brand purple (`#7c3aed`) used on the running-state
  * Play buttons. If avatars also lived in the violet family they'd
  * compete with the play CTAs and pull the eye away from the primary
  * action. Picking from a non-violet palette keeps avatars visually

@@ -70,7 +70,7 @@ const albumHref = resolvedMbid
 
 Every "Play" surface has two visual states:
 
-- **Connected** → Parachord brand purple `#8b5cf6`, pulsing green status dot on the CTAs, anchor opens the `parachord://` URL.
+- **Connected** → Parachord brand purple `#7c3aed`, pulsing green status dot on the CTAs, anchor opens the `parachord://` URL.
 - **Not connected** → muted `aria-disabled`, no navigation, custom Tooltip pitches *"Parachord isn't running. **Get Parachord →**"*.
 
 Default render is the disconnected state so SSR/hydration agree; the hook flips it once the WS opens.
