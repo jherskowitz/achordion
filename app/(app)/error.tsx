@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState, useTransition } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export default function AppError({
@@ -11,11 +13,38 @@ export default function AppError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  // The browser-side React render is also pending while reset() runs;
+  // track that separately so the spinner stays up across both phases.
+  const [refreshing, setRefreshing] = useState(false);
+
   useEffect(() => {
     console.error(error);
   }, [error]);
 
   const rateLimited = error.digest === "MB_RATE_LIMITED";
+
+  function handleRetry() {
+    // `reset()` alone re-renders the error boundary's children, but
+    // Next's data cache still holds whatever state caused the throw —
+    // so the same upstream call returns the same cached error and the
+    // boundary catches it again with no visible change. `router.refresh()`
+    // invalidates the segment's cached data and re-runs server
+    // components, so the next reset() actually re-fetches.
+    setRefreshing(true);
+    startTransition(() => {
+      router.refresh();
+      reset();
+    });
+    // Clear the spinner after a short floor — the transition finishes
+    // when the new server response paints, and we don't want to leave
+    // the button locked if the new render also errors (the boundary
+    // remounts with `pending=false` anyway, but belt-and-braces).
+    setTimeout(() => setRefreshing(false), 1500);
+  }
+
+  const isRetrying = pending || refreshing;
 
   return (
     <section className="mx-auto flex max-w-2xl flex-col items-start gap-6 px-4 py-24 sm:px-6">
@@ -42,7 +71,16 @@ export default function AppError({
         )}
       </p>
       <div className="flex flex-wrap gap-2">
-        <Button onClick={reset}>Try again</Button>
+        <Button onClick={handleRetry} disabled={isRetrying}>
+          {isRetrying ? (
+            <>
+              <Loader2 className="size-4 animate-spin" />
+              Retrying…
+            </>
+          ) : (
+            "Try again"
+          )}
+        </Button>
         <Button variant="outline" nativeButton={false} render={<Link href="/" />}>
           Back to home
         </Button>
