@@ -1,6 +1,9 @@
 import type { ReactNode } from "react";
 import { PageShell } from "@/components/achordion/page-shell";
-import { SectionTabs, type SectionTab } from "@/components/achordion/section-tabs";
+import {
+  PillSwitch,
+  type PillSwitchTab,
+} from "@/components/achordion/pill-switch";
 
 interface LayoutProps {
   children: ReactNode;
@@ -9,15 +12,20 @@ interface LayoutProps {
 
 export default async function CommunityLayout({ children, params }: LayoutProps) {
   const { name } = await params;
-  const tabs: SectionTab[] = [
+  const tabs: PillSwitchTab[] = [
     { href: `/user/${name}/community/followers`, label: "Followers" },
     { href: `/user/${name}/community/following`, label: "Following" },
   ];
   return (
     <PageShell className="pt-6">
-      {/* Drop the full-width divider; the per-tab underline alone reads
-          as "sub-tabs" against the page header above. */}
-      <SectionTabs tabs={tabs} className="mb-6 border-b-0" />
+      {/* A binary follower/following choice reads cleaner as a pill
+          switch than as full-width underline tabs — it visually says
+          "pick one of two views" rather than "navigate sections." */}
+      <PillSwitch
+        tabs={tabs}
+        ariaLabel="Community view"
+        className="mb-6"
+      />
       {children}
     </PageShell>
   );
