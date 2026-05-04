@@ -53,17 +53,30 @@ export function StationBuilder({
           >
             Station prompt
           </label>
-          <p className="text-muted-foreground mt-1 text-xs leading-5">
-            ListenBrainz Radio takes a small DSL — common building blocks:{" "}
-            <code className="bg-muted/70 rounded px-1 py-0.5">tag:(jazz)</code>,{" "}
+
+          {/* Mode picker sits right under the section header so it
+              reads as a "what kind of station" pre-amble before the
+              user types into the prompt input below.
+              Key on the URL mode so the slider's local state resets
+              when navigating in via a preset chip — useState's
+              initial value only fires on mount, so without the key a
+              preset-driven mode change wouldn't move the slider. */}
+          <div className="mt-3">
+            <RadioModeSlider key={mode} initialMode={mode} />
+          </div>
+
+          <p className="text-muted-foreground mt-3 text-xs leading-5">
+            What should it play? Try a genre like{" "}
+            <code className="bg-muted/70 rounded px-1 py-0.5">tag:(jazz)</code>,
+            an artist by MBID like{" "}
             <code className="bg-muted/70 rounded px-1 py-0.5">
               artist:(&lt;mbid&gt;)
             </code>
-            ,{" "}
+            , or music from a country like{" "}
             <code className="bg-muted/70 rounded px-1 py-0.5">
               country:(spain)
             </code>
-            . Combine with spaces.
+            . Mix them with spaces — or just pick one of the examples below.
           </p>
           <input
             id="prompt"
@@ -75,12 +88,6 @@ export function StationBuilder({
             className="border-border/60 bg-background placeholder:text-muted-foreground/70 focus:ring-ring/30 mt-3 h-11 w-full rounded-lg border px-3 text-sm outline-none focus:ring-2"
           />
         </div>
-
-        {/* Key on the URL mode so the slider's local state resets
-            when the user navigates in via a preset chip — useState's
-            initial value only fires on mount, so without the key a
-            preset-driven mode change wouldn't move the slider. */}
-        <RadioModeSlider key={mode} initialMode={mode} />
 
         <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
           <p className="text-muted-foreground/70 text-xs">
