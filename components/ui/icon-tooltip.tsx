@@ -38,11 +38,20 @@ export function IconTooltip({
   label,
   children,
   side = "bottom",
+  align = "center",
   className,
 }: {
   label: ReactNode;
   children: ReactNode;
   side?: "top" | "bottom";
+  /** Horizontal alignment relative to the trigger.
+   *   "center" — bubble centered on the trigger (default).
+   *   "start"  — bubble's left edge aligns with the trigger's left
+   *              edge. Use when the trigger is near the page's
+   *              left edge.
+   *   "end"    — bubble's right edge aligns with the trigger's right
+   *              edge. Use near the page's right edge. */
+  align?: "center" | "start" | "end";
   className?: string;
 }) {
   return (
@@ -52,8 +61,19 @@ export function IconTooltip({
         role="tooltip"
         aria-hidden
         className={cn(
-          "bg-foreground text-background pointer-events-none absolute left-1/2 z-50 w-max max-w-xs -translate-x-1/2 rounded-md px-2.5 py-1 text-xs font-medium whitespace-nowrap opacity-0 shadow-md transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100",
+          // Base bubble styling. `max-w-[min(20rem,calc(100vw-1rem))]`
+          // caps width at 320px on wide viewports but never wider than
+          // the viewport itself minus a small gutter — so a long label
+          // on a small phone wraps instead of overflowing horizontally.
+          // Long labels also wrap onto multiple lines (no
+          // `whitespace-nowrap`) so even a center-aligned bubble near
+          // the page edge stays inside the viewport.
+          "bg-foreground text-background pointer-events-none absolute z-50 w-max rounded-md px-2.5 py-1 text-xs font-medium opacity-0 shadow-md transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100",
+          "max-w-[min(20rem,calc(100vw-1rem))]",
           side === "bottom" ? "top-[calc(100%+6px)]" : "bottom-[calc(100%+6px)]",
+          align === "center" && "left-1/2 -translate-x-1/2",
+          align === "start" && "left-0",
+          align === "end" && "right-0",
         )}
       >
         {label}
