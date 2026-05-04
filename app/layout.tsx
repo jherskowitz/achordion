@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { Analytics } from "@vercel/analytics/next";
 import { Providers } from "@/components/providers";
 import "./globals.css";
 
@@ -33,6 +34,11 @@ export default function RootLayout({
     >
       <body className="bg-background text-foreground flex min-h-full flex-col">
         <Providers>{children}</Providers>
+        {/* Vercel Web Analytics — privacy-focused (no cookies, no
+            individual tracking, IP-derived geo discarded after
+            aggregation). Edge-injected script only when deployed
+            on Vercel; no-op locally and in self-hosted forks. */}
+        <Analytics />
       </body>
     </html>
   );
