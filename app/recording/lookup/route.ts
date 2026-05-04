@@ -14,7 +14,17 @@ export async function GET(request: Request) {
   const artist = url.searchParams.get("artist")?.trim() ?? "";
   const title = url.searchParams.get("title")?.trim() ?? "";
   if (!artist || !title) {
-    return new Response("Missing artist or title", { status: 400 });
+    // RSC prefetch hits these eagerly — empty params shouldn't 400.
+    // Redirect to /search with whatever we have so the user lands
+    // somewhere useful and the logs stay quiet.
+    const fallback = title || artist;
+    return Response.redirect(
+      new URL(
+        fallback ? `/search?q=${encodeURIComponent(fallback)}` : "/search",
+        request.url,
+      ),
+      302,
+    );
   }
   try {
     const q = `recording:"${title.replace(/"/g, '\\"')}" AND artist:"${artist.replace(/"/g, '\\"')}"`;

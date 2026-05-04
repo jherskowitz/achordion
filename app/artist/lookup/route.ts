@@ -13,7 +13,12 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const name = url.searchParams.get("name")?.trim() ?? "";
   if (!name) {
-    return new Response("Missing name", { status: 400 });
+    // Empty/missing name shouldn't 400 — Next's RSC prefetcher hits
+    // these URLs eagerly when a Link is rendered, and any chart row
+    // with a missing artist credit becomes a 400 in our logs that
+    // nobody can act on. Send the user to /search instead, which is
+    // what they'd want as a fallback anyway.
+    return Response.redirect(new URL("/search", request.url), 302);
   }
   try {
     // Quote the artist name to bias MB's search toward exact-phrase
