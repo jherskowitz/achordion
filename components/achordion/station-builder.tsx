@@ -1,9 +1,6 @@
 import Link from "next/link";
-import {
-  RadioModeSlider,
-  modeLabel,
-  type RadioMode,
-} from "./radio-mode-slider";
+import { modeLabel, type RadioMode } from "@/lib/radio-modes";
+import { RadioModeSlider } from "./radio-mode-slider";
 
 export type { RadioMode };
 

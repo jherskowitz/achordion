@@ -78,7 +78,14 @@ Decorative `Section › ThisPage` crumbs are removed across the app. Don't add t
 
 If a server component (`async function Page(...)`) imports a function that lives in a file marked `"use client"`, Next will throw at runtime: *"Attempted to call X from the server but X is on the client."* Re-exporting the function from the client file doesn't help — Next tags any binding sourced from a client module as client-only.
 
-**Rule:** any pure, side-effect-free helper consumed on **both** sides of the boundary lives in a non-client module under `/lib`. The client component imports it from there too. See `lib/familiarity.ts` (math used by the explore page server component AND `<FamiliaritySlider>`) and `lib/entity-links.ts` (used by every server-rendered list AND every client component).
+**This applies to *every* export, not just functions.** Constants, label-lookup tables, type re-exports, single-line helpers — if it lives in a `"use client"` file, calling it from a server component throws. Don't be fooled into thinking "it's just a string lookup, it'll be fine." It won't.
+
+**Rule:** any pure, side-effect-free helper or constant consumed on **both** sides of the boundary lives in a non-client module under `/lib`. The client component imports it from there too. See:
+- `lib/familiarity.ts` — listen-count thresholds + label helpers used by the explore page server component AND `<FamiliaritySlider>`.
+- `lib/entity-links.ts` — `artistHref`/`recordingHref`/`releaseGroupHref` builders used by every server-rendered list AND every client component.
+- `lib/radio-modes.ts` — LB Radio mode wire-tokens + display labels used by the server-rendered Station Builder preset chips AND the client `<RadioModeSlider>`.
+
+**Forcing-function:** when you build a new client component that exposes a `RadioMode`-style enum, a helper-from-value, or any preset/lookup table, put it in `/lib` from the start — even before you have a second consumer. The day you add a server-side preset chip / link helper / breadcrumb, you'll already be on the right side of the boundary.
 
 ### 9. Cover images always go through `<CoverArt>`, never raw `<Image>`
 
