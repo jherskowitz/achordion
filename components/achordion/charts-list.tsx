@@ -1,6 +1,6 @@
 import Link from "next/link";
-import Image from "next/image";
 import { Play } from "lucide-react";
+import { FadeInImage } from "./fade-in-image";
 import {
   parachordPlayAlbum,
   parachordPlayTrack,
@@ -42,7 +42,7 @@ export function ChartsSongsList({ items }: { items: AppleChartItem[] }) {
             className="group/cover relative shrink-0 overflow-hidden rounded-md"
           >
             {t.artworkUrl ? (
-              <Image
+              <FadeInImage
                 src={t.artworkUrl}
                 alt={t.name}
                 width={48}
@@ -103,12 +103,12 @@ function ChartsAlbumCard({ item }: { item: AppleChartItem }) {
   });
 
   const cover = item.artworkUrl ? (
-    <Image
+    <FadeInImage
       src={item.artworkUrl}
       alt={item.name}
       width={500}
       height={500}
-      className="aspect-square w-full object-cover transition-opacity group-hover:opacity-90"
+      className="aspect-square w-full object-cover group-hover:opacity-90"
       unoptimized
     />
   ) : (

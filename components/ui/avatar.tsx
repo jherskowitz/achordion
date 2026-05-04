@@ -26,11 +26,16 @@ function Avatar({
 }
 
 function AvatarImage({ className, ...props }: AvatarPrimitive.Image.Props) {
+  // Base UI's Avatar.Image only mounts the <img> after the bytes
+  // have actually loaded — so a CSS mount animation here doubles as
+  // a load-complete fade-in. 300ms ease-out matches the fade on
+  // <CoverArt> / <LazyAlbumCover> so all async image swaps across
+  // the app share the same calm motion.
   return (
     <AvatarPrimitive.Image
       data-slot="avatar-image"
       className={cn(
-        "aspect-square size-full rounded-full object-cover",
+        "aspect-square size-full rounded-full object-cover animate-in fade-in duration-300 ease-out",
         className
       )}
       {...props}

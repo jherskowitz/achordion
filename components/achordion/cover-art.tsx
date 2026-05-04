@@ -59,11 +59,19 @@ export function CoverArt({
       : { width: size, height: size };
 
   const [errored, setErrored] = useState(false);
+  // Track the image's load state so we can fade it in once the bytes
+  // arrive. Without this the placeholder → real-image swap is a hard
+  // pixel snap; with it, the image fades in smoothly over 300ms and
+  // transitions between covers (e.g. when LazyTrackCover's lookup
+  // resolves) feel calm rather than flickery.
+  const [loaded, setLoaded] = useState(false);
 
-  // Reset error state when the image source changes (e.g. user switches
-  // album editions or a parent revalidates cache).
+  // Reset error + loaded state when the image source changes (user
+  // switched album editions, parent revalidated cache, lazy lookup
+  // returned a new URL, etc.) so the fade fires again on the new src.
   useEffect(() => {
     setErrored(false);
+    setLoaded(false);
   }, [src]);
 
   if (!src || errored) {
@@ -84,8 +92,14 @@ export function CoverArt({
       width={size}
       height={size}
       unoptimized
+      onLoad={() => setLoaded(true)}
       onError={() => setErrored(true)}
-      className={cn("bg-muted shrink-0 object-cover", radius, className)}
+      className={cn(
+        "bg-muted shrink-0 object-cover transition-opacity duration-300 ease-out",
+        loaded ? "opacity-100" : "opacity-0",
+        radius,
+        className,
+      )}
       style={sizeStyle}
     />
   );

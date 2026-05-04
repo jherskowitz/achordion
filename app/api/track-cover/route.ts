@@ -57,7 +57,7 @@ export async function GET(request: Request) {
   if (!artist || !title)
     // 400 is not cached; missing-arg requests don't make sense to
     // memoize and we want bad callers to fix themselves.
-    return Response.json({ url: null }, { status: 400 });
+    return Response.json({ url: null, mbid: null }, { status: 400 });
 
   // Quote tokens so MB lucene treats them as exact-phrase matches.
   // Otherwise a multi-word artist like "The National" gets OR'd
@@ -70,8 +70,12 @@ export async function GET(request: Request) {
       const results = await searchReleaseGroups(q, 4);
       const top = results.find((r) => r["primary-type"] === "Album") ?? results[0];
       if (top?.id) {
+        // Surface the resolved release-group MBID alongside the URL.
+        // Callers (chart cards) use it to swap their `href` from a
+        // /release-group/lookup fallback to a direct
+        // /release-group/<mbid> link once the cover resolves.
         return Response.json(
-          { url: caaReleaseGroupUrl(top.id, 250) },
+          { url: caaReleaseGroupUrl(top.id, 250), mbid: top.id },
           { headers: CACHE_HEADERS },
         );
       }
@@ -89,10 +93,19 @@ export async function GET(request: Request) {
       // Recording search response doesn't include release info via
       // our schema; would need a follow-up getRecording per hit.
       // Skip rather than blow the rate limit on a low-success path.
-      return Response.json({ url: null }, { headers: CACHE_HEADERS });
+      return Response.json(
+        { url: null, mbid: null },
+        { headers: CACHE_HEADERS },
+      );
     }
-    return Response.json({ url: null }, { headers: CACHE_HEADERS });
+    return Response.json(
+      { url: null, mbid: null },
+      { headers: CACHE_HEADERS },
+    );
   } catch {
-    return Response.json({ url: null }, { headers: CACHE_HEADERS });
+    return Response.json(
+      { url: null, mbid: null },
+      { headers: CACHE_HEADERS },
+    );
   }
 }
