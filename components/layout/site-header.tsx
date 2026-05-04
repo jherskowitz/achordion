@@ -33,13 +33,29 @@ export async function SiteHeader() {
   // Items that live in the desktop header trailing region as icon
   // buttons (search) or via the avatar (settings) — but mobile only
   // has the hamburger sheet, so they need a labeled row in there too.
+  // Icons are pre-rendered as elements (not component refs) so this
+  // server component can pass them across the RSC boundary into MainNav
+  // (a client component) without React complaining about non-plain
+  // objects.
   const mobileExtras: MobileExtraItem[] = [
-    { href: "/search", label: "Search", icon: Search },
+    {
+      href: "/search",
+      label: "Search",
+      icon: <Search className="size-4 shrink-0" />,
+    },
   ];
   if (username) {
-    mobileExtras.push({ href: "/settings", label: "Settings", icon: Settings });
+    mobileExtras.push({
+      href: "/settings",
+      label: "Settings",
+      icon: <Settings className="size-4 shrink-0" />,
+    });
   } else {
-    mobileExtras.push({ href: "/login", label: "Sign In", icon: LogIn });
+    mobileExtras.push({
+      href: "/login",
+      label: "Sign In",
+      icon: <LogIn className="size-4 shrink-0" />,
+    });
   }
 
   return (

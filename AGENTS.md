@@ -121,6 +121,23 @@ The fix is to split the file: pure helpers stay client-safe (`lib/foo.ts`), serv
 
 If you find yourself adding `import "server-only"` to a module that already exports a pure helper, that's the signal to split.
 
+**Props from server → client must be plain serializable values, not component references.** When a server component (`<SiteHeader>`, any `async` page) passes data into a client component (`<MainNav>`, `<RadioModeSlider>`), every prop crosses the RSC serialization boundary. **Plain JSON-ish data is fine; React elements (already-rendered JSX like `<Search />`) are fine; *component classes / function refs are not*.** Passing a Lucide icon as `icon: Search` will throw at runtime:
+
+> *Only plain objects can be passed to Client Components from Server Components. Classes or other objects with methods are not supported.*  
+> `{href: "/search", icon: {$$typeof: ..., render: ...}}`
+
+**Fix:** pre-render the element on the server side and pass *the element*. The prop type is `React.ReactNode`, not `LucideIcon` / `ComponentType`.
+
+```tsx
+// ❌ Server passes a component class — breaks serialization
+<MainNav extras={[{ label: "Search", icon: Search }]} />
+
+// ✅ Server pre-renders the JSX; element serializes fine
+<MainNav extras={[{ label: "Search", icon: <Search className="size-4" /> }]} />
+```
+
+Same rule applies to function props (callbacks), Map/Set instances, Date objects with custom prototypes, and class instances — none of those cross. Strings, numbers, plain objects, arrays, and JSX elements do.
+
 ### 9. Cover images always go through `<CoverArt>`, never raw `<Image>`
 
 `<CoverArt>` has built-in `onError` swap-to-`Disc3`-placeholder, so a 404 from Cover Art Archive (which is *common* for older / niche releases) never paints the browser's broken-image glyph + alt text. Even when you have a known-good URL, use `<CoverArt>` — the consistency means a downstream API regression doesn't surface as broken images on your page.

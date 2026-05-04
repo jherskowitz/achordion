@@ -4,7 +4,6 @@ import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Menu } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -44,7 +43,11 @@ export interface MainNavItem {
 export interface MobileExtraItem {
   href: string;
   label: string;
-  icon?: LucideIcon;
+  /** Pre-rendered icon element (e.g., `<Search className="size-4 shrink-0" />`).
+   *  Passed as a serialized React element so this client component
+   *  doesn't have to import a non-serializable component reference
+   *  across the RSC boundary. */
+  icon?: React.ReactNode;
 }
 
 export function MainNav({
@@ -152,7 +155,6 @@ export function MainNav({
                   const isActive =
                     pathname === item.href ||
                     pathname.startsWith(`${item.href}/`);
-                  const Icon = item.icon;
                   return (
                     <Link
                       key={item.href}
@@ -167,7 +169,7 @@ export function MainNav({
                           : "text-muted-foreground hover:bg-muted hover:text-foreground",
                       )}
                     >
-                      {Icon && <Icon className="size-4 shrink-0" />}
+                      {item.icon}
                       {item.label}
                     </Link>
                   );
