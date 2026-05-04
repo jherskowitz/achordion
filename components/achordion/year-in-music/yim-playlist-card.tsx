@@ -34,7 +34,7 @@ export function YimPlaylistCard({
   const inner = (
     <>
       <div className="flex items-baseline justify-between gap-2">
-        <h3 className="text-foreground truncate text-base font-medium">
+        <h3 className="text-foreground min-w-0 flex-1 truncate text-base font-medium">
           {playlist.title ?? "Untitled playlist"}
         </h3>
         {badge && (

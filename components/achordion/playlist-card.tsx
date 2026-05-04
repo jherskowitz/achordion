@@ -56,7 +56,7 @@ export function PlaylistCard({
   const body = (
     <div className="min-w-0 flex-1">
       <div className="flex items-baseline justify-between gap-2">
-        <h3 className="text-foreground truncate text-base font-medium">
+        <h3 className="text-foreground min-w-0 flex-1 truncate text-base font-medium">
           {p.title}
         </h3>
         {ext?.public === false ? (
@@ -78,7 +78,7 @@ export function PlaylistCard({
         )}
       </div>
       {(showCreator || dateStr || algoSource || isCollab) && (
-        <p className="text-muted-foreground mt-1 inline-flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs">
+        <p className="text-muted-foreground mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs">
           {algoSource && (
             <span className="bg-foreground/10 text-foreground/80 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] tracking-wide uppercase">
               <Sparkles className="size-2.5" />
