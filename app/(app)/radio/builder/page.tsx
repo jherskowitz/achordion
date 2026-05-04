@@ -120,7 +120,13 @@ export default async function StationBuilderPage({ searchParams }: PageProps) {
       <StationBuilder prompt={prompt} mode={mode} />
 
       {hasPrompt && (
-        <section className="mt-10">
+        // `id` matches the form's action hash + presetHref's hash so
+        // the browser auto-scrolls past the form on submit / preset
+        // click — the station list was rendering below the fold and
+        // users had to scroll to find what they'd just built.
+        // `scroll-mt-6` keeps a little breathing room above the heading
+        // so it doesn't sit flush with the top of the viewport.
+        <section id="station-results" className="mt-10 scroll-mt-6">
           <h2 className="mb-3 text-sm font-semibold tracking-wide uppercase">
             Your station
           </h2>

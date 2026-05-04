@@ -51,7 +51,10 @@ const PRESETS: PresetExample[] = [
 
 function presetHref(p: PresetExample): string {
   const params = new URLSearchParams({ prompt: p.prompt, mode: p.mode });
-  return `/radio/builder?${params}`;
+  // Anchor to the results section so a preset click scrolls past
+  // the form to show the new station immediately. Same hash the
+  // form's action uses on submit.
+  return `/radio/builder?${params}#station-results`;
 }
 
 export function StationBuilder({
@@ -64,7 +67,7 @@ export function StationBuilder({
   return (
     <section className="space-y-6">
       <form
-        action="/radio/builder"
+        action="/radio/builder#station-results"
         method="get"
         className="border-border/60 bg-card/40 space-y-4 rounded-2xl border p-5"
       >
