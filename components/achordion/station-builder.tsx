@@ -1,6 +1,23 @@
 import Link from "next/link";
+import { Globe, Tag, User } from "lucide-react";
 import { modeLabel, type RadioMode } from "@/lib/radio-modes";
 import { RadioModeSlider } from "./radio-mode-slider";
+
+/** Best-effort classification of a preset prompt for the chip icon.
+ *  When a prompt mixes kinds (e.g. `country:(spain) tag:(indie)`),
+ *  pick the most specific signal — artist beats country beats tag —
+ *  so the icon matches the dimension that *defines* the station. */
+type PresetKind = "artist" | "country" | "tag";
+function presetKind(prompt: string): PresetKind {
+  if (/\bartist:\(/i.test(prompt)) return "artist";
+  if (/\bcountry:\(/i.test(prompt)) return "country";
+  return "tag";
+}
+
+function PresetIcon({ kind }: { kind: PresetKind }) {
+  const Icon = kind === "artist" ? User : kind === "country" ? Globe : Tag;
+  return <Icon className="text-muted-foreground/80 size-3 shrink-0" />;
+}
 
 export type { RadioMode };
 
@@ -117,8 +134,9 @@ export function StationBuilder({
             <li key={`${p.prompt}-${p.mode}`}>
               <Link
                 href={presetHref(p)}
-                className="border-border/60 hover:border-foreground/40 hover:bg-muted/40 inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs transition-colors"
+                className="border-border/60 hover:border-foreground/40 hover:bg-muted/40 inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs transition-colors"
               >
+                <PresetIcon kind={presetKind(p.prompt)} />
                 <span className="text-foreground">{p.label}</span>
                 <span className="text-muted-foreground/70 hidden sm:inline">
                   · {modeLabel(p.mode)}
