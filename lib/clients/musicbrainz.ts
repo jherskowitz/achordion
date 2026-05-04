@@ -658,13 +658,28 @@ const ArtistSearchSchema = z.object({
   count: z.number().optional(),
 });
 
+/**
+ * Lower-case + trim + collapse internal whitespace. Applied to the
+ * search-query string before it becomes part of the path that `mbFetch`
+ * uses as its cache key. MB Lucene queries are already case-insensitive
+ * server-side, so two queries that differ only in case or whitespace
+ * return the same data — without this normalization they each hash to
+ * a distinct cache entry, fragmenting the cache and giving an attacker
+ * a cheap way to inflate it. Pure cosmetic correctness, not a security
+ * fix on its own, but it removes a minor abuse vector.
+ */
+function normalizeSearchQuery(query: string): string {
+  return query.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
 export async function searchArtists(query: string, limit = 8) {
-  if (!query.trim()) return [];
-  const params = new URLSearchParams({ query, limit: String(limit) });
+  const q = normalizeSearchQuery(query);
+  if (!q) return [];
+  const params = new URLSearchParams({ query: q, limit: String(limit) });
   const result = await mbFetch(
     `/artist?${params}`,
     ArtistSearchSchema,
-    { revalidate: 60 * 60, tags: [cacheTagsMB.search(query)] },
+    { revalidate: 60 * 60, tags: [cacheTagsMB.search(q)] },
   );
   return result.artists;
 }
@@ -691,8 +706,9 @@ const ReleaseGroupSearchSchema = z.object({
 });
 
 export async function searchReleaseGroups(query: string, limit = 8) {
-  if (!query.trim()) return [];
-  const params = new URLSearchParams({ query, limit: String(limit) });
+  const q = normalizeSearchQuery(query);
+  if (!q) return [];
+  const params = new URLSearchParams({ query: q, limit: String(limit) });
   const result = await mbFetch(
     `/release-group?${params}`,
     ReleaseGroupSearchSchema,
@@ -726,8 +742,9 @@ const RecordingSearchSchema = z.object({
  * (artist, title) pair to a recording MBID at click time.
  */
 export async function searchRecordings(query: string, limit = 8) {
-  if (!query.trim()) return [];
-  const params = new URLSearchParams({ query, limit: String(limit) });
+  const q = normalizeSearchQuery(query);
+  if (!q) return [];
+  const params = new URLSearchParams({ query: q, limit: String(limit) });
   const result = await mbFetch(`/recording?${params}`, RecordingSearchSchema, {
     revalidate: 60 * 60,
   });

@@ -14,6 +14,7 @@ import {
   releaseGroupHref,
 } from "@/lib/entity-links";
 import { stripHtml } from "@/lib/strip-html";
+import { safeHttpUrl } from "@/components/achordion/external-links";
 import { PageShell } from "@/components/achordion/page-shell";
 import { Breadcrumbs } from "@/components/achordion/breadcrumbs";
 import { CoverArt } from "@/components/achordion/cover-art";
@@ -258,17 +259,21 @@ async function PlaylistBody({ mbid }: { mbid: string }) {
                 creator={data.creator ?? "ListenBrainz"}
               />
             )}
-            {data.externalUrls?.spotify && (
-              <a
-                href={data.externalUrls.spotify}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-xs underline-offset-4 hover:underline"
-              >
-                Open on Spotify
-                <ExternalLink className="size-3" />
-              </a>
-            )}
+            {(() => {
+              const spotifyHref = safeHttpUrl(data.externalUrls?.spotify);
+              if (!spotifyHref) return null;
+              return (
+                <a
+                  href={spotifyHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-xs underline-offset-4 hover:underline"
+                >
+                  Open on Spotify
+                  <ExternalLink className="size-3" />
+                </a>
+              );
+            })()}
             {data.tracks.length > 0 && (
               <a
                 href={`/api/playlist/${mbid}/xspf`}

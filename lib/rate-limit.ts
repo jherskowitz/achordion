@@ -42,11 +42,30 @@ const imageLimiter = makeLimiter("ip:image", 60, "60 s");
 // the first minute, which is the actual goal.
 const pageLimiter = makeLimiter("ip:page", 120, "60 s");
 
-/** Best-effort client-IP extraction from forwarded headers. */
+/**
+ * Client-IP extraction for rate-limit keying. Hardened against
+ * spoofing.
+ *
+ * **Why we don't read `X-Forwarded-For`'s leftmost value.** XFF is
+ * appended to by every hop on the way in. The leftmost entry is whatever
+ * the *original client* set — which means a hostile client can write
+ * `X-Forwarded-For: <random>` and bypass the limiter on every request.
+ * On Vercel the trusted source is the platform-injected `x-real-ip`
+ * header; fall back to the rightmost XFF entry (the closest trusted
+ * hop) when `x-real-ip` is missing (local dev, non-Vercel runtime).
+ */
 export function getClientIp(request: Request): string {
+  const realIp = request.headers.get("x-real-ip");
+  if (realIp) return realIp.trim();
   const fwd = request.headers.get("x-forwarded-for");
-  if (fwd) return fwd.split(",")[0]?.trim() ?? "unknown";
-  return request.headers.get("x-real-ip") ?? "unknown";
+  if (fwd) {
+    // Rightmost entry = closest trusted hop. Defensive even on non-
+    // Vercel runtimes where this is best-effort either way.
+    const parts = fwd.split(",");
+    const last = parts[parts.length - 1]?.trim();
+    if (last) return last;
+  }
+  return "unknown";
 }
 
 /**

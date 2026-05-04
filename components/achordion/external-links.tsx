@@ -100,9 +100,37 @@ function isDeadHost(url: string): boolean {
  *
  * Returns the original URL on parse failure.
  */
-export function normalizeStreamingUrl(url: string): string {
+/**
+ * Returns the URL only if it parses AND uses an `http(s):` scheme.
+ * `null` for anything else (`javascript:`, `data:`, `file:`, malformed,
+ * empty). Use this anywhere a URL from third-party data (MusicBrainz
+ * url-rels, ListenBrainz playlists, Wikipedia) becomes an `href`.
+ *
+ * MB editor input is *mostly* trustworthy but the schema only enforces
+ * `z.string()` — without this guard, a malicious `javascript:alert(1)`
+ * URL on an MB entity would render as a clickable XSS link in
+ * Achordion's UI.
+ */
+export function safeHttpUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
   try {
     const u = new URL(url);
+    if (u.protocol !== "http:" && u.protocol !== "https:") return null;
+    return u.toString();
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Normalize a streaming-service URL for the user's storefront, then
+ * scheme-validate. Returns `null` for any non-`http(s):` URL or parse
+ * failure — callers MUST handle null (skip the link entirely).
+ */
+export function normalizeStreamingUrl(url: string): string | null {
+  try {
+    const u = new URL(url);
+    if (u.protocol !== "http:" && u.protocol !== "https:") return null;
     const host = u.hostname.toLowerCase();
     if (host === "music.apple.com" || host === "itunes.apple.com") {
       const seg = u.pathname.split("/").filter(Boolean);
@@ -115,7 +143,7 @@ export function normalizeStreamingUrl(url: string): string {
     }
     return u.toString();
   } catch {
-    return url;
+    return null;
   }
 }
 
@@ -336,7 +364,11 @@ export function ExternalLinks({
   const seen = new Map<string, ArtistExternalLink>();
   for (const l of links) {
     if (isDeadHost(l.url)) continue;
+    // Drop unsafe-scheme URLs (javascript:, data:, etc.) at the dedup
+    // step so they never reach render. `key` doubles as both the
+    // dedup key and the safety gate.
     const key = normalizeStreamingUrl(l.url);
+    if (key === null) continue;
     if (!seen.has(key)) seen.set(key, l);
   }
   const deduped = Array.from(seen.values());
@@ -360,8 +392,11 @@ export function ExternalLinks({
         const src = faviconUrl(link.url);
         // Render the country-stripped URL so Apple Music / iTunes /
         // Spotify auto-route to the user's storefront instead of the
-        // one MB's editor happened to use.
+        // one MB's editor happened to use. Already non-null here —
+        // unsafe schemes were filtered out in the dedup loop above —
+        // but assert to satisfy the type and stay defensive.
         const href = normalizeStreamingUrl(link.url);
+        if (href === null) return null;
         return (
           // CSS-only IconTooltip — pure styling sibling, no Radix
           // slot chain, no hydration round-trip. See

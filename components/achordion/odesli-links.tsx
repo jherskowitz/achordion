@@ -119,6 +119,9 @@ function FaviconLink({
   // scoped to the userCountry we ask for; stripping the segment lets
   // those URLs work for users elsewhere too.
   const href = normalizeStreamingUrl(url);
+  // `null` for unsafe schemes (javascript:, data:, …) or parse
+  // failure — Odesli is well-behaved but the data is third-party.
+  if (href === null) return null;
   return (
     <li>
       <IconTooltip label={label}>
