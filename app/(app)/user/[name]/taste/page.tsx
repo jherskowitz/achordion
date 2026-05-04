@@ -11,7 +11,6 @@ import { parachordPlayTrack } from "@/lib/parachord";
 import { ComingSoon } from "@/components/achordion/coming-soon";
 import { CoverArt } from "@/components/achordion/cover-art";
 import { PageShell } from "@/components/achordion/page-shell";
-import { ParachordPlayButton } from "@/components/achordion/parachord-button";
 import {
   artistHref,
   recordingHref,
@@ -207,7 +206,6 @@ async function LovesBody({ name }: { name: string }) {
                   )}
                 </p>
               </div>
-              <ParachordPlayButton href={playHref} />
               <time
                 dateTime={new Date(t.lovedAt * 1000).toISOString()}
                 className="text-muted-foreground/70 shrink-0 tabular-nums text-xs"

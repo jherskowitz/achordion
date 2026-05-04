@@ -8,6 +8,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { CoverArt } from "./cover-art";
 
 /** Where to direct users who don't have Parachord installed yet. */
 const PARACHORD_HOMEPAGE = "https://parachord.com";
@@ -183,6 +184,112 @@ export function PlayOverNumberCell({
       </span>
       {playOverlay}
     </span>
+  );
+}
+
+/**
+ * Cover-art tile that doubles as the row's play affordance.
+ *
+ * Replaces the right-side trailing `<ParachordPlayButton>` on row-
+ * style track lists where there's a small album cover but no track
+ * number. On hover the cover gets a dark scrim with a centered play
+ * glyph; click sends the track to Parachord. Same two-state contract
+ * as the rest of the play family (`useParachordPresence` swaps in a
+ * disabled muted state with the "Get Parachord" tooltip).
+ *
+ * Pass the same `src` / `alt` you'd pass to `<CoverArt>`. Sizing is
+ * controlled by the wrapper's class via `containerClassName`
+ * (e.g. `"size-12"`) — defaults to a 48px tile that matches the row
+ * conventions in the recent-listens / radio-rewind / loved-tracks
+ * lists.
+ */
+export function PlayOverCover({
+  src,
+  alt,
+  playHref,
+  label = "Play in Parachord",
+  containerClassName,
+  rounded = "md",
+}: {
+  src: string | null;
+  alt: string;
+  playHref: string;
+  label?: string;
+  containerClassName?: string;
+  rounded?: "none" | "sm" | "md";
+}) {
+  const running = useParachordPresence();
+
+  // Inner cover + scrim, identical for both states. Only the wrapper
+  // element differs (anchor vs. disabled span).
+  const inner = (
+    <>
+      <CoverArt src={src} alt={alt} size={48} rounded={rounded} />
+      <span
+        aria-hidden
+        className={cn(
+          "absolute inset-0 flex items-center justify-center bg-black/45 opacity-0 transition-opacity",
+          "group-hover/cover:opacity-100 group-focus-within/cover:opacity-100",
+          rounded === "sm"
+            ? "rounded-sm"
+            : rounded === "md"
+              ? "rounded-md"
+              : "",
+        )}
+      >
+        <Play className="size-4 fill-current text-white" />
+      </span>
+    </>
+  );
+
+  if (running) {
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <a
+            href={playHref}
+            aria-label={label}
+            className={cn(
+              "group/cover relative block size-12 shrink-0 overflow-hidden",
+              rounded === "sm"
+                ? "rounded-sm"
+                : rounded === "md"
+                  ? "rounded-md"
+                  : "",
+              containerClassName,
+            )}
+          >
+            {inner}
+          </a>
+        </TooltipTrigger>
+        <TooltipContent>{label}</TooltipContent>
+      </Tooltip>
+    );
+  }
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span
+          role="button"
+          aria-disabled="true"
+          aria-label={label}
+          tabIndex={0}
+          className={cn(
+            "group/cover relative inline-block size-12 shrink-0 cursor-not-allowed overflow-hidden",
+            rounded === "sm"
+              ? "rounded-sm"
+              : rounded === "md"
+                ? "rounded-md"
+                : "",
+            containerClassName,
+          )}
+        >
+          {inner}
+        </span>
+      </TooltipTrigger>
+      <GetParachordTooltipContent />
+    </Tooltip>
   );
 }
 

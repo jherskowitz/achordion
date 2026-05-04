@@ -7,7 +7,6 @@ import { parachordPlayTrack } from "@/lib/parachord";
 import { LazyTrackCover } from "@/components/achordion/lazy-track-cover";
 import { OpenInParachordButton } from "@/components/achordion/open-in-parachord-button";
 import { PageShell } from "@/components/achordion/page-shell";
-import { ParachordPlayButton } from "@/components/achordion/parachord-button";
 
 // User asked for "refreshes on each load" — opt every render of this
 // route into dynamic mode, even with future caching changes upstream.
@@ -198,12 +197,6 @@ export default async function RewindStationPage({ params }: PageProps) {
                     )}
                   </p>
                 </div>
-                <ParachordPlayButton
-                  href={parachordPlayTrack({
-                    artist: t.creator,
-                    title: t.title,
-                  })}
-                />
               </li>
             );
           })}

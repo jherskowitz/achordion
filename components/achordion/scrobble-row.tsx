@@ -1,9 +1,8 @@
 import Link from "next/link";
-import { CoverArt } from "./cover-art";
 import { caaUrlFromListen } from "@/lib/clients/coverart";
 import type { Listen } from "@/lib/clients/listenbrainz";
 import { parachordPlayTrack } from "@/lib/parachord";
-import { ParachordPlayButton } from "./parachord-button";
+import { PlayOverCover } from "./parachord-button";
 import {
   artistHref,
   recordingHref,
@@ -45,7 +44,15 @@ export function ScrobbleRow({
 
   return (
     <li className="border-border/60 group flex items-center gap-3 border-b py-3 last:border-b-0">
-      <CoverArt src={cover} alt={meta.release_name ?? meta.track_name} size={48} />
+      <PlayOverCover
+        src={cover}
+        alt={meta.release_name ?? meta.track_name}
+        playHref={parachordPlayTrack({
+          artist: meta.artist_name,
+          title: meta.track_name,
+        })}
+        label={`Play "${meta.track_name}" by ${meta.artist_name} in Parachord`}
+      />
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium">
           <Link
@@ -94,12 +101,6 @@ export function ScrobbleRow({
           )}
         </p>
       </div>
-      <ParachordPlayButton
-        href={parachordPlayTrack({
-          artist: meta.artist_name,
-          title: meta.track_name,
-        })}
-      />
       {showRelative && (
         <time
           dateTime={new Date(listen.listened_at * 1000).toISOString()}
