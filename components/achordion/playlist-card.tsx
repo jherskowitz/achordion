@@ -109,7 +109,12 @@ export function PlaylistCard({
   );
 
   const inner = showMosaic ? (
-    <div className="flex gap-3">
+    // Outer flex needs `min-w-0` itself so it can shrink below its
+    // intrinsic content width inside whatever grid / flex parent is
+    // sizing the card — without this, a long title can push the
+    // card beyond its column on mobile even though the H3 has its
+    // own min-w-0 + truncate.
+    <div className="flex min-w-0 gap-3">
       <PlaylistCoverMosaic tracks={tracks} size={64} alt={p.title} />
       {body}
     </div>
@@ -117,9 +122,14 @@ export function PlaylistCard({
     body
   );
 
+  // `overflow-hidden` is the belt-and-suspenders cap on the card —
+  // if anything inside still tries to overflow horizontally, it gets
+  // visually clipped at the card boundary instead of pushing the
+  // card past its column on small screens.
   const cardClass =
-    "border-border/60 hover:border-foreground/30 hover:bg-muted/30 block rounded-xl border px-4 py-3 transition-colors";
-  const cardClassStatic = "border-border/60 rounded-xl border px-4 py-3";
+    "border-border/60 hover:border-foreground/30 hover:bg-muted/30 block overflow-hidden rounded-xl border px-4 py-3 transition-colors";
+  const cardClassStatic =
+    "border-border/60 overflow-hidden rounded-xl border px-4 py-3";
 
   return mbid ? (
     <Link href={`/playlist/${mbid}`} className={cardClass}>

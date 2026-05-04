@@ -57,9 +57,13 @@ export function YimPlaylistCard({
     </>
   );
 
+  // `overflow-hidden` clips any inner overflow to the card boundary
+  // so a long title never pushes the card past its column on
+  // mobile.
   const cardClass =
-    "border-border/60 hover:border-foreground/30 hover:bg-muted/30 block rounded-xl border px-4 py-3 transition-colors";
-  const cardClassStatic = "border-border/60 rounded-xl border px-4 py-3";
+    "border-border/60 hover:border-foreground/30 hover:bg-muted/30 block overflow-hidden rounded-xl border px-4 py-3 transition-colors";
+  const cardClassStatic =
+    "border-border/60 overflow-hidden rounded-xl border px-4 py-3";
 
   return mbid ? (
     <Link href={`/playlist/${mbid}`} className={cardClass}>
