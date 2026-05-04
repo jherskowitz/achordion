@@ -215,6 +215,28 @@ export default function AboutPage() {
           </p>
         </Section>
 
+        <Section title="A note on bots">
+          <p>
+            Achordion blocks AI training crawlers — GPTBot, ClaudeBot,
+            CCBot, PerplexityBot, Applebot-Extended, Google-Extended,
+            and friends — from walking our catalog routes. Partly to
+            keep the site healthy under crawler load, partly because
+            piping community-contributed listening data into a training
+            set without attribution isn&apos;t the spirit this project
+            was built on. Datacenter and proxy ASNs are blocked at the
+            edge, per-IP rate limits cap any one client at a few
+            requests per second, and our{" "}
+            <Out href="https://github.com/jherskowitz/achordion/blob/main/app/robots.ts">
+              robots.ts
+            </Out>
+            {" "}+{" "}
+            <Out href="https://github.com/jherskowitz/achordion/blob/main/middleware.ts">
+              middleware.ts
+            </Out>
+            {" "}are auditable in the public repo.
+          </p>
+        </Section>
+
         <Section title="Multi-source playback through one click">
           <p>
             Parachord aggregates playback across{" "}
