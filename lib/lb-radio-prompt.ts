@@ -1,57 +1,59 @@
-import { searchArtists } from "./clients/musicbrainz";
-
 /**
- * LB Radio's prompt syntax requires `artist:(...)` to take an MBID.
- * We let users type a name instead — `artist:(Alex G)` — and resolve
- * it to an MBID via MusicBrainz search before sending the prompt
- * upstream.
+ * Pure helpers for working with LB Radio prompt strings. No external
+ * dependencies — safe to import from server components, client
+ * components, route handlers, anywhere.
  *
- * Resolution is best-effort: if MB doesn't find a match, the chunk
- * is left as-is and LB Radio will emit a "no tracks" / parse error
- * the StationResults component already handles.
+ * Server-side artist-name → MBID resolution lives in a sibling
+ * module (`lb-radio-prompt-server.ts`) because that path imports
+ * `lib/clients/musicbrainz.ts`, which is `server-only`. Pulling the
+ * resolver in transitively from a client component compiles the
+ * server-only chain into the browser bundle and Next blows up.
  *
- * Returns the rewritten prompt. Safe to call when no `artist:(...)`
- * chunks are present (returns the input unchanged) or when all
- * chunks are already MBIDs (same — no MB calls fire).
+ * Rule of thumb (mirrors AGENTS.md #8): any helper consumed on both
+ * sides of the server/client boundary lives in a module that only
+ * imports other client-safe modules. Server-only deps stay in
+ * `*-server.ts` siblings.
  */
 
-const MBID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const ARTIST_CHUNK_RE = /artist:\(([^)]+)\)/gi;
+const ANY_CHUNK_RE = /(\w+):\(([^)]+)\)/gi;
 
-export async function resolveArtistNamesInPrompt(prompt: string): Promise<string> {
-  // Collect unique names that need resolution. Skip empty `()` and
-  // anything that's already an MBID.
-  const names = new Set<string>();
-  for (const m of prompt.matchAll(ARTIST_CHUNK_RE)) {
-    const inside = m[1]?.trim();
-    if (!inside || MBID_RE.test(inside)) continue;
-    names.add(inside);
+/**
+ * Turn an LB Radio prompt into a friendly display string for chips,
+ * headers, and tooltips. Examples:
+ *
+ *   "artist:(Big Thief)"            → "Big Thief"
+ *   "tag:(shoegaze)"                → "Shoegaze"
+ *   "country:(spain)"               → "Spain"
+ *   "tag:(dream pop, ambient)"      → "Dream pop, Ambient"
+ *   "country:(spain) tag:(indie)"   → "Spain · Indie"
+ *   "artist:(<mbid>)"               → "<mbid>"  (pass-through)
+ *
+ * For tag and country chunks, comma-separated items are split and
+ * each piece is title-cased. Artist chunks pass through verbatim
+ * since the user typed the canonical name.
+ *
+ * Returns the original prompt unchanged when no `kind:(...)` chunks
+ * match, so freeform inputs degrade gracefully.
+ */
+export function prettifyPrompt(prompt: string): string {
+  const parts: string[] = [];
+  for (const m of prompt.matchAll(ANY_CHUNK_RE)) {
+    const kind = m[1]?.toLowerCase();
+    const inside = m[2]?.trim();
+    if (!inside) continue;
+    if (kind === "artist") {
+      // Pass the user's typed name through verbatim. If they pasted
+      // an MBID, that lands here too — rare enough that prettifying
+      // it isn't worth the lookup round-trip.
+      parts.push(inside);
+    } else {
+      const items = inside
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .map((s) => s.charAt(0).toUpperCase() + s.slice(1));
+      parts.push(items.join(", "));
+    }
   }
-  if (names.size === 0) return prompt;
-
-  // Resolve in parallel — each searchArtists call is its own
-  // mb-rate-limited fetch, so parallelizing buys nothing on cold
-  // cache, but warm hits return immediately.
-  const resolved = new Map<string, string>();
-  await Promise.all(
-    [...names].map(async (name) => {
-      try {
-        const results = await searchArtists(name, 1);
-        if (results[0]?.id) resolved.set(name, results[0].id);
-      } catch {
-        // Silent — fall through to unresolved chunk in the rewrite.
-      }
-    }),
-  );
-
-  // Rewrite each chunk. Pass through MBID-shaped chunks and any
-  // names we couldn't resolve, so a partial failure doesn't lose the
-  // user's intent — they'll see whichever surface (LB Radio error,
-  // page-level "no tracks" message) is most informative.
-  return prompt.replace(ARTIST_CHUNK_RE, (full, inside: string) => {
-    const trimmed = inside.trim();
-    if (!trimmed || MBID_RE.test(trimmed)) return full;
-    const mbid = resolved.get(trimmed);
-    return mbid ? `artist:(${mbid})` : full;
-  });
+  return parts.length > 0 ? parts.join(" · ") : prompt;
 }

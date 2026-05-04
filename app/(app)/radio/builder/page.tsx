@@ -1,8 +1,13 @@
 import { Suspense } from "react";
 import { tryGetLbRadio } from "@/lib/clients/listenbrainz";
-import { resolveArtistNamesInPrompt } from "@/lib/lb-radio-prompt";
+import { prettifyPrompt } from "@/lib/lb-radio-prompt";
+import { resolveArtistNamesInPrompt } from "@/lib/lb-radio-prompt-server";
 import { PageShell } from "@/components/achordion/page-shell";
 import { LbRadioSection } from "@/components/achordion/lb-radio-section";
+import {
+  RecentStationsRow,
+  RecordRecentStation,
+} from "@/components/achordion/recent-stations";
 import {
   StationBuilder,
   type RadioMode,
@@ -71,11 +76,21 @@ async function StationResults({
     );
   }
   return (
-    <LbRadioSection
-      seedLabel={prompt}
-      tracks={result.tracks}
-      refillUrl={radioRefillUrl(resolvedPrompt, mode)}
-    />
+    <>
+      {/* Silently appends this station to the user's localStorage
+          history when the build succeeds. Mounts inside the success
+          branch so failed prompts don't pollute the list. */}
+      <RecordRecentStation prompt={prompt} mode={mode} />
+      <LbRadioSection
+        // Pretty label for the section header + Play tooltip — turn
+        // `artist:(Big Thief)` into `Big Thief`, `tag:(shoegaze)` into
+        // `Shoegaze`, etc. The raw prompt stays in the URL bar; the
+        // display label is just for readability.
+        seedLabel={prettifyPrompt(prompt)}
+        tracks={result.tracks}
+        refillUrl={radioRefillUrl(resolvedPrompt, mode)}
+      />
+    </>
   );
 }
 
@@ -118,6 +133,14 @@ export default async function StationBuilderPage({ searchParams }: PageProps) {
       </header>
 
       <StationBuilder prompt={prompt} mode={mode} />
+
+      {/* Recently-created stations — same-device only, lives in
+          localStorage so there's no Achordion-side state. The row
+          renders nothing until hydrated + non-empty, so first paint
+          is unaffected. */}
+      <div className="mt-6">
+        <RecentStationsRow />
+      </div>
 
       {hasPrompt && (
         // `id` matches the form's action hash + presetHref's hash so

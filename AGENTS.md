@@ -87,6 +87,14 @@ If a server component (`async function Page(...)`) imports a function that lives
 
 **Forcing-function:** when you build a new client component that exposes a `RadioMode`-style enum, a helper-from-value, or any preset/lookup table, put it in `/lib` from the start — even before you have a second consumer. The day you add a server-side preset chip / link helper / breadcrumb, you'll already be on the right side of the boundary.
 
+**Transitive imports count too.** Server-only-ness propagates through every module you import, not just the one you typed `import "server-only"` into. If `lib/foo.ts` exports a pure helper *and* a function that imports `lib/clients/musicbrainz.ts` (which is `server-only`), then any client component importing `foo` — even just for the pure helper — pulls the whole chain into the browser bundle, and Next refuses to compile with "You're importing a module that depends on `server-only`."
+
+The fix is to split the file: pure helpers stay client-safe (`lib/foo.ts`), server-only logic moves to a sibling that explicitly imports `server-only` (`lib/foo-server.ts`). Examples:
+- `lib/lb-radio-prompt.ts` — `prettifyPrompt` (pure regex+string work, used by client chips).
+- `lib/lb-radio-prompt-server.ts` — `resolveArtistNamesInPrompt` (uses `searchArtists` which is `server-only`).
+
+If you find yourself adding `import "server-only"` to a module that already exports a pure helper, that's the signal to split.
+
 ### 9. Cover images always go through `<CoverArt>`, never raw `<Image>`
 
 `<CoverArt>` has built-in `onError` swap-to-`Disc3`-placeholder, so a 404 from Cover Art Archive (which is *common* for older / niche releases) never paints the browser's broken-image glyph + alt text. Even when you have a known-good URL, use `<CoverArt>` — the consistency means a downstream API regression doesn't surface as broken images on your page.
