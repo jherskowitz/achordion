@@ -1,24 +1,11 @@
 import Link from "next/link";
+import {
+  RadioModeSlider,
+  modeLabel,
+  type RadioMode,
+} from "./radio-mode-slider";
 
-const MODES = [
-  {
-    id: "easy" as const,
-    label: "Easy",
-    blurb: "Stay close — tracks similar to the seed.",
-  },
-  {
-    id: "medium" as const,
-    label: "Medium",
-    blurb: "Mix it up — adjacent artists and styles.",
-  },
-  {
-    id: "hard" as const,
-    label: "Hard",
-    blurb: "Wide net — bigger jumps from the seed.",
-  },
-] as const;
-
-export type RadioMode = (typeof MODES)[number]["id"];
+export type { RadioMode };
 
 interface PresetExample {
   label: string;
@@ -92,37 +79,11 @@ export function StationBuilder({
           />
         </div>
 
-        <fieldset>
-          <legend className="text-foreground text-sm font-medium">
-            Mode
-          </legend>
-          <div
-            className="mt-3 grid gap-2 sm:grid-cols-3"
-            role="radiogroup"
-            aria-label="Mode"
-          >
-            {MODES.map((m) => (
-              <label
-                key={m.id}
-                className="border-border/60 has-[:checked]:bg-muted/40 has-[:checked]:border-foreground/40 hover:border-foreground/30 flex cursor-pointer flex-col gap-1 rounded-xl border px-3 py-2.5 transition-colors"
-              >
-                <input
-                  type="radio"
-                  name="mode"
-                  value={m.id}
-                  defaultChecked={m.id === mode}
-                  className="sr-only"
-                />
-                <span className="text-foreground text-sm font-medium">
-                  {m.label}
-                </span>
-                <span className="text-muted-foreground text-xs leading-4">
-                  {m.blurb}
-                </span>
-              </label>
-            ))}
-          </div>
-        </fieldset>
+        {/* Key on the URL mode so the slider's local state resets
+            when the user navigates in via a preset chip — useState's
+            initial value only fires on mount, so without the key a
+            preset-driven mode change wouldn't move the slider. */}
+        <RadioModeSlider key={mode} initialMode={mode} />
 
         <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
           <p className="text-muted-foreground/70 text-xs">
@@ -151,7 +112,7 @@ export function StationBuilder({
               >
                 <span className="text-foreground">{p.label}</span>
                 <span className="text-muted-foreground/70 hidden sm:inline">
-                  · {p.mode}
+                  · {modeLabel(p.mode)}
                 </span>
               </Link>
             </li>
