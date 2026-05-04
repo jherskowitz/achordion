@@ -19,8 +19,15 @@ interface OnAirIndicatorProps {
  * Small inline "now playing" indicator with a Listen-along action.
  * Renders nothing when the user isn't currently scrobbling. Async server
  * component — multiple rows in a list resolve in parallel through
- * React's concurrent renderer, and `getPlayingNow` revalidates at 30s
- * so repeat views inside a window are served from the data cache.
+ * React's concurrent renderer.
+ *
+ * Uses `{ live: true }` so each render goes straight to LB instead of
+ * the 30s data cache. Without it, "on air" status lagged by up to 30
+ * seconds on list/sidebar surfaces — fine for batch stats, jarring
+ * for "is this person playing music right now?" The cost is a
+ * parallel LB call per `<OnAirIndicator>` per page render, but
+ * /playing-now is fast and isn't governed by the MB queue, so the
+ * fan-out is bounded.
  *
  * Important: place this OUTSIDE any wrapping `<Link>` on the row.
  * Anchors inside anchors are invalid HTML, and the listen-along button
@@ -35,7 +42,7 @@ export async function OnAirIndicator({
   // the viewer to know whether to hide the listen-along button (a user
   // listening along to themselves is a loop).
   const [playing, session] = await Promise.all([
-    getPlayingNow(username).catch(() => null),
+    getPlayingNow(username, { live: true }).catch(() => null),
     auth().catch(() => null),
   ]);
   if (!playing) return null;
