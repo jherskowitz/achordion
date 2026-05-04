@@ -42,19 +42,71 @@ const SECURITY_HEADERS = [
   },
 ];
 
+/**
+ * Cache-Control for static assets that don't change without a deploy.
+ *
+ * Vercel's default Cache-Control on responses that don't set their
+ * own is `public, max-age=0, must-revalidate` — which forces the
+ * browser to re-validate every static image / SVG / favicon on every
+ * page load. Lots of needless conditional GETs, slower reloads, and
+ * a steady stream of `<img>` re-downloads when the ETag changes.
+ *
+ * `immutable` is safe for files whose URL contains a content hash
+ * (Next bundles, optimized images via `/_next/image` with width+
+ * quality params encoded in the URL). For top-level public assets
+ * the URL is stable but the file CAN change between deploys, so we
+ * use a 1-day max-age + must-revalidate (browser revalidates with
+ * an If-None-Match every 24h, gets a fast 304 if unchanged).
+ */
+const STATIC_ASSET_CACHE = {
+  key: "Cache-Control",
+  value: "public, max-age=86400, must-revalidate",
+};
+
+const IMMUTABLE_ASSET_CACHE = {
+  key: "Cache-Control",
+  value: "public, max-age=31536000, immutable",
+};
+
 const nextConfig: NextConfig = {
   async headers() {
     return [
       {
-        // Apply to every path. Next will merge these with route-
-        // specific headers set via `response.headers.set(...)` in
-        // route handlers (e.g. /api/track-cover's Cache-Control).
+        // Security headers on every path.
         source: "/:path*",
         headers: SECURITY_HEADERS,
+      },
+      {
+        // Next-fingerprinted bundles (JS / CSS / chunks) — the
+        // filename includes a content hash, so a 1-year immutable
+        // cache is safe. Without this every reload re-fetches the
+        // bundle even though its URL hasn't changed.
+        source: "/_next/static/:path*",
+        headers: [IMMUTABLE_ASSET_CACHE],
+      },
+      {
+        // Next image optimizer output. The output URL embeds the
+        // source path + width + quality, so any change produces a
+        // new URL. Cache aggressively.
+        source: "/_next/image",
+        headers: [IMMUTABLE_ASSET_CACHE],
+      },
+      {
+        // Top-level public PNG / JPEG / SVG / favicon / OG image.
+        // Filenames are stable across deploys but content can
+        // change, so 1-day max-age with revalidation gives fast
+        // reloads (cache hit) plus a same-day pickup of any update.
+        source: "/:file(.*\\.(?:png|jpg|jpeg|webp|svg|ico|gif|avif))",
+        headers: [STATIC_ASSET_CACHE],
       },
     ];
   },
   images: {
+    // Default 60s is too short for our use — MB / Wikipedia / CAA
+    // images don't churn on the timescale of a user reload, and
+    // the Next image optimizer caches by URL anyway. 30 days
+    // matches what cache-busting platforms like CAA expect.
+    minimumCacheTTL: 60 * 60 * 24 * 30,
     remotePatterns: [
       {
         protocol: "https",
