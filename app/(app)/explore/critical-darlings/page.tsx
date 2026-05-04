@@ -1,11 +1,7 @@
-import { Suspense } from "react";
 import { getCriticalDarlings } from "@/lib/clients/critical-darlings";
 import { PageShell } from "@/components/achordion/page-shell";
 import { ComingSoon } from "@/components/achordion/coming-soon";
-import {
-  CriticalDarlingCard,
-  CriticalDarlingCardSkeleton,
-} from "@/components/achordion/critical-darling-card";
+import { CriticalDarlingCard } from "@/components/achordion/critical-darling-card";
 
 export const metadata = { title: "Critical Darlings" };
 
@@ -45,11 +41,13 @@ export default async function CriticalDarlingsPage() {
           {albums.length} albums
         </p>
       </header>
+      {/* Cards render synchronously now — covers fetch lazily client-
+          side via <LazyAlbumCover>, so the per-card Suspense
+          boundaries that used to gate on a server-side MB lookup
+          aren't needed anymore. */}
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
         {albums.map((album) => (
-          <Suspense key={album.id} fallback={<CriticalDarlingCardSkeleton />}>
-            <CriticalDarlingCard album={album} />
-          </Suspense>
+          <CriticalDarlingCard key={album.id} album={album} />
         ))}
       </div>
     </PageShell>

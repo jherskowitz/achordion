@@ -1,59 +1,48 @@
 import Link from "next/link";
-import { CoverArt } from "./cover-art";
+import { LazyAlbumCover } from "./lazy-album-cover";
 import { PlayOnHoverFab } from "./play-on-hover-fab";
-import { searchReleaseGroups } from "@/lib/clients/musicbrainz";
-import { caaReleaseGroupUrl } from "@/lib/clients/coverart";
 import { parachordPlayAlbum } from "@/lib/parachord";
 import { artistHref, releaseGroupHref } from "@/lib/entity-links";
 import type { CriticsPickAlbum } from "@/lib/clients/critical-darlings";
 
 /**
- * Resolve a release-group MBID + cover-art URL for a Critical Darlings
- * pick by searching MusicBrainz. The MB client serializes requests at
- * 1/sec — wrap each card in its own Suspense boundary so this work
- * streams in rather than blocking the whole page.
+ * Critical Darlings album tile.
+ *
+ * Used to be `async` and resolved its cover-art URL server-side via
+ * MusicBrainz `searchReleaseGroups`. With ~30 cards on the page that
+ * meant ~30 calls serialized through MB's 1-req/sec rate limiter on
+ * cold render — first paint took half a minute.
+ *
+ * Cover lookup is now lazy and client-side via `<LazyAlbumCover>`,
+ * which fans out parallel `/api/track-cover` calls (the same artist+
+ * title resolver the radio rewinds + NACC charts use). The card
+ * itself renders instantly with a placeholder cover; covers stream
+ * in over a few seconds while the user can already scroll, click,
+ * read synopses.
+ *
+ * Navigation falls back to the lookup route
+ * (`/release-group/lookup?artist=…&title=…`) when no MBID is in
+ * hand — same canonicalization the rest of the app uses for text-
+ * only entity references.
  */
-async function resolveCover(album: CriticsPickAlbum): Promise<{
-  mbid: string | null;
-  coverUrl: string | null;
-}> {
-  try {
-    // Pull a handful of candidates and prefer Album over Single/EP/etc.
-    // Critical Darlings entries are reviews of full albums, but plain
-    // `release:"…" AND artist:"…"` often returns a same-titled single
-    // ahead of the album when both exist (e.g. lead-single sharing the
-    // album name). Bias the result by primary-type, falling back to
-    // MB's own score order when no Album candidate exists.
-    const query = `release:"${album.title.replace(/"/g, '\\"')}" AND artist:"${album.artist.replace(/"/g, '\\"')}"`;
-    const results = await searchReleaseGroups(query, 8);
-    if (results.length === 0) return { mbid: null, coverUrl: null };
-    const album_ = results.find((r) => r["primary-type"] === "Album");
-    const ep = results.find((r) => r["primary-type"] === "EP");
-    const top = album_ ?? ep ?? results[0];
-    return { mbid: top.id, coverUrl: caaReleaseGroupUrl(top.id, 250) };
-  } catch {
-    return { mbid: null, coverUrl: null };
-  }
-}
-
-export async function CriticalDarlingCard({
+export function CriticalDarlingCard({
   album,
 }: {
   album: CriticsPickAlbum;
 }) {
-  const { mbid, coverUrl } = await resolveCover(album);
-  // Use the lookup route as a fallback so the title+cover are always
-  // navigable even if MB search came back empty during render.
+  // No MBID at this point — `releaseGroupHref` builds a /lookup URL
+  // that resolves canonically on the destination server. Same
+  // resolver the artist credit-link / chart-row clicks already use.
   const albumLink = releaseGroupHref({
-    mbid,
     artist: album.artist,
     title: album.title,
   });
-  // Prefer the resolved MBID — Parachord picks the best resolver.
-  // Fall back to artist+title when MB search didn't find a match.
-  const parachordHref = parachordPlayAlbum(
-    mbid ? { mbid } : { artist: album.artist, title: album.title },
-  );
+  // Parachord resolves artist+title against its own sources, so
+  // shipping just the text is fine.
+  const parachordHref = parachordPlayAlbum({
+    artist: album.artist,
+    title: album.title,
+  });
 
   return (
     <article className="min-w-0 space-y-2">
@@ -62,12 +51,10 @@ export async function CriticalDarlingCard({
           fresh-releases grids. */}
       <div className="group relative overflow-hidden rounded-md">
         <Link href={albumLink} className="block">
-          <CoverArt
-            src={coverUrl}
+          <LazyAlbumCover
+            artist={album.artist}
+            album={album.title}
             alt={album.title}
-            size={240}
-            className="aspect-square h-auto w-full transition-opacity group-hover:opacity-90"
-            rounded="md"
           />
         </Link>
         <PlayOnHoverFab
