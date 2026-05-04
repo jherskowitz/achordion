@@ -1,27 +1,9 @@
 import Link from "next/link";
 import { PageShell } from "@/components/achordion/page-shell";
 import { PageHeader } from "@/components/achordion/page-header";
+import { ContentSection } from "@/components/achordion/content-section";
 
 export const metadata = { title: "FAQ" };
-
-function Section({
-  id,
-  title,
-  children,
-}: {
-  id: string;
-  title: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <section id={id} className="space-y-3 scroll-mt-24">
-      <h2 className="text-sm font-semibold tracking-wide uppercase">{title}</h2>
-      <div className="text-foreground/90 space-y-4 text-base leading-7">
-        {children}
-      </div>
-    </section>
-  );
-}
 
 // Same light-blue editorial link style used on /about and /donate.
 const LINK_CLASS =
@@ -84,7 +66,7 @@ export default function FaqPage() {
           </ul>
         </nav>
 
-        <Section id="account" title="How do I create an account?">
+        <ContentSection id="account" title="How do I create an account?">
           <p>
             Achordion uses your{" "}
             <Out href="https://musicbrainz.org">MusicBrainz</Out> account for
@@ -109,9 +91,9 @@ export default function FaqPage() {
             If Achordion went away tomorrow, your account and all of your data
             would still be at MusicBrainz and ListenBrainz, untouched.
           </p>
-        </Section>
+        </ContentSection>
 
-        <Section id="client" title="Is Achordion the same as ListenBrainz?">
+        <ContentSection id="client" title="Is Achordion the same as ListenBrainz?">
           <p>
             <strong>No — Achordion is a client on top of ListenBrainz.</strong>{" "}
             ListenBrainz is the data layer: it stores your scrobbles, builds
@@ -130,9 +112,9 @@ export default function FaqPage() {
             still there, still works, and reads from the same account. You can
             move between clients freely; nothing is locked to Achordion.
           </p>
-        </Section>
+        </ContentSection>
 
-        <Section
+        <ContentSection
           id="scrobbling"
           title="How do I get my listens into ListenBrainz?"
         >
@@ -210,9 +192,9 @@ export default function FaqPage() {
               MetaBrainz wiki keeps the canonical list.
             </li>
           </ul>
-        </Section>
+        </ContentSection>
 
-        <Section
+        <ContentSection
           id="playback"
           title="How do I actually play music from Achordion?"
         >
@@ -248,9 +230,9 @@ export default function FaqPage() {
             — Achordion (and every other MusicBrainz client) picks the new
             link up the next time the entity is fetched.
           </p>
-        </Section>
+        </ContentSection>
 
-        <Section
+        <ContentSection
           id="data-sources"
           title="Where does the data on Achordion come from?"
         >
@@ -294,9 +276,9 @@ export default function FaqPage() {
             </Link>
             .
           </p>
-        </Section>
+        </ContentSection>
 
-        <Section id="data-ownership" title="What does Achordion store about me?">
+        <ContentSection id="data-ownership" title="What does Achordion store about me?">
           <p>
             <strong>
               Almost nothing — and nothing you&apos;d consider yours.
@@ -328,9 +310,9 @@ export default function FaqPage() {
             ListenBrainz client at the same account and pick up where you left
             off.
           </p>
-        </Section>
+        </ContentSection>
 
-        <Section
+        <ContentSection
           id="edit-delete"
           title="How do I edit or delete my listening history?"
         >
@@ -371,9 +353,9 @@ export default function FaqPage() {
             it up automatically — there&apos;s no separate Achordion-side
             history to clean up.
           </p>
-        </Section>
+        </ContentSection>
 
-        <Section id="privacy" title="Who can see my listens?">
+        <ContentSection id="privacy" title="Who can see my listens?">
           <p>
             Visibility is controlled at ListenBrainz, not at Achordion.
             ListenBrainz profiles are public by default — your listens, stats,
@@ -389,9 +371,9 @@ export default function FaqPage() {
             . Whatever you set there is what Achordion shows, because Achordion
             is just rendering ListenBrainz&apos;s public API.
           </p>
-        </Section>
+        </ContentSection>
 
-        <Section
+        <ContentSection
           id="missing-data"
           title="An artist or album is missing — how do I fix it?"
         >
@@ -432,9 +414,9 @@ export default function FaqPage() {
             Achordion caches MusicBrainz responses for a short window, so
             edits usually show up within minutes.
           </p>
-        </Section>
+        </ContentSection>
 
-        <Section id="open-source" title="Is Achordion open source?">
+        <ContentSection id="open-source" title="Is Achordion open source?">
           <p>
             Yes. The code lives at{" "}
             <Out href="https://github.com/jherskowitz/achordion">
@@ -453,9 +435,9 @@ export default function FaqPage() {
             </Out>
             .
           </p>
-        </Section>
+        </ContentSection>
 
-        <Section id="support" title="How do I support the project?">
+        <ContentSection id="support" title="How do I support the project?">
           <p>
             The most important thing you can do is{" "}
             <Out href="https://metabrainz.org/donate">
@@ -473,9 +455,9 @@ export default function FaqPage() {
             , and tell a friend on a different streaming service that they can
             finally see what you&apos;re listening to.
           </p>
-        </Section>
+        </ContentSection>
 
-        <Section
+        <ContentSection
           id="contact"
           title="Still have questions? How do I get in touch?"
         >
@@ -501,7 +483,7 @@ export default function FaqPage() {
             instead. Bug reports + feature requests live there; questions and
             conversation live in Discussions.
           </p>
-        </Section>
+        </ContentSection>
       </div>
     </PageShell>
   );

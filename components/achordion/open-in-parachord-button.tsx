@@ -89,7 +89,7 @@ export function OpenInParachordButton({
           "inline-flex h-7 shrink-0 items-center gap-2 rounded-lg px-3 text-xs font-medium text-white transition-[filter] hover:brightness-110",
           className,
         )}
-        style={{ backgroundColor: "#7c3aed" }}
+        style={{ backgroundColor: "var(--parachord-accent)" }}
       >
         <span
           aria-hidden

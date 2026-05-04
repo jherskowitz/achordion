@@ -67,17 +67,36 @@
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
   --ring: oklch(0.708 0 0);
-  /* Year-in-Music + chart palette. Mirrors the Parachord sidebar
-     accent colors that DiceBear avatars also draw from, so cross-
-     surface hue use feels consistent. Order picks five well-
-     separated hues from the nine-color sidebar set: violet (the
-     Parachord primary), emerald (cool counterpoint), amber (warm
-     contrast), blue (cool fresh), pink (accent). */
-  --chart-1: #7c3aed; /* violet 600  — Home / Parachord primary */
-  --chart-2: #10b981; /* emerald 500 — New Releases */
-  --chart-3: #f59e0b; /* amber 500   — Recommendations */
-  --chart-4: #3b82f6; /* blue 500    — History */
-  --chart-5: #ec4899; /* pink 500    — Playlists */
+  /* Brand colors — see DESIGN.md § Color for the canonical
+     where-it-goes-vs-doesn't rules. Same hex in light + dark
+     mode. */
+  --achordion-brand: #774be9;     /* Wordmark mark only. */
+  --parachord-accent: #7c3aed;    /* Play affordances only. */
+
+  /* Sidebar palette — the nine-color Parachord-sidebar set. Used
+     by DiceBear avatar backgrounds and by chart-1..5 (a five-color
+     subset). DESIGN.md has the full table mapping hex → Parachord
+     sidebar role. */
+  --palette-violet:  #7c3aed; /* = parachord accent */
+  --palette-pink:    #ec4899;
+  --palette-cyan:    #06b6d4;
+  --palette-blue:    #3b82f6;
+  --palette-emerald: #10b981;
+  --palette-amber:   #f59e0b;
+  --palette-orange:  #f97316;
+  --palette-red:     #ef4444;
+  --palette-teal:    #10c9b4;
+
+  /* Year-in-Music + chart palette. Five well-separated hues from
+     the sidebar set: violet (primary), emerald (cool counterpoint),
+     amber (warm contrast), blue (cool fresh), pink (accent). Order
+     matters — `<EvolutionChart>` cycles `(i % 5) + 1` and adjacent
+     series should never look similar. */
+  --chart-1: var(--palette-violet);
+  --chart-2: var(--palette-emerald);
+  --chart-3: var(--palette-amber);
+  --chart-4: var(--palette-blue);
+  --chart-5: var(--palette-pink);
   --radius: 0.625rem;
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
@@ -108,15 +127,11 @@
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.556 0 0);
-  /* Same Parachord-sidebar / DiceBear palette in dark mode. The
-     500-level Tailwind hues read fine on the slate-950 dark
-     background; we let the existing fillOpacity controls in
-     evolution-chart soften them when needed. */
-  --chart-1: #7c3aed; /* violet 600 */
-  --chart-2: #10b981; /* emerald 500 */
-  --chart-3: #f59e0b; /* amber 500 */
-  --chart-4: #3b82f6; /* blue 500 */
-  --chart-5: #ec4899; /* pink 500 */
+  /* Brand + palette stay the same in dark mode — 500-level Tailwind
+     hues read fine on slate-950, and existing fillOpacity controls
+     in evolution-chart handle softening if needed. Chart-1..5 still
+     reference the palette aliases above; redefining at .dark scope
+     is unnecessary. */
   --sidebar: oklch(0.205 0 0);
   --sidebar-foreground: oklch(0.985 0 0);
   --sidebar-primary: oklch(0.488 0.243 264.376);

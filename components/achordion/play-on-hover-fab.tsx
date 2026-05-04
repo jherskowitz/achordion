@@ -51,7 +51,10 @@ export function PlayOnHoverFab({
             href={href}
             aria-label={label}
             className={baseClasses}
-            style={{ backgroundColor: "#7c3aed", color: "white" }}
+            style={{
+              backgroundColor: "var(--parachord-accent)",
+              color: "white",
+            }}
           >
             <Play className="size-4 fill-current" />
           </a>

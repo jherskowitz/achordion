@@ -6,7 +6,9 @@ import { cn } from "@/lib/utils";
  * Light/dark handling: the dark portions use `currentColor`, so the
  * mark inherits whatever `text-foreground` resolves to (near-black in
  * light mode, near-white in dark). The two purple accent rectangles
- * stay branded — `#774BE9` reads fine on both backgrounds.
+ * use the Achordion brand color (`var(--achordion-brand)`, `#774BE9`),
+ * which reads fine on both backgrounds. See DESIGN.md § Color for
+ * why this is the wordmark-only color and not used elsewhere.
  *
  * Sizing: the parent should set width or font-size; the SVG itself
  * carries the aspect ratio (919:175). The default `h-5` lines up with
@@ -54,8 +56,14 @@ export function WordmarkMark({
         stroke="currentColor"
       />
       <rect x="653" y="75" width="27" height="100" fill="currentColor" />
-      <path d="M653 55H680V69H653V55Z" fill="#774BE9" />
-      <path d="M648 51H685V56H648V51Z" fill="#774BE9" />
+      <path
+        d="M653 55H680V69H653V55Z"
+        style={{ fill: "var(--achordion-brand)" }}
+      />
+      <path
+        d="M648 51H685V56H648V51Z"
+        style={{ fill: "var(--achordion-brand)" }}
+      />
       <rect x="462" y="115" width="27" height="60" fill="currentColor" />
       <path
         d="M462 115C462 80.2061 488.191 52 520.5 52C520.667 52 520.833 52.0024 521 52.0039L521 79.0078C520.833 79.0046 520.667 79 520.5 79C505.195 79 489.499 92.7582 489.012 113.983L489 115L462 115Z"

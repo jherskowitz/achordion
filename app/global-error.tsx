@@ -72,6 +72,11 @@ export default function GlobalError({
             onClick={() => reset()}
             type="button"
             style={{
+              // Hardcoded hex (not var(--parachord-accent)) on
+              // purpose: this is the global-error fallback that fires
+              // when the root layout has failed. globals.css may not
+              // have loaded, so a CSS variable could be unresolved.
+              // The literal is the design system's failsafe.
               background: "#7c3aed",
               color: "white",
               border: "none",

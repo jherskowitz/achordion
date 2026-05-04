@@ -2,25 +2,9 @@ import Link from "next/link";
 import { ExternalLink, Heart } from "lucide-react";
 import { PageShell } from "@/components/achordion/page-shell";
 import { PageHeader } from "@/components/achordion/page-header";
+import { ContentSection } from "@/components/achordion/content-section";
 
 export const metadata = { title: "About" };
-
-function Section({
-  title,
-  children,
-}: {
-  title: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className="space-y-3">
-      <h2 className="text-sm font-semibold tracking-wide uppercase">{title}</h2>
-      <div className="text-foreground/90 space-y-4 text-base leading-7">
-        {children}
-      </div>
-    </section>
-  );
-}
 
 // Light-blue editorial link styling shared by every inline link on
 // the footer-linked content pages (about / donate). Sky-500 reads
@@ -54,7 +38,7 @@ export default function AboutPage() {
           aligned at the page edge — keeps the subhead and the
           section bodies on the same left rail. */}
       <div className="max-w-2xl space-y-12 pb-12">
-        <Section title="The pitch">
+        <ContentSection title="The pitch">
           <p>
             Connect with like-minded listeners across the globe to discover
             music that transcends services, platforms, and programming.
@@ -72,9 +56,9 @@ export default function AboutPage() {
             underneath it all. Four independent, open-source, non-corporate
             layers — one coherent experience.
           </p>
-        </Section>
+        </ContentSection>
 
-        <Section title="The two-project tldr">
+        <ContentSection title="The two-project tldr">
           <p>
             <strong>
               Achordion is the independent music community and data layer.
@@ -94,9 +78,9 @@ export default function AboutPage() {
             plays whatever you click. They&apos;re built to feel like one
             product across desktop, mobile, and web.
           </p>
-        </Section>
+        </ContentSection>
 
-        <Section title="Why this exists">
+        <ContentSection title="Why this exists">
           <p>
             ListenBrainz is the open-source, MetaBrainz-run alternative to
             last.fm — and it&apos;s great. But its UI hasn&apos;t had the
@@ -116,9 +100,9 @@ export default function AboutPage() {
             the track, and routes through whichever streaming service or
             local source the listener is set up with.
           </p>
-        </Section>
+        </ContentSection>
 
-        <Section title="What we're trying to build">
+        <ContentSection title="What we're trying to build">
           <ol className="ml-6 list-decimal space-y-3">
             <li>
               <strong>An open community for listeners,</strong>{" "}
@@ -173,9 +157,9 @@ export default function AboutPage() {
               should be available all the time.
             </li>
           </ol>
-        </Section>
+        </ContentSection>
 
-        <Section title="A view for artists, not just listeners">
+        <ContentSection title="A view for artists, not just listeners">
           <p>
             Today an artist who wants to understand their audience has
             to log into Spotify for Artists, Apple Music for Artists,
@@ -203,9 +187,9 @@ export default function AboutPage() {
             answer&apos;s on their Achordion page rather than scattered
             across half a dozen platform-specific stats pages.
           </p>
-        </Section>
+        </ContentSection>
 
-        <Section title="Your data stays yours">
+        <ContentSection title="Your data stays yours">
           <p>
             <strong>
               Achordion doesn&apos;t store your listening data.
@@ -233,9 +217,9 @@ export default function AboutPage() {
             with it — you&apos;d just point a different ListenBrainz
             client at the same account and pick up where you left off.
           </p>
-        </Section>
+        </ContentSection>
 
-        <Section title="A note on bots">
+        <ContentSection title="A note on bots">
           <p>
             Achordion blocks AI training crawlers — GPTBot, ClaudeBot,
             CCBot, PerplexityBot, Applebot-Extended, Google-Extended,
@@ -255,9 +239,9 @@ export default function AboutPage() {
             </Out>
             {" "}are auditable in the public repo.
           </p>
-        </Section>
+        </ContentSection>
 
-        <Section title="Multi-source playback through one click">
+        <ContentSection title="Multi-source playback through one click">
           <p>
             Parachord aggregates playback across{" "}
             <strong>
@@ -283,9 +267,9 @@ export default function AboutPage() {
             You control the priority order; Achordion just hands over the
             tracklist.
           </p>
-        </Section>
+        </ContentSection>
 
-        <Section title="Cross-platform scrobbling">
+        <ContentSection title="Cross-platform scrobbling">
           <p>
             Parachord scrobbles every play to{" "}
             <strong>ListenBrainz, Last.fm, and Libre.fm</strong>{" "}
@@ -301,9 +285,9 @@ export default function AboutPage() {
             browser extension — Achordion still reflects the activity through
             ListenBrainz.
           </p>
-        </Section>
+        </ContentSection>
 
-        <Section title="Built on">
+        <ContentSection title="Built on">
           <p>
             <Out href="https://musicbrainz.org">MusicBrainz</Out>{" "}
             for canonical music metadata and identity (sign in is the same
@@ -328,9 +312,9 @@ export default function AboutPage() {
               support them
             </Link>.
           </p>
-        </Section>
+        </ContentSection>
 
-        <Section title="Who's behind it">
+        <ContentSection title="Who's behind it">
           <p>
             Achordion and Parachord are both made by{" "}
             <Out href="https://github.com/jherskowitz">J Herskowitz</Out>.
@@ -358,7 +342,7 @@ export default function AboutPage() {
               tab.
             </li>
           </ul>
-        </Section>
+        </ContentSection>
       </div>
     </PageShell>
   );

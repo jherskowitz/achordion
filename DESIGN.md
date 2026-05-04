@@ -382,11 +382,11 @@ When adding new components, always probe both modes via the theme toggle before 
 
 Things this doc points at that aren't fully baked yet:
 
-1. **Lift `#7c3aed` and `#774BE9` into CSS variables** in `globals.css` (`--parachord-accent`, `--achordion-brand`). Replace the half-dozen inline hex literals across components/. One source of truth.
-2. **Lift the sidebar nine-color palette into CSS variables** (`--palette-violet`, etc.). Cuts the duplication between `lib/dicebear-shapes.ts` and `globals.css` chart vars.
-3. **Extract `<Section>`** as a shared component. Currently re-implemented inside /about, /faq, /donate. Same shape, same classes, three places.
-4. **`<EmptyState>`** — `<ComingSoon>` is the de-facto empty state but has a name that ties it to one specific use. Rename + extract for general use.
-5. **Heading hierarchy audit.** Lighthouse caught `<h1> → <h3>` skips on the home (fixed). Worth a sweep across every page once: `h1` only at page top, `h2` for section headings, `h3` only where the structure actually demands it.
+1. ✅ **Brand colors lifted into CSS variables** (`--parachord-accent`, `--achordion-brand`). Done.
+2. ✅ **Sidebar palette as CSS variables** (`--palette-violet`, `--palette-pink`, etc.). Done.
+3. ✅ **`<ContentSection>` extracted** to `components/achordion/content-section.tsx`. Done.
+4. **`<EmptyState>`** — `<ComingSoon>` is the de-facto empty state but has a name that ties it to one specific use. Rename + extract for general use. Tracked in [Issue #10](https://github.com/jherskowitz/achordion/issues/10).
+5. **Heading hierarchy audit.** Lighthouse caught `<h1> → <h3>` skips on the home (fixed). Worth a sweep across every page once: `h1` only at page top, `h2` for section headings, `h3` only where the structure actually demands it. Tracked in [Issue #11](https://github.com/jherskowitz/achordion/issues/11).
 
 If you spot a pattern that's recurring without a name, **add it here first**, then refactor the codebase to match. The doc is the contract.
 

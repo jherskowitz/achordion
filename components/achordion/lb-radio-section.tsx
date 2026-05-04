@@ -72,7 +72,7 @@ export function LbRadioSection({
       style={{
         // Inline so :hover swaps cleanly to brand purple regardless
         // of the surrounding theme tokens.
-        ["--play-bg" as string]: "#7c3aed",
+        ["--play-bg" as string]: "var(--parachord-accent)",
       }}
       onMouseEnter={(e) => {
         e.currentTarget.style.backgroundColor = "var(--play-bg)";
