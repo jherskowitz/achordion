@@ -5,6 +5,7 @@ import { parachordPlayTrack } from "@/lib/parachord";
 import { recordingHref } from "@/lib/entity-links";
 import { ArtistCreditLinks } from "./artist-credit-links";
 import { PlayOverNumberCell } from "./parachord-button";
+import { TrackActionsMenuSlot } from "./track-actions-menu-slot";
 
 /** MusicBrainz's special "Various Artists" entity. */
 const VARIOUS_ARTISTS_MBID = "89ad4ac3-39f7-470e-963a-56509c546377";
@@ -45,11 +46,13 @@ function TrackRow({
   listenCount,
   fallbackArtist,
   showArtist,
+  releaseMbid,
 }: {
   track: Track;
   listenCount?: number;
   fallbackArtist: string;
   showArtist: boolean;
+  releaseMbid: string;
 }) {
   const recordingMbid = track.recording?.id;
   const credit = formatArtistCredit(track["artist-credit"]);
@@ -89,6 +92,18 @@ function TrackRow({
       <span className="text-muted-foreground shrink-0 tabular-nums text-xs">
         {formatLength(track.length ?? track.recording?.length)}
       </span>
+      <TrackActionsMenuSlot
+        track={{
+          recordingMbid: recordingMbid ?? null,
+          trackName: track.title,
+          artistName: artist,
+          // Album tracklist context is the abstract release group, but
+          // the row is bound to a specific release/edition — pass that
+          // release MBID through so Pin/Recommend send the same edition
+          // the user is looking at.
+          releaseMbid,
+        }}
+      />
     </li>
   );
 }
@@ -122,6 +137,7 @@ export function TrackList({ release, listenCounts }: TrackListProps) {
                 track={track}
                 fallbackArtist={fallbackArtist}
                 showArtist={showArtist}
+                releaseMbid={release.id}
                 listenCount={
                   track.recording?.id
                     ? listenCounts?.get(track.recording.id)

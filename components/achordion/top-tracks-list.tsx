@@ -4,6 +4,7 @@ import { caaReleaseGroupUrl, caaReleaseUrl } from "@/lib/clients/coverart";
 import { parachordPlayTrack } from "@/lib/parachord";
 import { PlayOverNumberCell } from "./parachord-button";
 import { artistHref, recordingHref } from "@/lib/entity-links";
+import { TrackActionsMenuSlot } from "./track-actions-menu-slot";
 
 interface TrackEntry {
   track_name: string;
@@ -80,6 +81,14 @@ export function TopTracksList({ tracks }: { tracks: TrackEntry[] }) {
             <span className="text-muted-foreground shrink-0 tabular-nums text-xs">
               {t.listen_count.toLocaleString()}
             </span>
+            <TrackActionsMenuSlot
+              track={{
+                recordingMbid: t.recording_mbid ?? null,
+                trackName: t.track_name,
+                artistName: t.artist_name,
+                releaseMbid: t.release_mbid ?? null,
+              }}
+            />
           </li>
         );
       })}
