@@ -89,6 +89,7 @@ export function LiveOnAirIndicator({
       }
     }
 
+    void poll();
     start();
     document.addEventListener("visibilitychange", onVisibility);
     return () => {
