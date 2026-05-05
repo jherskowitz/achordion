@@ -76,7 +76,7 @@ export function UserStatsRadioWidget({ username }: { username: string }) {
   );
 
   return (
-    <div className="border-border/60 w-72 max-w-[80vw] rounded-2xl border">
+    <div className="border-border/60 bg-background relative w-72 max-w-[80vw] rounded-2xl border">
       <div className="flex items-center gap-3 p-3">
         <IconTooltip
           side="top"
@@ -116,7 +116,7 @@ export function UserStatsRadioWidget({ username }: { username: string }) {
       {open && (
         <div
           id={`stats-radio-range-${username}`}
-          className="border-border/60 border-t px-3 pb-3 pt-3"
+          className="border-border/60 bg-background absolute left-0 right-0 top-full z-30 mt-1 rounded-2xl border px-3 pb-3 pt-3 shadow-lg"
         >
           <input
             type="range"
