@@ -17,6 +17,7 @@ import { caaReleaseUrl } from "@/lib/clients/coverart";
 import { parachordPlayAlbum, parachordPlayTrack } from "@/lib/parachord";
 import { CoverArt } from "@/components/achordion/cover-art";
 import { PlayOnHoverFab } from "@/components/achordion/play-on-hover-fab";
+import { TrackActionsMenuSlot } from "@/components/achordion/track-actions-menu-slot";
 import { ReleaseTypeChip } from "@/components/achordion/release-type-chip";
 import {
   ExternalLinks,
@@ -217,9 +218,19 @@ async function RecordingBody({ mbid }: { mbid: string }) {
           </Suspense>
         }
         actions={
-          <Suspense fallback={<PopularityStatsSkeleton />}>
-            <PopularityStats promise={popularityPromise} />
-          </Suspense>
+          <>
+            <Suspense fallback={<PopularityStatsSkeleton />}>
+              <PopularityStats promise={popularityPromise} />
+            </Suspense>
+            <TrackActionsMenuSlot
+              track={{
+                recordingMbid: recording.id,
+                trackName: recording.title,
+                artistName: credit.name,
+                releaseMbid: heroRelease?.id ?? null,
+              }}
+            />
+          </>
         }
       />
 
