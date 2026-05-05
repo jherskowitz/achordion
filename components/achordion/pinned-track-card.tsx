@@ -1,15 +1,59 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import { Pin } from "lucide-react";
 import { CoverArt } from "./cover-art";
 import { caaUrlFromListen } from "@/lib/clients/coverart";
 import type { PinnedRecording } from "@/lib/clients/listenbrainz";
-import type { ArtistExternalLink } from "@/lib/clients/musicbrainz";
+import {
+  getRecording,
+  partitionArtistRelations,
+} from "@/lib/clients/musicbrainz";
 import { parachordPlayTrack } from "@/lib/parachord";
 import { ParachordCtaButton } from "./parachord-button";
-import { ExternalLinks } from "./external-links";
+import { ExternalLinks, categoriseLinks } from "./external-links";
 import { TrackActionsMenuSlot } from "./track-actions-menu-slot";
+import { Skeleton } from "@/components/ui/skeleton";
 import { artistHref, releaseGroupHref } from "@/lib/entity-links";
 import { cn } from "@/lib/utils";
+
+/**
+ * Async server component that fetches a recording from MusicBrainz and
+ * renders the streaming-favicon row. Wrapped in <Suspense> by the card
+ * so the rest of the pin paints immediately while MB resolves.
+ */
+async function PinnedExternalLinks({
+  recordingMbid,
+}: {
+  recordingMbid: string;
+}) {
+  const recording = await getRecording(recordingMbid).catch(() => null);
+  const streaming = recording
+    ? categoriseLinks(
+        partitionArtistRelations({ relations: recording.relations }).urls,
+      ).streaming
+    : [];
+  return (
+    <ExternalLinks
+      links={streaming}
+      addSources={{ mbEntity: "recording", mbid: recordingMbid }}
+    />
+  );
+}
+
+/**
+ * Skeleton for the favicon row — five `size-9` muted squares with the
+ * same `gap-2 flex-wrap` rhythm as the real <ExternalLinks> output, so
+ * the slot doesn't shift when the data arrives.
+ */
+function PinnedExternalLinksSkeleton() {
+  return (
+    <div className="flex flex-wrap gap-2" aria-hidden>
+      {Array.from({ length: 5 }).map((_, i) => (
+        <Skeleton key={i} className="size-9 rounded-md" />
+      ))}
+    </div>
+  );
+}
 
 function relativeFromNow(unixSeconds: number): string {
   const now = Math.floor(Date.now() / 1000);
@@ -66,17 +110,12 @@ interface PinnedTrackCardProps {
   pin: PinnedRecording;
   /** Hero variant — bigger, more prominent. Used at the top of the overview. */
   variant?: "hero" | "row";
-  /** MB url-rels filtered to streaming services, fed to the favicon row.
-   *  Optional — when omitted the row still renders the "+ Add sources"
-   *  tile (provided the pin has a recording MBID). */
-  streamingLinks?: ArtistExternalLink[];
   className?: string;
 }
 
 export function PinnedTrackCard({
   pin,
   variant = "row",
-  streamingLinks,
   className,
 }: PinnedTrackCardProps) {
   const meta = pin.track_metadata;
@@ -183,14 +222,14 @@ export function PinnedTrackCard({
                 size="sm"
               />
               <TrackActionsMenuSlot track={trackRef} />
-              {/* Always show the row when we have an MBID — empty
-                  streaming list still gets the "+" affordance so users
-                  can seed Spotify / Apple etc. on MB. */}
+              {/* Streaming favicons stream in via Suspense so the
+                  Parachord button + ⋮ paint immediately. The "+" tile
+                  always renders once the row resolves, even if MB has
+                  no streaming rels for this recording. */}
               {recordingMbid && (
-                <ExternalLinks
-                  links={streamingLinks ?? []}
-                  addSources={{ mbEntity: "recording", mbid: recordingMbid }}
-                />
+                <Suspense fallback={<PinnedExternalLinksSkeleton />}>
+                  <PinnedExternalLinks recordingMbid={recordingMbid} />
+                </Suspense>
               )}
             </div>
           )}
@@ -206,10 +245,9 @@ export function PinnedTrackCard({
               />
               <TrackActionsMenuSlot track={trackRef} />
               {recordingMbid && (
-                <ExternalLinks
-                  links={streamingLinks ?? []}
-                  addSources={{ mbEntity: "recording", mbid: recordingMbid }}
-                />
+                <Suspense fallback={<PinnedExternalLinksSkeleton />}>
+                  <PinnedExternalLinks recordingMbid={recordingMbid} />
+                </Suspense>
               )}
             </div>
           )}
