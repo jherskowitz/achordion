@@ -2370,3 +2370,33 @@ export async function submitRecommendation(
   if (opts.blurb !== undefined) metadata.blurb_content = opts.blurb;
   await lbPost("/recommend-personal-recording", token, { metadata });
 }
+
+// ─── Add to existing playlist ───────────────────────────────────────
+
+/**
+ * Append a recording to the end of an existing LB playlist. Body uses
+ * the JSPF track shape — `identifier` is a string-array (matches the
+ * shape LB returns from `getPlaylist`'s tracks). Caller must own the
+ * playlist or be a collaborator.
+ */
+export async function addRecordingToPlaylist(
+  token: string,
+  playlistMbid: string,
+  recordingMbid: string,
+): Promise<void> {
+  await lbPost(
+    `/playlist/${encodeURIComponent(playlistMbid)}/item/add`,
+    token,
+    {
+      playlist: {
+        track: [
+          {
+            identifier: [
+              `https://musicbrainz.org/recording/${recordingMbid}`,
+            ],
+          },
+        ],
+      },
+    },
+  );
+}
