@@ -201,6 +201,19 @@ Belt-and-suspenders helpers for cards that wrap variable-width content:
 
 The mass fix landed in commit 611e2ba sweeps every page with this bug. **If you add a new grid layout that holds entity names, playlist titles, or any user-supplied text, follow the explicit-`minmax(0, ...)` pattern from the start.**
 
+### 13. Every layout must work on mobile
+
+Achordion is used as much on phones as on laptops. **No change ships without a mobile pass.** When you add or modify any layout, resize the viewport to <640px (or use the device toolbar) and confirm it doesn't overflow, stack weirdly, or hide content behind fixed chrome.
+
+Concrete rules that cover the cases that have actually broken:
+
+- **Flex rows that pack 3+ children must stack on small.** Default to `flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:gap-6`. The user-page-header row originally packed avatar + name + follow + radio widget into one always-horizontal row and elbowed the username block on every viewport between phone and laptop.
+- **Right-aligned widgets in a header row should never have a fixed width that exceeds their share of the container at common mobile widths.** `w-72 max-w-[80vw]` is fine; combined with a non-stacking flex row it isn't.
+- **Absolute-positioned dropdowns / popovers need an explicit z-index that's actually in the Tailwind bundle.** `z-10`, `z-40`, `z-50` are emitted by default; one-offs like `z-30` may or may not survive a dev cache hiccup. If your panel ends up rendering behind sibling content, computed `z-index: auto` is the smoking gun. Stick to the emitted set unless you've verified.
+- **Cap pill / chip widths or use `truncate` + `min-w-0`.** Long track / artist / playlist names are the common cause of mobile overflow. The on-air pill's lesson: `max-w-[220px]` (or any single-class width cap) is more robust than `hidden ... sm:inline-flex` gating because the latter relies on a class Tailwind may or may not have scanned.
+
+If you can't actually preview at narrow widths in your environment, at minimum read the JSX and confirm every horizontal layout has either a stacking variant, a truncating child, or both.
+
 ---
 
 ## Browser-extension hydration gotchas
@@ -213,6 +226,7 @@ The Parachord browser extension (and other extensions some users run) **mutates 
 | Tooltip-wrapped anchors throw a hydration error and tear down the client tree | `<TooltipTrigger asChild>` Slot resolves differently on server vs client | Use `<IconTooltip>` (CSS-only) for anchor triggers |
 | React duplicate-key warnings | MB sometimes returns the same release-group across pagination boundaries | `getArtistReleaseGroups` dedupes by MBID; member rows use composite keys (`mbid-begin-end-i`) |
 | One bad anchor takes down a whole interactive region | Hydration error propagates up to the closest Suspense; client tree regenerates | Add `suppressHydrationWarning` on layout-chrome anchors / use `IconTooltip` for icon rows |
+| Random dev-only CSS / runtime breakage (`SES Removing unpermitted intrinsics` in console) | A wallet extension (MetaMask / similar) injects SES, which strips `eval` / `Function`. Next 16 dev (Turbopack HMR + Tailwind v4 dev pipeline) uses both, so module / CSS hot updates partially fail. Production isn't affected — it ships pre-compiled. | Disable the extension or test in incognito; don't chase it as a code bug. |
 
 `suppressHydrationWarning` only papers over **attribute / text** mismatches, not tree-shape mismatches. If the server emits a `<button>` and the client emits an `<a>` (which Radix `asChild` slot-cloning can do), suppressHydrationWarning won't help — restructure instead.
 
@@ -288,6 +302,26 @@ This section is for **Parachord agents** modifying the `parachord-desktop` / `pa
 `<base64>` is UTF-8 base64 of `JSON.stringify(tracks)` where each track is `{ title, artist, album?, duration? }` (duration in **seconds**, not ms — protocol spec).
 
 Helpers in `lib/parachord.ts`. Do not change those URL shapes without coordinating with the Parachord protocol owner.
+
+### LB Radio handoff: pre-fetched pool + refill, not raw prompt
+
+`parachord://play/radio?prompt=…` (Mode B) is the wrong tool for any "play this user's radio" affordance. Parachord's prompt mode falls through to its in-app spinoff seed when LB rejects the input — and LB *will* reject anything malformed, returning silent 0-track stations.
+
+The shape that actually plays music is **Mode C-inline**:
+
+```
+parachord://play/radio?tracks=<base64-of-initial-pool>&refill=<lb-radio-api-url>&name=<displayName>
+```
+
+Pattern:
+
+1. Build the LB Radio prompt per [Troi's syntax](https://troi.readthedocs.io/en/latest/lb_radio.html). For stats: **`stats:<user>::<range>`** (double colon before range). Other mode prefixes: `tag:(...)`, `country:(...)`, `artist:(...)`, `artist:(<mbid>)`.
+2. Fetch the initial 50-track pool server-side via `tryGetLbRadio(prompt, mode)` (in `lib/clients/listenbrainz.ts`). The LB token is server-only, so client widgets that need this must call the proxy route at **`/api/lb-radio?prompt=…&mode=easy`** (returns `{ tracks: ParachordTrack[] }`).
+3. Hand Parachord both `tracks=` (immediate playback) and `refill=https://api.listenbrainz.org/1/explore/lb-radio?prompt=…&mode=easy` (so it can extend with the user's local LB token when the pool runs low).
+
+Reference implementations: server-side, `LbRadioSection` (used on `/radio` and the user-radio rails). Client-side with a click-time fetch, `UserStatsRadioWidget` (range slider drives a different prompt per click).
+
+Don't try to use `parachord://play/radio?url=<lb-radio-api-url>` (Mode C, URL-only) for LB Radio — Parachord's URL-pool path expects a static playlist, not an LB-Radio JSPF endpoint that needs a token. Always pre-fetch and inline.
 
 ### What Parachord expects from Achordion
 
@@ -372,3 +406,16 @@ Helpers in `lib/parachord.ts`. Do not change those URL shapes without coordinati
 - Commits follow a focused-and-themed style — see `git log --oneline` for the cadence. Subject lines describe what the user-facing change does, not the implementation.
 - Do not amend commits unless explicitly requested.
 - Production deploy is Vercel from `main`; the WS-to-localhost approach works in production because Chrome / Edge / Firefox treat `ws://127.0.0.1` as a "potentially trustworthy origin" exception from mixed-content blocks.
+
+### Tailwind v4 + Next 16 dev cache: stop the server before wiping `.next`
+
+If a freshly-added Tailwind utility (`sm:inline-flex`, `z-30`, `max-w-[24ch]`, `lg:grid-cols-[minmax(0,1fr)_280px]` etc.) silently doesn't apply on `localhost`, *but works in production*, you've got a stale dev scan. Symptom: the class is in your TSX file, the bundle 200s, but the rule isn't in the served CSS.
+
+`rm -rf .next` alone won't fix it — the still-running dev server immediately recreates `.next/dev` with its in-memory state. The dance:
+
+1. Stop the dev server completely.
+2. `rm -rf .next` (and `.turbo` if it exists at the repo root). `node_modules/.cache` may also be involved if it exists.
+3. Start the server.
+4. Hard-reload the browser.
+
+Once you've eaten the cost, prefer classes Tailwind has already emitted in similar locations — repeat use cases are scanned reliably. Brand-new arbitrary values in a single new file are the failure mode.
