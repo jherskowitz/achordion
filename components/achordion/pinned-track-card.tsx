@@ -90,27 +90,23 @@ export function PinnedTrackCard({
   const now = Math.floor(Date.now() / 1000);
   const isActive = pin.pinned_until > now;
 
+  const trackRef = {
+    recordingMbid,
+    trackName: meta.track_name,
+    artistName: meta.artist_name,
+    releaseMbid:
+      meta.mbid_mapping?.release_mbid ??
+      meta.additional_info?.release_mbid ??
+      null,
+  };
   return (
     <article
       className={cn(
-        "border-border/60 from-card/40 to-card/10 relative rounded-2xl border bg-gradient-to-br",
+        "border-border/60 from-card/40 to-card/10 rounded-2xl border bg-gradient-to-br",
         isHero ? "p-5 sm:p-6" : "p-4",
         className,
       )}
     >
-      <div className="absolute top-2 right-2 z-10">
-        <TrackActionsMenuSlot
-          track={{
-            recordingMbid,
-            trackName: meta.track_name,
-            artistName: meta.artist_name,
-            releaseMbid:
-              meta.mbid_mapping?.release_mbid ??
-              meta.additional_info?.release_mbid ??
-              null,
-          }}
-        />
-      </div>
       <div className={cn("flex gap-4", isHero ? "sm:gap-6" : "sm:gap-5")}>
         <CoverArt
           src={cover}
@@ -181,6 +177,7 @@ export function PinnedTrackCard({
                 label="Play in Parachord"
                 size="sm"
               />
+              <TrackActionsMenuSlot track={trackRef} />
               {/* Always show the row when we have an MBID — empty
                   streaming list still gets the "+" affordance so users
                   can seed Spotify / Apple etc. on MB. */}
@@ -192,12 +189,23 @@ export function PinnedTrackCard({
               )}
             </div>
           )}
-          {!isHero && recordingMbid && (
-            <div className="mt-3">
-              <ExternalLinks
-                links={streamingLinks ?? []}
-                addSources={{ mbEntity: "recording", mbid: recordingMbid }}
+          {!isHero && (
+            <div className="mt-3 flex flex-wrap items-center gap-3">
+              <ParachordCtaButton
+                href={parachordPlayTrack({
+                  artist: meta.artist_name,
+                  title: meta.track_name,
+                })}
+                label="Play in Parachord"
+                size="sm"
               />
+              <TrackActionsMenuSlot track={trackRef} />
+              {recordingMbid && (
+                <ExternalLinks
+                  links={streamingLinks ?? []}
+                  addSources={{ mbEntity: "recording", mbid: recordingMbid }}
+                />
+              )}
             </div>
           )}
         </div>
