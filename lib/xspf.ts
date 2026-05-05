@@ -1,5 +1,25 @@
 import type { LbRadioTrack, PlaylistDetail } from "@/lib/clients/listenbrainz";
 
+/** Slugify a name for use in an XSPF filename. */
+export function xspfFilenameSlug(name: string): string {
+  return (
+    name.replace(/[^\w\d\-]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 80) ||
+    "tracks"
+  );
+}
+
+/** Wrap an XSPF document in a download Response. */
+export function xspfDownloadResponse(xml: string, baseFilename: string): Response {
+  return new Response(xml, {
+    status: 200,
+    headers: {
+      "Content-Type": "application/xspf+xml; charset=utf-8",
+      "Content-Disposition": `attachment; filename="${baseFilename}.xspf"`,
+      "Cache-Control": "private, no-cache, no-store, max-age=0, must-revalidate",
+    },
+  });
+}
+
 /** XML-escape text content for elements + attributes. */
 function xe(s: string | null | undefined): string {
   if (!s) return "";
