@@ -141,7 +141,7 @@ async function PlaylistBody({ mbid }: { mbid: string }) {
           <Breadcrumbs items={breadcrumbs} />
         </div>
       )}
-      <header className="mt-8 mb-10 grid gap-6 sm:grid-cols-[240px_1fr] sm:gap-8">
+      <header className="mt-8 mb-10 grid grid-cols-1 gap-6 sm:grid-cols-[240px_minmax(0,1fr)] sm:gap-8">
         <PlaylistCoverMosaic
           tracks={data.tracks}
           alt={data.title}
@@ -384,7 +384,7 @@ async function PlaylistBody({ mbid }: { mbid: string }) {
 
 function HeaderSkeleton() {
   return (
-    <div className="mt-8 mb-10 grid gap-6 sm:grid-cols-[200px_1fr] sm:gap-8">
+    <div className="mt-8 mb-10 grid grid-cols-1 gap-6 sm:grid-cols-[200px_minmax(0,1fr)] sm:gap-8">
       <Skeleton className="aspect-square w-full max-w-[280px] rounded-md sm:max-w-none" />
       <div className="space-y-3">
         <Skeleton className="h-3 w-20" />

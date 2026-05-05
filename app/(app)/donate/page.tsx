@@ -76,7 +76,7 @@ export default function DonatePage() {
             credit card, GitHub Sponsors, crypto, mailed cheques, the
             works).
           </p>
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <DonateCard
               primary
               title="Donate to MetaBrainz"
@@ -117,7 +117,7 @@ export default function DonatePage() {
             Genuinely though — if you have to choose, give to
             MetaBrainz. They&apos;re the load-bearing wall.
           </p>
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <DonateCard
               title="Ko-fi"
               blurb="One-time tips or monthly memberships. 0% platform fee on tips — every dollar goes to project costs."

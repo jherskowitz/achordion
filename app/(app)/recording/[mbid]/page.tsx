@@ -240,7 +240,7 @@ async function RecordingBody({ mbid }: { mbid: string }) {
       {/* Two-column layout for the body: "Also appears on" fills the
           left rail, sidebar (Top listeners + Other Links) anchors the
           right. Same pattern the artist page uses. */}
-      <div className="mt-6 grid gap-10 lg:grid-cols-[1fr_240px]">
+      <div className="mt-6 grid grid-cols-1 gap-10 lg:grid-cols-[minmax(0,1fr)_240px]">
         <div className="min-w-0">
           {otherReleaseGroups.length > 0 && (
             <section>
@@ -392,7 +392,7 @@ function RecordingPageSkeleton() {
           </div>
         </div>
       </div>
-      <div className="grid gap-10 lg:grid-cols-[1fr_240px]">
+      <div className="grid grid-cols-1 gap-10 lg:grid-cols-[minmax(0,1fr)_240px]">
         <div className="min-w-0">
           <Skeleton className="mb-4 h-3 w-32" />
           <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5 xl:grid-cols-6">

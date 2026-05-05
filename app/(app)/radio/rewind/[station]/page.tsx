@@ -75,7 +75,7 @@ export default async function RewindStationPage({ params }: PageProps) {
         </Link>
       </div>
 
-      <header className="mb-8 grid gap-6 sm:grid-cols-[200px_1fr] sm:items-end sm:gap-8">
+      <header className="mb-8 grid grid-cols-1 gap-6 sm:grid-cols-[200px_minmax(0,1fr)] sm:items-end sm:gap-8">
         <div
           className="flex aspect-square w-full max-w-[280px] items-center justify-center rounded-2xl text-center font-semibold tracking-tight sm:max-w-none"
           style={{ backgroundColor: station.color, color: fg }}

@@ -155,7 +155,7 @@ export default async function TagPage({ params }: PageParams) {
         </p>
       </header>
 
-      <div className="grid gap-10 lg:grid-cols-[1fr_240px]">
+      <div className="grid grid-cols-1 gap-10 lg:grid-cols-[minmax(0,1fr)_240px]">
         <div className="min-w-0 space-y-12">
           <Suspense fallback={<Skeleton className="h-24 w-full rounded-2xl" />}>
             <TagRadioBlock tag={tag} />

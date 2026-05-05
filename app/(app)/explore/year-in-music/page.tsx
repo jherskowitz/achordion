@@ -114,7 +114,7 @@ export default async function ExploreYearInMusicPage({ searchParams }: PageParam
           </section>
         )}
 
-        <div className="grid gap-10 lg:grid-cols-2">
+        <div className="grid grid-cols-1 gap-10 lg:grid-cols-2">
           <section>
             <SectionHeader title="Top genres" />
             <YearTopGenres genres={data.top_genres ?? []} limit={12} />
@@ -173,7 +173,7 @@ export default async function ExploreYearInMusicPage({ searchParams }: PageParam
 
         <section>
           <SectionHeader title="Year-end playlists" />
-          <div className="grid gap-3 md:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
             <YimPlaylistCard
               playlist={data["playlist-top-discoveries-for-year"] ?? null}
               badge="Top discoveries"

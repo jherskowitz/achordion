@@ -60,7 +60,7 @@ async function CardWithCovers({ entry }: { entry: LbPlaylistSummary }) {
 
 function TwoCardSkeleton() {
   return (
-    <div className="grid gap-3 md:grid-cols-2">
+    <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
       {Array.from({ length: 2 }).map((_, i) => (
         <div
           key={i}
@@ -218,7 +218,7 @@ async function WeeklyAlgoSection({
     );
   }
   return (
-    <ul className="grid gap-3 md:grid-cols-2">
+    <ul className="grid grid-cols-1 gap-3 md:grid-cols-2">
       {matches.map((entry) => (
         <li key={entry.playlist.identifier}>
           <Suspense
@@ -425,7 +425,7 @@ export default async function ExploreOverviewPage({
 
   return (
     <PageShell className="pt-8">
-      <div className="grid gap-10 lg:grid-cols-[1fr_280px]">
+      <div className="grid grid-cols-1 gap-10 lg:grid-cols-[minmax(0,1fr)_280px]">
         <div className="min-w-0 space-y-12">
           <section>
             <SectionHeader

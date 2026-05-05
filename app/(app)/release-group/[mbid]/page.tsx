@@ -144,7 +144,7 @@ async function AlbumBody({ mbid }: { mbid: string }) {
         }
       />
 
-      <div className="grid gap-10 lg:grid-cols-[1fr_240px]">
+      <div className="grid grid-cols-1 gap-10 lg:grid-cols-[minmax(0,1fr)_240px]">
         <div className="min-w-0 space-y-12">
           <section>
             <h2 className="mb-4 text-sm font-semibold tracking-wide uppercase">
@@ -256,7 +256,7 @@ function AlbumPageSkeleton() {
   return (
     <div className="space-y-10 pt-8">
       {/* Header: cover + breadcrumb / title / artist / stats */}
-      <div className="grid gap-6 sm:grid-cols-[200px_1fr] sm:gap-8">
+      <div className="grid grid-cols-1 gap-6 sm:grid-cols-[200px_minmax(0,1fr)] sm:gap-8">
         <Skeleton className="aspect-square w-full max-w-[280px] rounded-md sm:max-w-none" />
         <div className="space-y-3">
           <Skeleton className="h-3 w-32" />
@@ -271,7 +271,7 @@ function AlbumPageSkeleton() {
         </div>
       </div>
       {/* Body grid */}
-      <div className="grid gap-10 lg:grid-cols-[1fr_240px]">
+      <div className="grid grid-cols-1 gap-10 lg:grid-cols-[minmax(0,1fr)_240px]">
         <div className="min-w-0">
           <Skeleton className="mb-4 h-3 w-16" />
           <div className="border-border/60 divide-border/60 divide-y rounded-xl border px-4">

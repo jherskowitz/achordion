@@ -165,7 +165,7 @@ async function ArtistBody({
         </div>
       )}
 
-      <div className="mt-6 grid gap-10 lg:grid-cols-[1fr_240px]">
+      <div className="mt-6 grid grid-cols-1 gap-10 lg:grid-cols-[minmax(0,1fr)_240px]">
         <div className="min-w-0 space-y-12">
           {bioSource ? (
             <Suspense
@@ -533,8 +533,8 @@ function ArtistPageSkeleton() {
       </div>
 
       {/* Body grid — bio + radio + popular tracks on the left, sidebar
-          on the right, mirroring the real lg:grid-cols-[1fr_240px]. */}
-      <div className="grid gap-10 lg:grid-cols-[1fr_240px]">
+          on the right, mirroring the real lg:grid-cols-[minmax(0,1fr)_240px]. */}
+      <div className="grid grid-cols-1 gap-10 lg:grid-cols-[minmax(0,1fr)_240px]">
         <div className="min-w-0 space-y-12">
           <Skeleton className="h-32 w-full rounded-xl" />
           <Skeleton className="h-24 w-full rounded-2xl" />

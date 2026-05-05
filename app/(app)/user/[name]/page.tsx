@@ -80,7 +80,7 @@ export default async function UserOverviewPage({ params }: PageParams) {
       <Suspense fallback={null}>
         <PinnedSection name={name} />
       </Suspense>
-      <div className="mt-8 grid gap-8 lg:grid-cols-[1fr_280px]">
+      <div className="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_280px]">
         <div className="min-w-0">
           <h2 className="mb-4 text-sm font-semibold tracking-wide uppercase">
             Recent listens

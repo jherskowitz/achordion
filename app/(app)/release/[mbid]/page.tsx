@@ -29,7 +29,7 @@ async function ReleaseBody({ mbid }: { mbid: string }) {
 
   return (
     <>
-      <header className="mt-8 mb-10 grid gap-6 sm:grid-cols-[160px_1fr] sm:gap-8">
+      <header className="mt-8 mb-10 grid grid-cols-1 gap-6 sm:grid-cols-[160px_minmax(0,1fr)] sm:gap-8">
         <CoverArt
           src={caaReleaseUrl(release.id, 500)}
           alt={release.title}
@@ -86,7 +86,7 @@ async function ReleaseBody({ mbid }: { mbid: string }) {
 
 function Fallback() {
   return (
-    <div className="mt-8 mb-10 grid gap-6 sm:grid-cols-[160px_1fr] sm:gap-8">
+    <div className="mt-8 mb-10 grid grid-cols-1 gap-6 sm:grid-cols-[160px_minmax(0,1fr)] sm:gap-8">
       <Skeleton className="aspect-square w-full max-w-[220px] rounded-md" />
       <div className="space-y-3">
         <Skeleton className="h-3 w-24" />

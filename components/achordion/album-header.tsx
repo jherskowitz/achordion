@@ -75,7 +75,7 @@ export function AlbumHeader({
     .slice(0, 6);
 
   return (
-    <header className="mt-8 mb-10 grid gap-6 sm:grid-cols-[200px_1fr] sm:gap-8">
+    <header className="mt-8 mb-10 grid grid-cols-1 gap-6 sm:grid-cols-[200px_minmax(0,1fr)] sm:gap-8">
       <CoverArt
         src={caaReleaseGroupUrl(rg.id, 500)}
         alt={rg.title}

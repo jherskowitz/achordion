@@ -20,7 +20,7 @@ export default async function SettingsLayout({
           Settings
         </h1>
       </header>
-      <div className="grid gap-10 md:grid-cols-[200px_1fr]">
+      <div className="grid grid-cols-1 gap-10 md:grid-cols-[200px_minmax(0,1fr)]">
         <aside>
           <SettingsNav />
         </aside>
