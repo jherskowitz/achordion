@@ -552,6 +552,59 @@ export function playlistMbidFromIdentifier(
   return m?.[1] ?? null;
 }
 
+export interface PlaylistSummary {
+  mbid: string;
+  title: string;
+  isPublic: boolean;
+  lastModifiedAt: string;
+}
+
+/**
+ * Owner-scoped playlist list for the *viewer* — passes their LB token so
+ * private playlists show up too. Flatter than `getUserPlaylists`: just the
+ * fields the track-actions "Add to playlist" submenu needs.
+ *
+ * The viewer-scoped response is personalised, so `lbFetch` skips the data
+ * cache (token forces no-store). We still attach a tag for downstream
+ * `revalidateTag` after writes — useful when Next caches the calling RSC.
+ */
+export async function getUserPlaylistsForViewer(
+  viewer: string,
+  token: string,
+  count = 10,
+): Promise<PlaylistSummary[]> {
+  try {
+    const params = new URLSearchParams({ count: String(count) });
+    const result = await lbFetch(
+      `/user/${encodeURIComponent(viewer)}/playlists?${params}`,
+      UserPlaylistsResponseSchema,
+      { token, revalidate: 300, tags: [`lb:user:${viewer}:playlists`] },
+    );
+    const out: PlaylistSummary[] = [];
+    for (const entry of result.playlists) {
+      const p = entry.playlist;
+      const mbid = playlistMbidFromIdentifier(p.identifier);
+      if (!mbid) continue;
+      const ext = p.extension?.["https://musicbrainz.org/doc/jspf#playlist"];
+      out.push({
+        mbid,
+        title: p.title,
+        isPublic: ext?.public ?? true,
+        lastModifiedAt: ext?.last_modified_at ?? p.date ?? "",
+      });
+    }
+    return out;
+  } catch (err) {
+    if (
+      err instanceof ListenBrainzError &&
+      (err.status === 204 || err.status === 404)
+    ) {
+      return [];
+    }
+    throw err;
+  }
+}
+
 // ─── Pinned recordings ─────────────────────────────────────────────
 
 const PinnedTrackMetaSchema = z
