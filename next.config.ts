@@ -68,6 +68,33 @@ const IMMUTABLE_ASSET_CACHE = {
   value: "public, max-age=31536000, immutable",
 };
 
+/**
+ * Cache-Control for public entity-detail routes (artist, release-
+ * group, release, recording, tag). Same content for everyone — no
+ * per-user state in the rendered HTML — so the edge can serve a
+ * single cached response to every visitor for 1 hour, then refresh
+ * in the background while still serving stale for up to 24h
+ * (`stale-while-revalidate`).
+ *
+ * `s-maxage` is the CDN-only directive (browsers ignore it); we
+ * deliberately leave `max-age=0, must-revalidate` on the *browser*
+ * side so back/forward navigation still gets the freshest version
+ * from the edge instead of a stale browser-cached HTML.
+ *
+ * Critical assumption: site-header auth state is now resolved
+ * client-side via `useSession()` (see components/layout/site-header
+ * .tsx), which means the SSR output is identical for every visitor
+ * — no avatar, no "My Feed" / "My Profile" tabs. Logged-in users
+ * get those slots filled in post-hydration via the shared session
+ * cookie. If you ever add server-rendered auth-dependent content
+ * to one of these routes, REMOVE its entry from this list before
+ * shipping.
+ */
+const PUBLIC_ENTITY_CACHE = {
+  key: "Cache-Control",
+  value: "public, max-age=0, must-revalidate, s-maxage=3600, stale-while-revalidate=86400",
+};
+
 const nextConfig: NextConfig = {
   async headers() {
     return [
@@ -98,6 +125,68 @@ const nextConfig: NextConfig = {
         // reloads (cache hit) plus a same-day pickup of any update.
         source: "/:file(.*\\.(?:png|jpg|jpeg|webp|svg|ico|gif|avif))",
         headers: [STATIC_ASSET_CACHE],
+      },
+      // Public entity-detail routes. Each renders the same HTML for
+      // every visitor (auth state lives client-side), so the edge
+      // can share a single cached response across all visitors. See
+      // PUBLIC_ENTITY_CACHE above for the trade-offs.
+      {
+        source: "/artist/:mbid",
+        headers: [PUBLIC_ENTITY_CACHE],
+      },
+      {
+        source: "/release-group/:mbid",
+        headers: [PUBLIC_ENTITY_CACHE],
+      },
+      {
+        source: "/release/:mbid",
+        headers: [PUBLIC_ENTITY_CACHE],
+      },
+      {
+        source: "/release/:mbid/:rest*",
+        headers: [PUBLIC_ENTITY_CACHE],
+      },
+      {
+        source: "/recording/:mbid",
+        headers: [PUBLIC_ENTITY_CACHE],
+      },
+      {
+        source: "/tag/:name",
+        headers: [PUBLIC_ENTITY_CACHE],
+      },
+      // Charts pages are also public + identical for everyone.
+      {
+        source: "/charts",
+        headers: [PUBLIC_ENTITY_CACHE],
+      },
+      {
+        source: "/charts/:rest*",
+        headers: [PUBLIC_ENTITY_CACHE],
+      },
+      // Static content pages (about, faq, donate, login).
+      {
+        source: "/about",
+        headers: [PUBLIC_ENTITY_CACHE],
+      },
+      {
+        source: "/faq",
+        headers: [PUBLIC_ENTITY_CACHE],
+      },
+      {
+        source: "/donate",
+        headers: [PUBLIC_ENTITY_CACHE],
+      },
+      {
+        source: "/login",
+        headers: [PUBLIC_ENTITY_CACHE],
+      },
+      {
+        source: "/changelog",
+        headers: [PUBLIC_ENTITY_CACHE],
+      },
+      {
+        source: "/explore/critical-darlings",
+        headers: [PUBLIC_ENTITY_CACHE],
       },
     ];
   },

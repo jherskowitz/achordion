@@ -1,6 +1,8 @@
+"use client";
+
 import Link from "next/link";
+import { useSession } from "next-auth/react";
 import { Search } from "lucide-react";
-import { auth } from "@/auth";
 import { Wordmark } from "./wordmark";
 import { ThemeToggle } from "./theme-toggle";
 import {
@@ -11,18 +13,46 @@ import {
 import { Button } from "@/components/ui/button";
 import { UserAvatar } from "@/components/achordion/user-avatar";
 
-export async function SiteHeader() {
-  const session = await auth();
+/**
+ * Sitewide top header.
+ *
+ * **Why this is a client component, not a server component**: the
+ * earlier server version called `auth()` on every render, which
+ * marked every route below the header as dynamic and prevented
+ * Vercel from edge-caching entity pages (artist/release-group/
+ * recording/etc). Free-tier CPU usage was 75% on launch day with
+ * real users hitting the same MBIDs repeatedly via Chrome's link
+ * prefetch, every hit paying the full server-render cost.
+ *
+ * The fix is to read the session via `useSession()` post-hydration
+ * instead — the SSR output is identical for everyone (the anonymous
+ * variant), which makes pages whose content doesn't depend on auth
+ * state edge-cacheable. Logged-in users see the anonymous header
+ * for the first paint, then `useSession()` resolves and the avatar
+ * swaps in. The flash is brief and only happens once per full page
+ * load (not on SPA navigation, where the existing client state
+ * persists).
+ *
+ * `<SessionProvider>` lives in `components/providers/index.tsx` so
+ * `useSession()` is available everywhere.
+ */
+export function SiteHeader() {
+  const { data: session, status } = useSession();
   const username = session?.user?.mbUsername;
   const avatarUrl = session?.user?.image ?? undefined;
   const displayName = session?.user?.name ?? username ?? "";
+
+  // While auth state is loading post-hydration, render the anonymous
+  // variant. Same shape as the SSR output, so there's no layout
+  // shift when useSession resolves.
+  const showAuthed = status === "authenticated" && !!username;
 
   const nav: MainNavItem[] = [
     { href: "/explore", label: "Explore" },
     { href: "/radio", label: "Radio" },
     { href: "/charts", label: "Charts" },
   ];
-  if (username) {
+  if (showAuthed) {
     nav.push({ href: "/feed", label: "My Feed" });
     nav.push({
       href: `/user/${encodeURIComponent(username)}`,
@@ -36,7 +66,7 @@ export async function SiteHeader() {
   const mobileExtras: MobileExtraItem[] = [
     { href: "/search", label: "Search" },
   ];
-  if (username) {
+  if (showAuthed) {
     mobileExtras.push({ href: "/settings", label: "Settings" });
   } else {
     mobileExtras.push({ href: "/login", label: "Sign In" });
@@ -67,7 +97,7 @@ export async function SiteHeader() {
             <Search className="size-4" />
           </Button>
           <ThemeToggle />
-          {username ? (
+          {showAuthed ? (
             <Link
               href="/settings"
               aria-label={`Settings for ${displayName}`}
