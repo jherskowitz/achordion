@@ -2144,6 +2144,37 @@ export async function getUserFeedback(
   }
 }
 
+/**
+ * Set of recording MBIDs the user has loved (score=1). Optimised for
+ * the track-actions menu, which checks "is this loved?" hundreds of
+ * times per render and wants O(1) membership. Drops feedback rows
+ * without a recording_mbid (older MSID-only entries) — the action
+ * menu can't act on them anyway since the LB write API requires an
+ * MBID.
+ */
+export async function getUserLovedRecordings(
+  username: string,
+): Promise<Set<string>> {
+  const params = new URLSearchParams({ score: "1", count: "1000" });
+  try {
+    const result = await lbFetch(
+      `/feedback/user/${encodeURIComponent(username)}/get-feedback?${params}`,
+      FeedbackResponseSchema,
+      {
+        revalidate: 60,
+        tags: [`lb:user:${username}:loved`, cacheTagsLB.user(username)],
+      },
+    );
+    const out = new Set<string>();
+    for (const f of result.feedback) {
+      if (f.recording_mbid) out.add(f.recording_mbid);
+    }
+    return out;
+  } catch {
+    return new Set();
+  }
+}
+
 // ─── User feed (events) ─────────────────────────────────────────────
 
 const FeedTrackMetadataSchema = z
