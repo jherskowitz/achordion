@@ -166,6 +166,41 @@ Wikidata image resolution (artists), MB recording-metadata (track covers), CAA U
 
 Examples: `<LazyArtistAvatar>` (in search typeahead), `<LazyTrackCover>` / `<LazyAlbumCover>` (radio rewinds, charts), the artist images that lazy-load in `<SearchTypeahead>` rows. The lazy cover components both expose an `onResolved({ url, mbid })` callback. When LB / source data didn't already ship the MBID, capture it via `useState` and use it for the album href + Parachord play target. See `CollegeAlbumCard`, `RadioRewindRow`, `ChartsAlbumCard` (Apple Music) for the canonical implementations.
 
+### 12. CSS Grid tracks need explicit `min: 0` or they overflow on mobile
+
+Bug class that bit us repeatedly: a long playlist title or annotation pushed cards past the viewport on mobile, even with `truncate` + `min-w-0` + `flex-1` correctly applied to the inner H3.
+
+The cause is a CSS-spec default that's surprising:
+
+- **`display: grid` with no `grid-template-columns`** falls back to a single auto-sized column. That column tries to size to its content's max-content.
+- **Grid items default to `min-width: auto`** — they refuse to shrink below their content's *min-content* (= the longest unbreakable word). The track inherits this and refuses to shrink with them.
+- **`grid-cols-[1fr_280px]`** has the same trap. Bare `1fr` is `minmax(auto, 1fr)`, and `auto` triggers the same min-content floor.
+
+Result: a playlist card with a long title makes the grid track expand past the viewport, dragging every child along even though `truncate` is set up correctly inside.
+
+**Rule:** every grid layout that renders user-supplied text needs `minmax(0, ...)` (or Tailwind's `grid-cols-N` shorthand which already wraps `minmax(0, 1fr)`) on every track that holds variable-width content.
+
+```tsx
+// ❌ Auto-sized track. Long content pushes the grid wider than viewport.
+<div className="grid gap-3 md:grid-cols-2">
+
+// ✅ Explicit single-column on mobile, two-column at md+.
+<div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+
+// ❌ Bare `1fr` has min-width: auto by default.
+<div className="grid lg:grid-cols-[1fr_280px]">
+
+// ✅ minmax(0, 1fr) lets the track shrink past intrinsic content.
+<div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_280px]">
+```
+
+Belt-and-suspenders helpers for cards that wrap variable-width content:
+
+- **`min-w-0`** on flex containers that wrap a flex child with `truncate` (so the flex child can actually shrink below its min-content).
+- **`overflow-hidden`** on the card's outer surface as a final cap — even if the inner layout misbehaves, content gets visually clipped at the card boundary instead of pushing the card past its column.
+
+The mass fix landed in commit 611e2ba sweeps every page with this bug. **If you add a new grid layout that holds entity names, playlist titles, or any user-supplied text, follow the explicit-`minmax(0, ...)` pattern from the start.**
+
 ---
 
 ## Browser-extension hydration gotchas

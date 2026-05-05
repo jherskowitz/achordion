@@ -145,6 +145,20 @@ The headline rail is *deliberately wider* than the reading rail so display type 
 - **Section spacing inside a page**: `space-y-12` between Sections, `space-y-3` or `space-y-4` inside a Section
 - **Hero pad**: `pt-20 pb-16 sm:pt-28 sm:pb-24` on the home
 
+### Grid tracks for variable-width content
+
+Every grid layout that holds entity names, playlist titles, or any user-supplied text needs **explicit `minmax(0, ...)`** on the variable-width track — bare `1fr` and bare `display: grid` (no template) both trigger CSS's `min-width: auto` default, which refuses to shrink past intrinsic content and pushes the whole track past the viewport on mobile.
+
+```tsx
+// ✅ Explicit single-column on mobile, two-column at md+.
+<div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+
+// ✅ minmax(0, 1fr) lets the variable-width track shrink past content.
+<div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_280px]">
+```
+
+Tailwind's `grid-cols-N` already wraps the columns in `minmax(0, 1fr)`, so explicit-numbered columns are always safe. The trap is bare `grid` without a column template, and custom `grid-cols-[1fr_X]` track lists. **AGENTS.md rule #12** has the full bug-class write-up.
+
 ### Avatar / cover sizes
 
 | Class | Rendered | Use |
