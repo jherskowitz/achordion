@@ -204,10 +204,7 @@ export async function WeeklyStatsSidebar({ name }: { name: string }) {
   if (!hasAny) {
     return (
       <div className="border-border/60 rounded-xl border p-4">
-        <p className="text-muted-foreground text-xs tracking-wide uppercase">
-          This week
-        </p>
-        <p className="text-muted-foreground mt-2 text-sm">
+        <p className="text-muted-foreground text-sm">
           No listens recorded in the last week.
         </p>
       </div>
@@ -218,10 +215,6 @@ export async function WeeklyStatsSidebar({ name }: { name: string }) {
 
   return (
     <div className="border-border/60 space-y-6 rounded-xl border p-4">
-      <p className="text-muted-foreground text-xs tracking-wide uppercase">
-        This week
-      </p>
-
       {artists.length > 0 && (
         <section>
           <SectionHeader
