@@ -15,6 +15,8 @@ interface LbClient {
    * featured app, dropped on the brief tiles.
    */
   highlight?: string;
+  /** Path under /public, e.g. "/apps/foo.jpg". Optional. */
+  image?: string;
 }
 
 const PARACHORD: LbClient = {
@@ -22,12 +24,20 @@ const PARACHORD: LbClient = {
   platforms: ["Mac", "Windows", "Linux", "Android", "iOS"],
   blurb:
     "A cross-platform music player that scrobbles to ListenBrainz, plays from Spotify / Apple Music / SoundCloud / your local library, and matches every track to a MusicBrainz identity automatically.",
-  url: "https://parachord.app",
+  url: "https://parachord.com",
   highlight:
     "Sister project to Achordion — they're built to feel like one product across desktop, mobile, and the web.",
+  image: "/parachord-hero.png",
 };
 
 const CLIENTS: LbClient[] = [
+  {
+    name: "Unstream",
+    platforms: ["Mac", "Chrome", "Firefox", "iOS"],
+    blurb:
+      "Menu-bar app and browser extensions that detect what you're listening to in Spotify, Apple Music, or your browser, scrobble it to ListenBrainz, and surface direct-from-artist purchase links across Bandcamp, Mirlo, Qobuz, Beatport, and 15+ other marketplaces.",
+    url: "https://unstream.stream/",
+  },
   {
     name: "Pano Scrobbler",
     platforms: ["Android"],
@@ -47,7 +57,7 @@ const CLIENTS: LbClient[] = [
     platforms: ["Mac"],
     blurb:
       "Mac menu-bar app that scrobbles Apple Music and Spotify to ListenBrainz, Last.fm, and Libre.fm via system Now Playing APIs.",
-    url: "https://neptunes.app",
+    url: "https://apps.apple.com/us/app/neptunes/id1006739057",
   },
   {
     name: "Web Scrobbler",
@@ -116,11 +126,6 @@ function PlatformPills({ platforms }: { platforms: string[] }) {
 }
 
 function FeaturedCard({ client }: { client: LbClient }) {
-  // Show the Parachord hero shot in the featured card. Other clients
-  // would render the same `<FeaturedCard>` without an image — but in
-  // practice we only feature Parachord, so a flag-on-the-client is
-  // overkill. Match by name.
-  const showHero = client.name === "Parachord";
   return (
     <a
       href={client.url}
@@ -132,19 +137,15 @@ function FeaturedCard({ client }: { client: LbClient }) {
         <Sparkles className="size-2.5" />
         Featured
       </span>
-      {showHero && (
-        <>
-          {/* Self-hosted from public/ — same asset as the welcome wizard.
-              eslint-disable-next-line @next/next/no-img-element */}
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="/parachord-hero.png"
-            alt="The Parachord desktop app"
-            width={1512}
-            height={927}
-            className="border-border/40 mb-5 block w-full rounded-xl border"
-          />
-        </>
+      {client.image && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={client.image}
+          alt={`${client.name} screenshot`}
+          width={1512}
+          height={927}
+          className="border-border/40 mb-5 block w-full rounded-xl border"
+        />
       )}
       <h4 className="text-foreground text-lg font-semibold tracking-tight">
         {client.name}
@@ -174,8 +175,19 @@ function ClientTile({ client }: { client: LbClient }) {
       href={client.url}
       target="_blank"
       rel="noopener noreferrer"
-      className="border-border/60 hover:border-foreground/30 hover:bg-muted/30 group block rounded-xl border p-4 transition-colors"
+      className="border-border/60 hover:border-foreground/30 hover:bg-muted/30 group block overflow-hidden rounded-xl border p-4 transition-colors"
     >
+      {client.image && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={client.image}
+          alt={`${client.name} screenshot`}
+          width={1280}
+          height={800}
+          loading="lazy"
+          className="border-border/40 mb-3 block aspect-[16/10] w-full rounded-lg border object-cover"
+        />
+      )}
       <div className="flex items-baseline justify-between gap-3">
         <h4 className="text-foreground text-sm font-medium">{client.name}</h4>
         <ExternalLink className="text-muted-foreground/60 group-hover:text-muted-foreground size-3 shrink-0" />
@@ -195,18 +207,15 @@ function ClientTile({ client }: { client: LbClient }) {
  * Intentionally not exhaustive — we showcase Parachord prominently
  * (sister project, full-feature reference) and surface the rest as a
  * helpful "where else do people scrobble from" tour.
+ *
+ * Caller is responsible for any introductory copy / page header —
+ * this component renders only the featured card + tile grid so it
+ * can drop cleanly into /apps (where PageHeader provides the title)
+ * and any future place that wants the same list.
  */
 export function LbClientMarketplace() {
   return (
     <section className="space-y-4">
-      <header>
-        <h3 className="text-sm font-medium">ListenBrainz scrobbler apps</h3>
-        <p className="text-muted-foreground mt-1 text-sm leading-6">
-          Don&apos;t see your music app in the list above? These third-party
-          clients can scrobble straight to ListenBrainz, so anything you
-          play through them shows up here automatically.
-        </p>
-      </header>
       <FeaturedCard client={PARACHORD} />
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {CLIENTS.map((c) => (

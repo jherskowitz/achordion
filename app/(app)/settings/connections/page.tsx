@@ -4,7 +4,6 @@ import { Check, ExternalLink } from "lucide-react";
 import { auth } from "@/auth";
 import { hasUserLbToken } from "@/lib/lb-token";
 import { LbTokenForm } from "@/components/achordion/lb-token-form";
-import { LbClientMarketplace } from "@/components/achordion/lb-client-marketplace";
 import { MusicServicesCard } from "@/components/achordion/music-services-card";
 import { clearLbTokenAction } from "../actions";
 
@@ -97,7 +96,23 @@ export default async function ConnectionsPage() {
 
       <MusicServicesCard />
 
-      <LbClientMarketplace />
+      <section className="space-y-3">
+        <header>
+          <h3 className="text-sm font-medium">Scrobbler apps</h3>
+        </header>
+        <p className="text-muted-foreground text-sm leading-6">
+          Looking for a music player or browser extension that scrobbles
+          straight to ListenBrainz? See the curated list of cross-
+          platform clients on the{" "}
+          <Link
+            href="/apps"
+            className="text-foreground hover:underline underline-offset-4"
+          >
+            App Marketplace
+          </Link>
+          .
+        </p>
+      </section>
     </div>
   );
 }

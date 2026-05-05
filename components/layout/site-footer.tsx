@@ -37,6 +37,9 @@ export function SiteFooter() {
           <Link href="/faq" className="hover:text-foreground">
             FAQ
           </Link>
+          <Link href="/apps" className="hover:text-foreground">
+            Apps
+          </Link>
           <Link href="/donate" className="hover:text-foreground">
             Donate
           </Link>
