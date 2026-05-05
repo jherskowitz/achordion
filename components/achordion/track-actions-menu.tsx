@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Heart, ListPlus, MoreVertical, Pin } from "lucide-react";
+import { Heart, ListPlus, MoreVertical, Pin, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -17,10 +17,14 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { feedbackTrackAction } from "@/app/(app)/track/actions";
+import {
+  deleteListenAction,
+  feedbackTrackAction,
+} from "@/app/(app)/track/actions";
 import { parachordQueueAdd } from "@/lib/parachord";
 import { useLoved } from "./loved-tracks-provider";
 import { PinTrackDialog } from "./track-actions/pin-track-dialog";
+import { ConfirmDialog } from "./track-actions/confirm-dialog";
 
 export type TrackRef = {
   recordingMbid?: string | null;
@@ -43,13 +47,29 @@ export type TrackRef = {
 export function TrackActionsMenu({
   track,
   viewer,
+  onDeleted,
 }: {
   track: TrackRef;
   viewer: { mbUsername: string } | null;
+  /**
+   * Fired after a successful Delete-listen call. Consumers (e.g.
+   * `LiveScrobbleList`) use this to optimistically drop the row from
+   * local state so it disappears without waiting for a re-fetch.
+   */
+  onDeleted?: () => void;
 }) {
   const [pinOpen, setPinOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   if (!viewer) return null;
   const canPin = !!(track.recordingMbid || track.recordingMsid);
+  // Delete only makes sense for an actual listen owned by the viewer:
+  // we need a recording_msid + listened_at to address the listen, and
+  // the row's owner must be the signed-in user.
+  const canDelete =
+    !!track.listenedAt &&
+    !!track.recordingMsid &&
+    !!track.ownerUsername &&
+    track.ownerUsername === viewer.mbUsername;
   return (
     <>
       <DropdownMenu>
@@ -72,9 +92,43 @@ export function TrackActionsMenu({
           <DropdownMenuSeparator />
           <DropdownMenuLabel>Add</DropdownMenuLabel>
           <QueueAddItem track={track} />
+          {canDelete ? (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                variant="destructive"
+                onClick={() => setDeleteOpen(true)}
+              >
+                <Trash2 />
+                Delete listen…
+              </DropdownMenuItem>
+            </>
+          ) : null}
         </DropdownMenuContent>
       </DropdownMenu>
       <PinTrackDialog open={pinOpen} onOpenChange={setPinOpen} track={track} />
+      {canDelete ? (
+        <ConfirmDialog
+          open={deleteOpen}
+          onOpenChange={setDeleteOpen}
+          title="Delete this listen?"
+          body="This can't be undone."
+          confirmLabel="Delete"
+          destructive
+          onConfirm={async () => {
+            const result = await deleteListenAction({
+              recordingMsid: track.recordingMsid!,
+              listenedAt: track.listenedAt!,
+            });
+            if (!result.ok) {
+              toast.error(result.reason);
+              return;
+            }
+            onDeleted?.();
+            toast.success("Listen deleted");
+          }}
+        />
+      ) : null}
     </>
   );
 }

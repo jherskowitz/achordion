@@ -129,7 +129,27 @@ export function LiveScrobbleList({
           listenedAt: listen.listened_at,
           ownerUsername: username,
         };
-        return <TrackActionsMenu track={trackRef} viewer={viewer} />;
+        return (
+          <TrackActionsMenu
+            track={trackRef}
+            viewer={viewer}
+            onDeleted={() => {
+              // Optimistically drop the row. The next poll tick (or a
+              // navigation that triggers `revalidateTag`) will reconcile.
+              setListens((prev) =>
+                prev.filter(
+                  (l) =>
+                    !(
+                      l.listened_at === listen.listened_at &&
+                      (l.track_metadata.additional_info as
+                        | { recording_msid?: string }
+                        | undefined)?.recording_msid === recordingMsid
+                    ),
+                ),
+              );
+            }}
+          />
+        );
       }}
     />
   );
