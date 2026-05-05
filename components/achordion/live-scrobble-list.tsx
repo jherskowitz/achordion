@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useSession } from "next-auth/react";
 import type { Listen } from "@/lib/clients/listenbrainz";
 import { ScrobbleList } from "./scrobble-list";
+import { TrackActionsMenu, type TrackRef } from "./track-actions-menu";
 
 const POLL_INTERVAL_MS = 25_000;
 
@@ -15,6 +17,12 @@ const POLL_INTERVAL_MS = 25_000;
  * Polling pauses when the document is hidden — no point fetching for a
  * background tab. We re-fetch immediately on visibility-return so the
  * user sees current state when they switch back.
+ *
+ * For signed-in viewers we also slot a `<TrackActionsMenu>` (⋮) into
+ * each row's right edge. We use `useSession()` rather than threading
+ * a `viewer` prop from the server so the parent page (`/user/[name]`)
+ * can stay edge-cacheable — calling `auth()` server-side would
+ * dynamic-render every variant.
  */
 export function LiveScrobbleList({
   username,
@@ -25,6 +33,10 @@ export function LiveScrobbleList({
 }) {
   const [listens, setListens] = useState<Listen[]>(initialListens);
   const latestTsRef = useRef<number | null>(initialListens[0]?.listened_at ?? null);
+
+  const { data: session } = useSession();
+  const viewerName = session?.user?.mbUsername;
+  const viewer = viewerName ? { mbUsername: viewerName } : null;
 
   useEffect(() => {
     let cancelled = false;
@@ -85,5 +97,40 @@ export function LiveScrobbleList({
     };
   }, [username]);
 
-  return <ScrobbleList listens={listens} />;
+  return (
+    <ScrobbleList
+      listens={listens}
+      renderTrailing={(listen) => {
+        if (!viewer) return null;
+        const meta = listen.track_metadata;
+        const recordingMbid =
+          meta.mbid_mapping?.recording_mbid ??
+          meta.additional_info?.recording_mbid ??
+          null;
+        // `recording_msid` lives in additional_info via passthrough,
+        // so it isn't on the typed surface — pull it through `unknown`.
+        const additional = meta.additional_info as
+          | (Record<string, unknown> & { recording_msid?: string })
+          | undefined;
+        const recordingMsid =
+          typeof additional?.recording_msid === "string"
+            ? additional.recording_msid
+            : null;
+        const releaseMbid =
+          meta.mbid_mapping?.release_mbid ??
+          meta.additional_info?.release_mbid ??
+          null;
+        const trackRef: TrackRef = {
+          recordingMbid,
+          recordingMsid,
+          trackName: meta.track_name,
+          artistName: meta.artist_name,
+          releaseMbid,
+          listenedAt: listen.listened_at,
+          ownerUsername: username,
+        };
+        return <TrackActionsMenu track={trackRef} viewer={viewer} />;
+      }}
+    />
+  );
 }

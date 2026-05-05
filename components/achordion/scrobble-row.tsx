@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { caaUrlFromListen } from "@/lib/clients/coverart";
 import type { Listen } from "@/lib/clients/listenbrainz";
@@ -28,9 +29,17 @@ function relativeTime(unixSeconds: number): string {
 export function ScrobbleRow({
   listen,
   showRelative = true,
+  trailing,
 }: {
   listen: Listen;
   showRelative?: boolean;
+  /**
+   * Optional content rendered at the row's right edge, after the
+   * relative timestamp. Used by `LiveScrobbleList` to slot in the
+   * `<TrackActionsMenu>` ⋮ button for signed-in viewers without
+   * making this row component aware of session state.
+   */
+  trailing?: ReactNode;
 }) {
   const meta = listen.track_metadata;
   const recordingMbid =
@@ -109,6 +118,7 @@ export function ScrobbleRow({
           {relativeTime(listen.listened_at)}
         </time>
       )}
+      {trailing}
     </li>
   );
 }
