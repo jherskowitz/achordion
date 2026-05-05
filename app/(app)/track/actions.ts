@@ -129,3 +129,33 @@ export async function addToPlaylistAction(input: {
     };
   }
 }
+
+export type CreatePlaylistResult =
+  | { ok: true; playlistMbid: string }
+  | { ok: false; reason: string };
+
+export async function createPlaylistAction(input: {
+  name: string;
+  isPublic: boolean;
+  recordingMbid?: string;
+}): Promise<CreatePlaylistResult> {
+  const auth = await requireUserToken();
+  if (!auth.ok) return auth;
+  if (!input.name.trim()) {
+    return { ok: false, reason: "Playlist name is required." };
+  }
+  try {
+    const { playlistMbid } = await createPlaylistOnLb(auth.token, {
+      name: input.name.trim(),
+      isPublic: input.isPublic,
+      recordingMbid: input.recordingMbid,
+    });
+    revalidateTag(`lb:user:${auth.viewer}:playlists`, "max");
+    return { ok: true, playlistMbid };
+  } catch (e) {
+    return {
+      ok: false,
+      reason: e instanceof Error ? e.message : "Couldn't create playlist.",
+    };
+  }
+}
