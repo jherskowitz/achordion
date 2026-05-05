@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import { useSession } from "next-auth/react";
 import { toast } from "sonner";
 import {
@@ -38,13 +38,17 @@ export function PinTrackDialog({ open, onOpenChange, track }: Props) {
 
   // Clear inputs every time the dialog (re)opens. We don't try to
   // preserve drafts across opens — the blurb is short and tied to a
-  // specific track + moment.
-  useEffect(() => {
+  // specific track + moment. Track the previous `open` prop and
+  // reset during render rather than in an effect, per React's
+  // recommended pattern for prop-derived state.
+  const [prevOpen, setPrevOpen] = useState(open);
+  if (prevOpen !== open) {
+    setPrevOpen(open);
     if (open) {
       setBlurb("");
       setPinnedUntil("");
     }
-  }, [open]);
+  }
 
   function handleSubmit() {
     const blurbTrimmed = blurb.trim();

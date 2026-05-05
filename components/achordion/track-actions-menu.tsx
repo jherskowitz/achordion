@@ -417,20 +417,9 @@ function AddToPlaylistSub({
   recordingMbid: string | null;
   onCreateNew: () => void;
 }) {
-  // No token → can't list playlists or add to them. Render a flat
-  // item wrapped in the no-token popover instead of the submenu;
-  // a hover-opening submenu trigger doesn't compose with a
-  // click-opening popover.
-  if (!disabled && !hasToken) {
-    return (
-      <NeedsTokenPopover hasToken={false}>
-        <DropdownMenuItem>
-          <ListMusic />
-          Add to playlist
-        </DropdownMenuItem>
-      </NeedsTokenPopover>
-    );
-  }
+  // Hooks must run unconditionally on every render, so they go
+  // first — branching for the no-token / disabled cases happens
+  // below, after all hook calls have executed.
   const [subOpen, setSubOpen] = useState(false);
   // Tracks which playlists this open of the menu has already added
   // to, so we can render a checkmark and skip re-firing on a second
@@ -446,8 +435,23 @@ function AddToPlaylistSub({
       }
       return (await res.json()) as PlaylistsResponse;
     },
-    enabled: subOpen && !disabled,
+    enabled: subOpen && !disabled && hasToken,
   });
+
+  // No token → can't list playlists or add to them. Render a flat
+  // item wrapped in the no-token popover instead of the submenu;
+  // a hover-opening submenu trigger doesn't compose with a
+  // click-opening popover.
+  if (!disabled && !hasToken) {
+    return (
+      <NeedsTokenPopover hasToken={false}>
+        <DropdownMenuItem>
+          <ListMusic />
+          Add to playlist
+        </DropdownMenuItem>
+      </NeedsTokenPopover>
+    );
+  }
 
   async function handleAdd(playlistMbid: string, title: string) {
     if (!recordingMbid) return;
@@ -572,19 +576,8 @@ function RecommendSub({
   recordingMbid: string | null;
   onChoosePeople: () => void;
 }) {
-  // Same shape as AddToPlaylistSub — collapse to a flat
-  // popover-wrapped item when there's no token to send the
-  // recommendation with.
-  if (!disabled && !hasToken) {
-    return (
-      <NeedsTokenPopover hasToken={false}>
-        <DropdownMenuItem>
-          <Megaphone />
-          Recommend
-        </DropdownMenuItem>
-      </NeedsTokenPopover>
-    );
-  }
+  // Hooks must run unconditionally — declared first, with branching
+  // for the no-token / disabled cases below.
   const [subOpen, setSubOpen] = useState(false);
   const [sending, setSending] = useState(false);
   const queryClient = useQueryClient();
@@ -598,8 +591,22 @@ function RecommendSub({
       }
       return (await res.json()) as FollowersResponse;
     },
-    enabled: subOpen && !disabled,
+    enabled: subOpen && !disabled && hasToken,
   });
+
+  // Same shape as AddToPlaylistSub — collapse to a flat
+  // popover-wrapped item when there's no token to send the
+  // recommendation with.
+  if (!disabled && !hasToken) {
+    return (
+      <NeedsTokenPopover hasToken={false}>
+        <DropdownMenuItem>
+          <Megaphone />
+          Recommend
+        </DropdownMenuItem>
+      </NeedsTokenPopover>
+    );
+  }
 
   async function handleAllFollowers() {
     if (!recordingMbid) return;

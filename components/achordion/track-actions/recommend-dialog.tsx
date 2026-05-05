@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -41,13 +41,18 @@ export function RecommendDialog({ open, onOpenChange, track }: Props) {
   const [pending, startTransition] = useTransition();
 
   // Reset every time the dialog reopens so a previous attempt's
-  // selection doesn't carry over to a different track.
-  useEffect(() => {
+  // selection doesn't carry over to a different track. Reset during
+  // render via a tracked previous-prop value rather than in an
+  // effect — see React docs on storing information from previous
+  // renders.
+  const [prevOpen, setPrevOpen] = useState(open);
+  if (prevOpen !== open) {
+    setPrevOpen(open);
     if (open) {
       setSelected(new Set());
       setFilter("");
     }
-  }, [open]);
+  }
 
   const query = useQuery<FollowersResponse>({
     queryKey: ["me", "followers"],
@@ -61,7 +66,15 @@ export function RecommendDialog({ open, onOpenChange, track }: Props) {
     enabled: open,
   });
 
-  const allFollowers = query.data?.followers ?? [];
+  // Memoize the followers list so its identity is stable across
+  // renders that don't change the underlying query data — otherwise
+  // the `visible` useMemo below sees a fresh array every render and
+  // never hits its cache.
+  const followersData = query.data?.followers;
+  const allFollowers = useMemo(
+    () => followersData ?? [],
+    [followersData],
+  );
   const visible = useMemo(() => {
     const q = filter.trim().toLowerCase();
     if (!q) return allFollowers;

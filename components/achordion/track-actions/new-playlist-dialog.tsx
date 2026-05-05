@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import {
@@ -41,14 +41,20 @@ export function NewPlaylistDialog({
   const [pending, startTransition] = useTransition();
   const queryClient = useQueryClient();
 
-  // Reset form whenever the dialog (re)opens — same pattern as
-  // PinTrackDialog: we don't try to preserve drafts across opens.
-  useEffect(() => {
+  // Reset form whenever the dialog transitions from closed → open.
+  // Tracking the previous `open` prop and calling setState during
+  // render is React's recommended pattern for "derive state from
+  // a prop change" — see https://react.dev/reference/react/useState#storing-information-from-previous-renders.
+  // This avoids `react-hooks/set-state-in-effect` and the cascading
+  // re-render that an effect-based reset would cause.
+  const [prevOpen, setPrevOpen] = useState(open);
+  if (prevOpen !== open) {
+    setPrevOpen(open);
     if (open) {
       setName("");
       setIsPublic(true);
     }
-  }, [open]);
+  }
 
   function handleSubmit() {
     const trimmed = name.trim();
