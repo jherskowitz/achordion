@@ -81,7 +81,11 @@ export async function OnAirIndicator({
     return (
       <div
         className={cn(
-          "text-muted-foreground inline-flex items-center gap-2 text-xs",
+          // `flex max-w-full` instead of `inline-flex` so the
+          // container is bounded and the inner `truncate` actually
+          // clips long track / artist names on mobile. Mirrors the
+          // compact variant below.
+          "text-muted-foreground flex max-w-full items-center gap-2 text-xs",
           className,
         )}
       >

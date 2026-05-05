@@ -132,7 +132,12 @@ export function LiveOnAirIndicator({
     return (
       <div
         className={cn(
-          "text-muted-foreground inline-flex items-center gap-2 text-xs",
+          // `flex max-w-full` instead of `inline-flex` so the
+          // container is bounded by its parent and the inner
+          // `truncate` actually clips long track / artist names
+          // on mobile. The compact variant below already does
+          // this — keep them consistent.
+          "text-muted-foreground flex max-w-full items-center gap-2 text-xs",
           className,
         )}
       >
