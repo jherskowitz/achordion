@@ -45,6 +45,9 @@ import { PinTrackDialog } from "./track-actions/pin-track-dialog";
 import { ConfirmDialog } from "./track-actions/confirm-dialog";
 import { NewPlaylistDialog } from "./track-actions/new-playlist-dialog";
 import { RecommendDialog } from "./track-actions/recommend-dialog";
+import { NeedsTokenPopover } from "./track-actions/needs-token-popover";
+
+type HasLbTokenResponse = { hasToken: boolean };
 
 export type TrackRef = {
   recordingMbid?: string | null;
@@ -67,10 +70,18 @@ export type TrackRef = {
 export function TrackActionsMenu({
   track,
   viewer,
+  hasLbToken,
   onDeleted,
 }: {
   track: TrackRef;
   viewer: { mbUsername: string } | null;
+  /**
+   * Whether the viewer has an LB token configured. `undefined` means
+   * "still loading" — we treat it as truthy so the popover doesn't
+   * flash before the React Query fetch resolves. Pass an explicit
+   * boolean to skip the client fetch (useful in tests/storybook).
+   */
+  hasLbToken?: boolean | undefined;
   /**
    * Fired after a successful Delete-listen call. Consumers (e.g.
    * `LiveScrobbleList`) use this to optimistically drop the row from
@@ -82,6 +93,27 @@ export function TrackActionsMenu({
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [newPlaylistOpen, setNewPlaylistOpen] = useState(false);
   const [recommendOpen, setRecommendOpen] = useState(false);
+  // Lazy-fetch the viewer's LB-token status once per session. Cache
+  // it under ["me","has-lb-token"] so every TrackActionsMenu shares
+  // a single network round-trip. Skipped entirely when the caller
+  // passes an explicit `hasLbToken` (test override).
+  const tokenQuery = useQuery<HasLbTokenResponse>({
+    queryKey: ["me", "has-lb-token"],
+    queryFn: async () => {
+      const res = await fetch("/api/me/has-lb-token");
+      if (!res.ok) throw new Error("Couldn't check token state.");
+      return (await res.json()) as HasLbTokenResponse;
+    },
+    enabled: hasLbToken === undefined && !!viewer,
+    staleTime: Infinity,
+  });
+  // Treat unknown / loading as "has token" so we don't flash the
+  // NeedsTokenPopover wrapper on first render. The toast fallback
+  // from the server action covers the race where someone clicks
+  // before the fetch resolves.
+  const tokenKnown =
+    hasLbToken !== undefined ? hasLbToken : tokenQuery.data?.hasToken;
+  const hasToken = tokenKnown ?? true;
   if (!viewer) return null;
   const canPin = !!(track.recordingMbid || track.recordingMsid);
   const canPlaylist = !!track.recordingMbid;
@@ -111,18 +143,24 @@ export function TrackActionsMenu({
         />
         <DropdownMenuContent align="end" className="w-56">
           <DropdownMenuLabel>Track</DropdownMenuLabel>
-          <LoveItem track={track} />
-          <PinItem disabled={!canPin} onSelect={() => setPinOpen(true)} />
+          <LoveItem track={track} hasToken={hasToken} />
+          <PinItem
+            disabled={!canPin}
+            hasToken={hasToken}
+            onSelect={() => setPinOpen(true)}
+          />
           <DropdownMenuSeparator />
           <DropdownMenuLabel>Add</DropdownMenuLabel>
           <QueueAddItem track={track} />
           <AddToPlaylistSub
             disabled={!canPlaylist}
+            hasToken={hasToken}
             recordingMbid={track.recordingMbid ?? null}
             onCreateNew={() => setNewPlaylistOpen(true)}
           />
           <RecommendSub
             disabled={!canRecommend}
+            hasToken={hasToken}
             recordingMbid={track.recordingMbid ?? null}
             onChoosePeople={() => setRecommendOpen(true)}
           />
@@ -132,13 +170,15 @@ export function TrackActionsMenu({
           {canDelete ? (
             <>
               <DropdownMenuSeparator />
-              <DropdownMenuItem
-                variant="destructive"
-                onClick={() => setDeleteOpen(true)}
-              >
-                <Trash2 />
-                Delete listen…
-              </DropdownMenuItem>
+              <NeedsTokenPopover hasToken={hasToken}>
+                <DropdownMenuItem
+                  variant="destructive"
+                  onClick={() => setDeleteOpen(true)}
+                >
+                  <Trash2 />
+                  Delete listen…
+                </DropdownMenuItem>
+              </NeedsTokenPopover>
             </>
           ) : null}
         </DropdownMenuContent>
@@ -191,9 +231,11 @@ export function TrackActionsMenu({
  */
 function PinItem({
   disabled,
+  hasToken,
   onSelect,
 }: {
   disabled: boolean;
+  hasToken: boolean;
   onSelect: () => void;
 }) {
   const item = (
@@ -205,17 +247,19 @@ function PinItem({
       Pin track…
     </DropdownMenuItem>
   );
-  if (!disabled) return item;
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <span>{item}</span>
-      </TooltipTrigger>
-      <TooltipContent side="left">
-        No MusicBrainz ID for this recording.
-      </TooltipContent>
-    </Tooltip>
-  );
+  if (disabled) {
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span>{item}</span>
+        </TooltipTrigger>
+        <TooltipContent side="left">
+          No MusicBrainz ID for this recording.
+        </TooltipContent>
+      </Tooltip>
+    );
+  }
+  return <NeedsTokenPopover hasToken={hasToken}>{item}</NeedsTokenPopover>;
 }
 
 /**
@@ -253,7 +297,7 @@ function WriteReviewItem() {
  * Disabled when the row has no recording MBID, since LB feedback
  * is keyed on MBID. A tooltip explains why.
  */
-function LoveItem({ track }: { track: TrackRef }) {
+function LoveItem({ track, hasToken }: { track: TrackRef; hasToken: boolean }) {
   const { isLoved, setLoved } = useLoved();
   const mbid = track.recordingMbid ?? null;
   const loved = isLoved(mbid);
@@ -301,17 +345,19 @@ function LoveItem({ track }: { track: TrackRef }) {
     </DropdownMenuItem>
   );
 
-  if (!disabled) return item;
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <span>{item}</span>
-      </TooltipTrigger>
-      <TooltipContent side="left">
-        No MusicBrainz ID for this recording.
-      </TooltipContent>
-    </Tooltip>
-  );
+  if (disabled) {
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span>{item}</span>
+        </TooltipTrigger>
+        <TooltipContent side="left">
+          No MusicBrainz ID for this recording.
+        </TooltipContent>
+      </Tooltip>
+    );
+  }
+  return <NeedsTokenPopover hasToken={hasToken}>{item}</NeedsTokenPopover>;
 }
 
 /**
@@ -362,13 +408,29 @@ type PlaylistsResponse = {
  */
 function AddToPlaylistSub({
   disabled,
+  hasToken,
   recordingMbid,
   onCreateNew,
 }: {
   disabled: boolean;
+  hasToken: boolean;
   recordingMbid: string | null;
   onCreateNew: () => void;
 }) {
+  // No token → can't list playlists or add to them. Render a flat
+  // item wrapped in the no-token popover instead of the submenu;
+  // a hover-opening submenu trigger doesn't compose with a
+  // click-opening popover.
+  if (!disabled && !hasToken) {
+    return (
+      <NeedsTokenPopover hasToken={false}>
+        <DropdownMenuItem>
+          <ListMusic />
+          Add to playlist
+        </DropdownMenuItem>
+      </NeedsTokenPopover>
+    );
+  }
   const [subOpen, setSubOpen] = useState(false);
   // Tracks which playlists this open of the menu has already added
   // to, so we can render a checkmark and skip re-firing on a second
@@ -501,13 +563,28 @@ type FollowersResponse = { followers: string[] };
  */
 function RecommendSub({
   disabled,
+  hasToken,
   recordingMbid,
   onChoosePeople,
 }: {
   disabled: boolean;
+  hasToken: boolean;
   recordingMbid: string | null;
   onChoosePeople: () => void;
 }) {
+  // Same shape as AddToPlaylistSub — collapse to a flat
+  // popover-wrapped item when there's no token to send the
+  // recommendation with.
+  if (!disabled && !hasToken) {
+    return (
+      <NeedsTokenPopover hasToken={false}>
+        <DropdownMenuItem>
+          <Megaphone />
+          Recommend
+        </DropdownMenuItem>
+      </NeedsTokenPopover>
+    );
+  }
   const [subOpen, setSubOpen] = useState(false);
   const [sending, setSending] = useState(false);
   const queryClient = useQueryClient();
