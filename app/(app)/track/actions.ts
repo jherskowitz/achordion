@@ -78,3 +78,32 @@ export async function pinTrackAction(input: {
     };
   }
 }
+
+export async function recommendTrackAction(input: {
+  recordingMbid: string;
+  recipients: string[];
+  blurb?: string;
+}): Promise<ActionResult> {
+  const auth = await requireUserToken();
+  if (!auth.ok) return auth;
+  if (input.recipients.length === 0) {
+    return { ok: false, reason: "Pick at least one recipient." };
+  }
+  if (input.recipients.length > 50) {
+    return { ok: false, reason: "Pick 50 or fewer recipients." };
+  }
+  try {
+    await submitRecommendation(auth.token, {
+      recordingMbid: input.recordingMbid,
+      recipients: input.recipients,
+      blurb: input.blurb,
+    });
+    return { ok: true };
+  } catch (e) {
+    return {
+      ok: false,
+      reason:
+        e instanceof Error ? e.message : "Couldn't send recommendations.",
+    };
+  }
+}
