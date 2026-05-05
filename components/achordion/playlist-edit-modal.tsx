@@ -10,7 +10,7 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import { Dialog } from "@base-ui/react/dialog";
-import { Pencil, X } from "lucide-react";
+import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { editPlaylistAction } from "@/app/(app)/playlist/[mbid]/actions";
 import { cn } from "@/lib/utils";
@@ -31,10 +31,12 @@ import { cn } from "@/lib/utils";
  * reads better as a save-time error than a yellow "no such user"
  * inline.
  */
-export function PlaylistEditButton({
+export function PlaylistEditDialog({
   mbid,
   owner,
   initial,
+  open,
+  onOpenChange,
 }: {
   mbid: string;
   /** Playlist creator — excluded from collaborator suggestions since
@@ -46,9 +48,13 @@ export function PlaylistEditButton({
     isPublic: boolean;
     collaborators: string[];
   };
+  /** Controlled open state — caller (e.g. PlaylistOwnerToolsMenu)
+   *  decides when to open from a menu item or other affordance. */
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
 }) {
   const router = useRouter();
-  const [open, setOpen] = useState(false);
+  const setOpen = onOpenChange;
   const [title, setTitle] = useState(initial.title);
   const [annotation, setAnnotation] = useState(initial.annotation);
   const [isPublic, setIsPublic] = useState(initial.isPublic);
@@ -182,18 +188,6 @@ export function PlaylistEditButton({
 
   return (
     <Dialog.Root open={open} onOpenChange={setOpen}>
-      <Dialog.Trigger
-        render={
-          <Button
-            variant="outline"
-            size="sm"
-            className="gap-1.5 rounded-full"
-          />
-        }
-      >
-        <Pencil className="size-3.5" />
-        Edit
-      </Dialog.Trigger>
       <Dialog.Portal>
         <Dialog.Backdrop className="fixed inset-0 z-50 bg-black/40 transition-opacity duration-150 data-ending-style:opacity-0 data-starting-style:opacity-0 supports-backdrop-filter:backdrop-blur-xs" />
         <Dialog.Popup className="bg-popover text-popover-foreground border-border/60 fixed top-1/2 left-1/2 z-50 w-[min(95vw,520px)] -translate-x-1/2 -translate-y-1/2 rounded-2xl border shadow-xl transition duration-150 data-ending-style:opacity-0 data-starting-style:opacity-0">

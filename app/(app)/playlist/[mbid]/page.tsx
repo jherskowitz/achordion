@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
-import { Download, ExternalLink, Globe, Lock, Users } from "lucide-react";
+import { ExternalLink, Globe, Lock, Users } from "lucide-react";
 import { auth } from "@/auth";
 import { getLbTokenForRequest } from "@/lib/lb-token";
 import { getPlaylist } from "@/lib/clients/listenbrainz";
@@ -21,7 +21,8 @@ import { CoverArt } from "@/components/achordion/cover-art";
 import { OpenInParachordButton } from "@/components/achordion/open-in-parachord-button";
 import { PlayOverNumberCell } from "@/components/achordion/parachord-button";
 import { PlaylistCoverMosaic } from "@/components/achordion/playlist-cover-mosaic";
-import { PlaylistEditButton } from "@/components/achordion/playlist-edit-modal";
+import { PlaylistOwnerToolsMenu } from "@/components/achordion/playlist-owner-tools-menu";
+import { TrackListActionsMenu } from "@/components/achordion/track-list-actions-menu";
 import { PlaylistVisibilityToggle } from "@/components/achordion/playlist-visibility-toggle";
 import { TrackActionsMenuSlot } from "@/components/achordion/track-actions-menu-slot";
 import { IconTooltip } from "@/components/ui/icon-tooltip";
@@ -228,18 +229,6 @@ async function PlaylistBody({ mbid }: { mbid: string }) {
                 </span>
               </IconTooltip>
             )}
-            {isOwner && (
-              <PlaylistEditButton
-                mbid={mbid}
-                owner={data.creator}
-                initial={{
-                  title: data.title,
-                  annotation: data.annotation ?? "",
-                  isPublic: data.isPublic,
-                  collaborators: data.collaborators,
-                }}
-              />
-            )}
           </div>
           {data.annotation && stripHtml(data.annotation) && (
             <p className="text-muted-foreground/80 mt-3 max-w-prose text-sm leading-6">
@@ -260,6 +249,37 @@ async function PlaylistBody({ mbid }: { mbid: string }) {
                 creator={data.creator ?? "ListenBrainz"}
               />
             )}
+            {data.tracks.length > 0 &&
+              (isOwner ? (
+                <PlaylistOwnerToolsMenu
+                  mbid={mbid}
+                  owner={data.creator}
+                  initial={{
+                    title: data.title,
+                    annotation: data.annotation ?? "",
+                    isPublic: data.isPublic,
+                    collaborators: data.collaborators,
+                  }}
+                  tracks={parachordTracks}
+                  xspfUrl={`/api/playlist/${mbid}/xspf`}
+                  xspfFilename={(data.title || mbid)
+                    .replace(/[^\w\d\-]+/g, "_")
+                    .replace(/^_+|_+$/g, "")
+                    .slice(0, 80) || mbid}
+                />
+              ) : (
+                <TrackListActionsMenu
+                  title={data.title}
+                  creator={data.creator ?? undefined}
+                  tracks={parachordTracks}
+                  xspfUrl={`/api/playlist/${mbid}/xspf`}
+                  xspfFilename={(data.title || mbid)
+                    .replace(/[^\w\d\-]+/g, "_")
+                    .replace(/^_+|_+$/g, "")
+                    .slice(0, 80) || mbid}
+                  triggerLabel="Playlist actions"
+                />
+              ))}
             {(() => {
               const spotifyHref = safeHttpUrl(data.externalUrls?.spotify);
               if (!spotifyHref) return null;
@@ -275,16 +295,6 @@ async function PlaylistBody({ mbid }: { mbid: string }) {
                 </a>
               );
             })()}
-            {data.tracks.length > 0 && (
-              <a
-                href={`/api/playlist/${mbid}/xspf`}
-                download
-                className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-xs underline-offset-4 hover:underline"
-              >
-                <Download className="size-3" />
-                Download XSPF
-              </a>
-            )}
           </div>
         </div>
       </header>
