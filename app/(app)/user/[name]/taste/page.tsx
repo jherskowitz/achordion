@@ -14,6 +14,7 @@ import { CoverArt } from "@/components/achordion/cover-art";
 import { PageShell } from "@/components/achordion/page-shell";
 import { TrackListActionsMenu } from "@/components/achordion/track-list-actions-menu";
 import { OpenInParachordButton } from "@/components/achordion/open-in-parachord-button";
+import { TrackActionsMenuSlot } from "@/components/achordion/track-actions-menu-slot";
 import {
   artistHref,
   recordingHref,
@@ -216,6 +217,14 @@ async function LovesBody({ name }: { name: string }) {
               >
                 {relativeTimestamp(t.lovedAt)}
               </time>
+              <TrackActionsMenuSlot
+                track={{
+                  recordingMbid: t.recordingMbid,
+                  trackName: t.trackName,
+                  artistName: t.artistName,
+                  releaseMbid: t.releaseMbid,
+                }}
+              />
             </li>
           );
         })}

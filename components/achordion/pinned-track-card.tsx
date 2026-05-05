@@ -7,6 +7,7 @@ import type { ArtistExternalLink } from "@/lib/clients/musicbrainz";
 import { parachordPlayTrack } from "@/lib/parachord";
 import { ParachordCtaButton } from "./parachord-button";
 import { ExternalLinks } from "./external-links";
+import { TrackActionsMenuSlot } from "./track-actions-menu-slot";
 import { artistHref, releaseGroupHref } from "@/lib/entity-links";
 import { cn } from "@/lib/utils";
 
@@ -92,11 +93,24 @@ export function PinnedTrackCard({
   return (
     <article
       className={cn(
-        "border-border/60 from-card/40 to-card/10 rounded-2xl border bg-gradient-to-br",
+        "border-border/60 from-card/40 to-card/10 relative rounded-2xl border bg-gradient-to-br",
         isHero ? "p-5 sm:p-6" : "p-4",
         className,
       )}
     >
+      <div className="absolute top-2 right-2 z-10">
+        <TrackActionsMenuSlot
+          track={{
+            recordingMbid,
+            trackName: meta.track_name,
+            artistName: meta.artist_name,
+            releaseMbid:
+              meta.mbid_mapping?.release_mbid ??
+              meta.additional_info?.release_mbid ??
+              null,
+          }}
+        />
+      </div>
       <div className={cn("flex gap-4", isHero ? "sm:gap-6" : "sm:gap-5")}>
         <CoverArt
           src={cover}
