@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -142,45 +143,51 @@ export function TrackActionsMenu({
           }
         />
         <DropdownMenuContent align="end" className="w-56">
-          <DropdownMenuLabel>Track</DropdownMenuLabel>
-          <LoveItem track={track} hasToken={hasToken} />
-          <PinItem
-            disabled={!canPin}
-            hasToken={hasToken}
-            onSelect={() => setPinOpen(true)}
-          />
+          <DropdownMenuGroup>
+            <DropdownMenuLabel>Track</DropdownMenuLabel>
+            <LoveItem track={track} hasToken={hasToken} />
+            <PinItem
+              disabled={!canPin}
+              hasToken={hasToken}
+              onSelect={() => setPinOpen(true)}
+            />
+          </DropdownMenuGroup>
           <DropdownMenuSeparator />
-          <DropdownMenuLabel>Add</DropdownMenuLabel>
-          <QueueAddItem track={track} />
-          <AddToPlaylistSub
-            disabled={!canPlaylist}
-            hasToken={hasToken}
-            recordingMbid={track.recordingMbid ?? null}
-            onCreateNew={() => setNewPlaylistOpen(true)}
-          />
-          <RecommendSub
-            disabled={!canRecommend}
-            hasToken={hasToken}
-            recordingMbid={track.recordingMbid ?? null}
-            onChoosePeople={() => setRecommendOpen(true)}
-          />
+          <DropdownMenuGroup>
+            <DropdownMenuLabel>Add</DropdownMenuLabel>
+            <QueueAddItem track={track} />
+            <AddToPlaylistSub
+              disabled={!canPlaylist}
+              hasToken={hasToken}
+              recordingMbid={track.recordingMbid ?? null}
+              onCreateNew={() => setNewPlaylistOpen(true)}
+            />
+            <RecommendSub
+              disabled={!canRecommend}
+              hasToken={hasToken}
+              recordingMbid={track.recordingMbid ?? null}
+              onChoosePeople={() => setRecommendOpen(true)}
+            />
+          </DropdownMenuGroup>
           <DropdownMenuSeparator />
-          <DropdownMenuLabel>Tools</DropdownMenuLabel>
-          <WriteReviewItem />
-          {canDelete ? (
-            <>
-              <DropdownMenuSeparator />
-              <NeedsTokenPopover hasToken={hasToken}>
-                <DropdownMenuItem
-                  variant="destructive"
-                  onClick={() => setDeleteOpen(true)}
-                >
-                  <Trash2 />
-                  Delete listen…
-                </DropdownMenuItem>
-              </NeedsTokenPopover>
-            </>
-          ) : null}
+          <DropdownMenuGroup>
+            <DropdownMenuLabel>Tools</DropdownMenuLabel>
+            <WriteReviewItem />
+            {canDelete ? (
+              <>
+                <DropdownMenuSeparator />
+                <NeedsTokenPopover hasToken={hasToken}>
+                  <DropdownMenuItem
+                    variant="destructive"
+                    onClick={() => setDeleteOpen(true)}
+                  >
+                    <Trash2 />
+                    Delete listen…
+                  </DropdownMenuItem>
+                </NeedsTokenPopover>
+              </>
+            ) : null}
+          </DropdownMenuGroup>
         </DropdownMenuContent>
       </DropdownMenu>
       <PinTrackDialog open={pinOpen} onOpenChange={setPinOpen} track={track} />
