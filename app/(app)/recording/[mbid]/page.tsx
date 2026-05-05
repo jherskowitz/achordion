@@ -207,21 +207,12 @@ async function RecordingBody({ mbid }: { mbid: string }) {
         ]}
         afterTitle={
           // External streaming favicon row sits directly under the
-          // artist · album · year · length byline. Suspense lets the
-          // Odesli call (cached 24h per seed URL) stream in without
-          // blocking the rest of the header.
-          <Suspense fallback={null}>
-            <OdesliLinks
-              seedUrl={odesliSeed}
-              recordingMbid={recording.id}
-            />
-          </Suspense>
-        }
-        actions={
-          <>
-            <Suspense fallback={<PopularityStatsSkeleton />}>
-              <PopularityStats promise={popularityPromise} />
-            </Suspense>
+          // artist · album · year · length byline, with the per-track
+          // ⋮ menu inline at the start so it lives in the same row as
+          // the external links rather than over in the actions slot.
+          // Suspense lets the Odesli call (cached 24h per seed URL)
+          // stream in without blocking the rest of the header.
+          <div className="flex flex-wrap items-center gap-2">
             <TrackActionsMenuSlot
               track={{
                 recordingMbid: recording.id,
@@ -230,7 +221,18 @@ async function RecordingBody({ mbid }: { mbid: string }) {
                 releaseMbid: heroRelease?.id ?? null,
               }}
             />
-          </>
+            <Suspense fallback={null}>
+              <OdesliLinks
+                seedUrl={odesliSeed}
+                recordingMbid={recording.id}
+              />
+            </Suspense>
+          </div>
+        }
+        actions={
+          <Suspense fallback={<PopularityStatsSkeleton />}>
+            <PopularityStats promise={popularityPromise} />
+          </Suspense>
         }
       />
 
