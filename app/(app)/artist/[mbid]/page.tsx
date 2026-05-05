@@ -339,7 +339,10 @@ async function LbRadioBlock({
 }
 
 async function SimilarArtistsSection({ mbid }: { mbid: string }) {
-  const similar = await getSimilarArtists(mbid, 12);
+  // 8 instead of 12 — fits 4-up on lg, 2-up on mobile, and saves
+  // server CPU cost. The "Fans also like" row is a discovery
+  // hint, not exhaustive.
+  const similar = await getSimilarArtists(mbid, 8);
   // Hide the section entirely when there's nothing to show — the
   // heading was leaving an empty card visible for artists with no LB
   // similar-artists data on file.

@@ -563,7 +563,14 @@ export async function getArtistReleaseGroups(
   mbid: string,
 ): Promise<ReleaseGroup[]> {
   const PAGE = 100;
-  const MAX = 500;
+  // Cap at 200 release groups (2 paginated MB calls). Even prolific
+  // artists like Bob Dylan top out around 100-150 release groups
+  // before deep cuts (compilations, video releases, foreign-edition
+  // re-issues) take over — and those tend to bucket as Compilation /
+  // Other anyway. Going from 500 → 200 saves up to 3 MB calls per
+  // artist render at the 1-req/sec MB rate limit, which is the
+  // dominant CPU cost on Vercel for cold artist pages.
+  const MAX = 200;
   const all: ReleaseGroup[] = [];
   // MB sometimes returns the same release-group across pagination
   // boundaries when the underlying ordering shifts mid-fetch — dedupe
