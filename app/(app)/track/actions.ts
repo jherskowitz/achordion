@@ -48,3 +48,33 @@ export async function feedbackTrackAction(input: {
     };
   }
 }
+
+export async function pinTrackAction(input: {
+  recordingMbid?: string;
+  recordingMsid?: string;
+  blurb?: string;
+  pinnedUntil?: number;
+}): Promise<ActionResult> {
+  const auth = await requireUserToken();
+  if (!auth.ok) return auth;
+  if (!input.recordingMbid && !input.recordingMsid) {
+    return {
+      ok: false,
+      reason: "Track is missing a MusicBrainz ID — can't pin.",
+    };
+  }
+  try {
+    await submitPin(auth.token, {
+      recordingMbid: input.recordingMbid,
+      recordingMsid: input.recordingMsid,
+      blurb: input.blurb,
+      pinnedUntil: input.pinnedUntil,
+    });
+    return { ok: true };
+  } catch (e) {
+    return {
+      ok: false,
+      reason: e instanceof Error ? e.message : "Couldn't pin track.",
+    };
+  }
+}
