@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useSession } from "next-auth/react";
+import { useQuery } from "@tanstack/react-query";
 import { Search } from "lucide-react";
 import { Wordmark } from "./wordmark";
 import { ThemeToggle } from "./theme-toggle";
@@ -47,13 +48,31 @@ export function SiteHeader() {
   // shift when useSession resolves.
   const showAuthed = status === "authenticated" && !!username;
 
+  // Unread feed count — only fetched once we know the viewer is
+  // signed in, polled lightly in the background while a tab is open.
+  // Server returns 0 for unauthed / no-LB-token cases, so the badge
+  // simply never appears in those states.
+  const { data: unread } = useQuery({
+    queryKey: ["me", "feed-unread"],
+    queryFn: async () => {
+      const r = await fetch("/api/me/feed-unread");
+      if (!r.ok) return { count: 0 };
+      return (await r.json()) as { count: number };
+    },
+    enabled: showAuthed,
+    staleTime: 60_000,
+    refetchInterval: 90_000,
+    refetchOnWindowFocus: true,
+  });
+  const feedUnread = unread?.count ?? 0;
+
   const nav: MainNavItem[] = [
     { href: "/explore", label: "Explore" },
     { href: "/radio", label: "Radio" },
     { href: "/charts", label: "Charts" },
   ];
   if (showAuthed) {
-    nav.push({ href: "/feed", label: "My Feed" });
+    nav.push({ href: "/feed", label: "My Feed", badge: feedUnread });
     nav.push({
       href: `/user/${encodeURIComponent(username)}`,
       label: "My Profile",

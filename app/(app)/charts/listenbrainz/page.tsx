@@ -9,6 +9,9 @@ import {
   LbAlbumsChartGrid,
   LbSongsChartList,
 } from "@/components/achordion/lb-charts-list";
+import { TrackListActionsMenu } from "@/components/achordion/track-list-actions-menu";
+import { OpenInParachordButton } from "@/components/achordion/open-in-parachord-button";
+import { topRecordingsToParachordTracks } from "@/lib/parachord-listens";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
@@ -62,6 +65,28 @@ async function ChartsBody({ tab, range }: { tab: Tab; range: Range }) {
       <Attribution range={range} />
       <LbAlbumsChartGrid items={items} />
     </>
+  );
+}
+
+async function SongsChartCta({ range }: { range: Range }) {
+  const items = await getSitewideTopRecordings(range, 50).catch(() => []);
+  const tracks = topRecordingsToParachordTracks(items);
+  const title = `ListenBrainz — Top songs (${range.replace(/_/g, " ")})`;
+  return (
+    <div className="flex items-center gap-2">
+      <OpenInParachordButton
+        kind="playlist"
+        tracks={tracks}
+        title={title}
+        creator="ListenBrainz"
+      />
+      <TrackListActionsMenu
+        title={title}
+        creator="ListenBrainz"
+        tracks={tracks}
+        triggerLabel="Songs chart actions"
+      />
+    </div>
   );
 }
 
@@ -133,6 +158,11 @@ export default async function ListenBrainzChartsPage({
       </header>
 
       <div className="mb-6 flex flex-wrap items-center gap-3">
+        {tab === "songs" && (
+          <Suspense fallback={null}>
+            <SongsChartCta range={range} />
+          </Suspense>
+        )}
         {/* Albums / Songs — same tab strip pattern as Apple Music. */}
         <div
           role="tablist"

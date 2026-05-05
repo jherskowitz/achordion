@@ -11,6 +11,10 @@ import { parachordPlayTrack } from "@/lib/parachord";
 import { ComingSoon } from "@/components/achordion/coming-soon";
 import { CoverArt } from "@/components/achordion/cover-art";
 import { PageShell } from "@/components/achordion/page-shell";
+import type { ParachordTrack } from "@/lib/parachord";
+import { TrackListActionsMenu } from "@/components/achordion/track-list-actions-menu";
+import { OpenInParachordButton } from "@/components/achordion/open-in-parachord-button";
+import { TrackActionsMenuSlot } from "@/components/achordion/track-actions-menu-slot";
 import {
   artistHref,
   recordingHref,
@@ -61,16 +65,18 @@ function pickCoverUrl(
   return null;
 }
 
-async function LovesBody({ name }: { name: string }) {
-  const feedback = await getUserFeedback(name, { score: 1, count: 50 });
-  if (feedback.length === 0) {
-    return (
-      <ComingSoon
-        title={`${name} hasn't loved any tracks yet`}
-        description="Loves on ListenBrainz appear here — anything they've ❤️'d on a track shows up in this list."
-      />
-    );
-  }
+/**
+ * Fetch + enrich a user's loves into the row shape used by both the
+ * list body and the CTA. Shared so Save-to-Parachord / Play don't
+ * re-derive (and end up filtering out msid-only rows that the body
+ * still renders thanks to the metadata enrichment).
+ */
+async function loadLoves(
+  name: string,
+  count = 50,
+): Promise<{ feedback: FeedbackItem[]; tracks: LovedTrack[] }> {
+  const feedback = await getUserFeedback(name, { score: 1, count });
+  if (feedback.length === 0) return { feedback, tracks: [] };
 
   // Loves before LB's MB-mapping work only carry recording_msid (no
   // mbid) — those won't enrich. Filter to MBID-bearing entries before
@@ -122,13 +128,29 @@ async function LovesBody({ name }: { name: string }) {
       },
     ];
   });
+  return { feedback, tracks };
+}
+
+async function LovesBody({ name }: { name: string }) {
+  const { feedback, tracks } = await loadLoves(name);
+  if (feedback.length === 0) {
+    return (
+      <ComingSoon
+        title={`${name} hasn't loved any tracks yet`}
+        description="Loves on ListenBrainz appear here — anything they've ❤️'d on a track shows up in this list."
+      />
+    );
+  }
 
   return (
     <>
-      <p className="text-muted-foreground mb-4 text-xs">
-        {feedback.length.toLocaleString()} loved track
-        {feedback.length === 1 ? "" : "s"} · most recent first
-      </p>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <p className="text-muted-foreground text-xs">
+          {feedback.length.toLocaleString()} loved track
+          {feedback.length === 1 ? "" : "s"} · most recent first
+        </p>
+        <LovesCta name={name} />
+      </div>
       <ol className="border-border/60 divide-border/60 divide-y rounded-xl border px-4">
         {tracks.map((t, i) => {
           const playHref = parachordPlayTrack({
@@ -213,6 +235,14 @@ async function LovesBody({ name }: { name: string }) {
               >
                 {relativeTimestamp(t.lovedAt)}
               </time>
+              <TrackActionsMenuSlot
+                track={{
+                  recordingMbid: t.recordingMbid,
+                  trackName: t.trackName,
+                  artistName: t.artistName,
+                  releaseMbid: t.releaseMbid,
+                }}
+              />
             </li>
           );
         })}
@@ -235,6 +265,42 @@ function LovesSkeleton() {
         </li>
       ))}
     </ol>
+  );
+}
+
+async function LovesCta({ name }: { name: string }) {
+  // Use the SAME enrichment path as LovesBody so msid-only loves
+  // (which the body still renders via metadata enrichment) flow into
+  // Save-to-Parachord and Play. Reusing loadLoves dedupes the
+  // underlying LB / MB fetches via Next's fetch cache.
+  let tracks: ParachordTrack[] = [];
+  try {
+    const loaded = await loadLoves(name);
+    tracks = loaded.tracks.map((t) => ({
+      title: t.trackName,
+      artist: t.artistName,
+      ...(t.releaseName ? { album: t.releaseName } : {}),
+    }));
+  } catch {
+    // Both buttons still render; their actions just no-op when empty.
+  }
+  return (
+    <div className="flex items-center gap-2">
+      <OpenInParachordButton
+        kind="playlist"
+        tracks={tracks}
+        title={`${name} — Loved tracks`}
+        creator={name}
+      />
+      <TrackListActionsMenu
+        title={`${name} — Loved tracks`}
+        creator={name}
+        tracks={tracks}
+        xspfUrl={`/api/user/${encodeURIComponent(name)}/loved.xspf`}
+        xspfFilename={`${name}-loved`}
+        triggerLabel="Loved-tracks actions"
+      />
+    </div>
   );
 }
 

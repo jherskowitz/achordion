@@ -5,6 +5,7 @@ import { getLbTokenForRequest } from "@/lib/lb-token";
 import { FollowToggle } from "./follow-toggle";
 import { LiveOnAirIndicator } from "./live-on-air-indicator";
 import { SectionTabs, type SectionTab } from "./section-tabs";
+import { UserStatsRadioWidget } from "./user-stats-radio-widget";
 
 function userTabs(name: string): SectionTab[] {
   return [
@@ -85,6 +86,7 @@ export async function UserPageHeader({ name }: { name: string }) {
               disabledReason={disabledReason}
             />
           )}
+          <UserStatsRadioWidget username={name} />
         </div>
         <SectionTabs tabs={userTabs(name)} />
       </div>

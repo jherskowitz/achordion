@@ -14,6 +14,9 @@ import { StatRangePicker } from "@/components/achordion/stat-range-picker";
 import { TopArtistsList } from "@/components/achordion/top-artists-list";
 import { TopAlbumsGrid } from "@/components/achordion/top-albums-grid";
 import { TopTracksList } from "@/components/achordion/top-tracks-list";
+import { TrackListActionsMenu } from "@/components/achordion/track-list-actions-menu";
+import { OpenInParachordButton } from "@/components/achordion/open-in-parachord-button";
+import { topRecordingsToParachordTracks } from "@/lib/parachord-listens";
 import { ListeningActivityChart } from "@/components/achordion/listening-activity-chart";
 import { DailyHeatmap } from "@/components/achordion/daily-heatmap";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -87,6 +90,41 @@ async function TracksSection({
       />
     );
   }
+}
+
+async function TopTracksCta({
+  name,
+  range,
+}: {
+  name: string;
+  range: StatRange;
+}) {
+  let tracks: ReturnType<typeof topRecordingsToParachordTracks> = [];
+  try {
+    const recordings = await getUserTopRecordings(name, range, 100);
+    tracks = topRecordingsToParachordTracks(recordings);
+  } catch {
+    // Both buttons still render; their actions just no-op when empty.
+  }
+  const title = `${name} — Top tracks (${range.replace(/_/g, " ")})`;
+  return (
+    <div className="flex items-center gap-2">
+      <OpenInParachordButton
+        kind="playlist"
+        tracks={tracks}
+        title={title}
+        creator={name}
+      />
+      <TrackListActionsMenu
+        title={title}
+        creator={name}
+        tracks={tracks}
+        xspfUrl={`/api/user/${encodeURIComponent(name)}/top-tracks.xspf?range=${range}`}
+        xspfFilename={`${name}-top-tracks-${range}`}
+        triggerLabel="Top-tracks actions"
+      />
+    </div>
+  );
 }
 
 async function ActivitySection({
@@ -182,9 +220,14 @@ export default async function StatsPage({ params, searchParams }: PageParams) {
           </section>
 
           <section>
-            <h3 className="mb-3 text-xs tracking-wide uppercase text-muted-foreground">
-              Tracks
-            </h3>
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <h3 className="text-xs tracking-wide uppercase text-muted-foreground">
+                Tracks
+              </h3>
+              <Suspense key={`tracks-menu-${range}`} fallback={null}>
+                <TopTracksCta name={name} range={range} />
+              </Suspense>
+            </div>
             <Suspense key={`tracks-${range}`} fallback={<ListSkeleton />}>
               <TracksSection name={name} range={range} />
             </Suspense>

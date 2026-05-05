@@ -11,6 +11,7 @@ import {
 import { parachordPlayTrack } from "@/lib/parachord";
 import { ParachordCtaButton } from "./parachord-button";
 import { ExternalLinks, categoriseLinks } from "./external-links";
+import { TrackActionsMenuSlot } from "./track-actions-menu-slot";
 import { Skeleton } from "@/components/ui/skeleton";
 import { artistHref, releaseGroupHref } from "@/lib/entity-links";
 import { cn } from "@/lib/utils";
@@ -128,6 +129,15 @@ export function PinnedTrackCard({
   const now = Math.floor(Date.now() / 1000);
   const isActive = pin.pinned_until > now;
 
+  const trackRef = {
+    recordingMbid,
+    trackName: meta.track_name,
+    artistName: meta.artist_name,
+    releaseMbid:
+      meta.mbid_mapping?.release_mbid ??
+      meta.additional_info?.release_mbid ??
+      null,
+  };
   return (
     <article
       className={cn(
@@ -136,7 +146,12 @@ export function PinnedTrackCard({
         className,
       )}
     >
-      <div className={cn("flex gap-4", isHero ? "sm:gap-6" : "sm:gap-5")}>
+      <div
+        className={cn(
+          "flex items-start gap-4",
+          isHero ? "sm:gap-6" : "sm:gap-5",
+        )}
+      >
         <CoverArt
           src={cover}
           alt={meta.release_name ?? meta.track_name}
@@ -206,9 +221,10 @@ export function PinnedTrackCard({
                 label="Play in Parachord"
                 size="sm"
               />
+              <TrackActionsMenuSlot track={trackRef} />
               {/* Streaming favicons stream in via Suspense so the
-                  Parachord button paints immediately. The "+" tile is
-                  always present once the row resolves, even if MB has
+                  Parachord button + ⋮ paint immediately. The "+" tile
+                  always renders once the row resolves, even if MB has
                   no streaming rels for this recording. */}
               {recordingMbid && (
                 <Suspense fallback={<PinnedExternalLinksSkeleton />}>
@@ -217,11 +233,22 @@ export function PinnedTrackCard({
               )}
             </div>
           )}
-          {!isHero && recordingMbid && (
-            <div className="mt-3">
-              <Suspense fallback={<PinnedExternalLinksSkeleton />}>
-                <PinnedExternalLinks recordingMbid={recordingMbid} />
-              </Suspense>
+          {!isHero && (
+            <div className="mt-3 flex flex-wrap items-center gap-3">
+              <ParachordCtaButton
+                href={parachordPlayTrack({
+                  artist: meta.artist_name,
+                  title: meta.track_name,
+                })}
+                label="Play in Parachord"
+                size="sm"
+              />
+              <TrackActionsMenuSlot track={trackRef} />
+              {recordingMbid && (
+                <Suspense fallback={<PinnedExternalLinksSkeleton />}>
+                  <PinnedExternalLinks recordingMbid={recordingMbid} />
+                </Suspense>
+              )}
             </div>
           )}
         </div>

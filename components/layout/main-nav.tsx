@@ -32,6 +32,9 @@ import { cn } from "@/lib/utils";
 export interface MainNavItem {
   href: string;
   label: string;
+  /** Optional unread-count badge rendered as a small pill after the
+   *  label (e.g., on "My Feed"). */
+  badge?: number;
 }
 
 /**
@@ -100,6 +103,14 @@ export function MainNav({
               )}
             >
               {item.label}
+              {typeof item.badge === "number" && item.badge > 0 && (
+                <span
+                  aria-label={`${item.badge} unread`}
+                  className="bg-primary text-primary-foreground ml-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] leading-none font-semibold tabular-nums"
+                >
+                  {item.badge > 99 ? "99+" : item.badge}
+                </span>
+              )}
             </Button>
           );
         })}
@@ -135,13 +146,21 @@ export function MainNav({
                   aria-current={isActive ? "page" : undefined}
                   onClick={() => setOpen(false)}
                   className={cn(
-                    "rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                    "flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
                     isActive
                       ? "bg-muted text-foreground"
                       : "text-muted-foreground hover:bg-muted hover:text-foreground",
                   )}
                 >
-                  {item.label}
+                  <span>{item.label}</span>
+                  {typeof item.badge === "number" && item.badge > 0 && (
+                    <span
+                      aria-label={`${item.badge} unread`}
+                      className="bg-primary text-primary-foreground inline-flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] leading-none font-semibold tabular-nums"
+                    >
+                      {item.badge > 99 ? "99+" : item.badge}
+                    </span>
+                  )}
                 </Link>
               );
             })}
