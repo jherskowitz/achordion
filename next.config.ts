@@ -69,17 +69,30 @@ const IMMUTABLE_ASSET_CACHE = {
 };
 
 /**
- * Cache-Control for public entity-detail routes (artist, release-
- * group, release, recording, tag). Same content for everyone — no
- * per-user state in the rendered HTML — so the edge can serve a
- * single cached response to every visitor for 1 hour, then refresh
- * in the background while still serving stale for up to 24h
- * (`stale-while-revalidate`).
+ * Edge-cache directives for public entity-detail routes (artist,
+ * release-group, release, recording, tag) and charts/static pages.
+ * Same content for everyone — no per-user state in the rendered
+ * HTML — so the edge can serve a single cached response to every
+ * visitor for 1 hour, then refresh in the background while still
+ * serving stale for up to 24h.
  *
- * `s-maxage` is the CDN-only directive (browsers ignore it); we
- * deliberately leave `max-age=0, must-revalidate` on the *browser*
- * side so back/forward navigation still gets the freshest version
- * from the edge instead of a stale browser-cached HTML.
+ * **Why `CDN-Cache-Control` instead of plain `Cache-Control`**:
+ * Next.js overrides plain `Cache-Control` to `private, no-cache,
+ * no-store` for any route it considers dynamically rendered (which
+ * includes anything reading `searchParams`, cookies, or headers
+ * server-side — `/artist/[mbid]` reads `?type=` to filter the
+ * discography, so it's dynamic by Next's reckoning). Setting
+ * `Cache-Control` via headers() doesn't survive that override.
+ *
+ * `CDN-Cache-Control` is the standard CDN-only header that Next
+ * does NOT touch. Vercel's edge respects it for the cache decision
+ * regardless of what `Cache-Control` says. So:
+ *
+ *   - Browser sees: whatever Next sets (private, no-cache for
+ *     dynamic routes; means back/forward gets a fresh edge fetch).
+ *   - Vercel edge sees: `public, s-maxage=3600, ...` — caches the
+ *     SSR'd HTML for 1h, serves it to every other visitor in that
+ *     window without re-rendering.
  *
  * Critical assumption: site-header auth state is now resolved
  * client-side via `useSession()` (see components/layout/site-header
@@ -91,8 +104,8 @@ const IMMUTABLE_ASSET_CACHE = {
  * shipping.
  */
 const PUBLIC_ENTITY_CACHE = {
-  key: "Cache-Control",
-  value: "public, max-age=0, must-revalidate, s-maxage=3600, stale-while-revalidate=86400",
+  key: "CDN-Cache-Control",
+  value: "public, s-maxage=3600, stale-while-revalidate=86400",
 };
 
 const nextConfig: NextConfig = {
