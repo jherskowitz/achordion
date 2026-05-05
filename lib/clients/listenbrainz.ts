@@ -2345,3 +2345,28 @@ export async function submitPin(
   if (opts.pinnedUntil !== undefined) body.pinned_until = opts.pinnedUntil;
   await lbPost("/pin", token, body);
 }
+
+// ─── Recommend personally to followers ──────────────────────────────
+
+export interface SubmitRecommendationOptions {
+  recordingMbid: string;
+  recipients: string[];
+  blurb?: string;
+}
+
+/**
+ * Send a personal recommendation to one or more LB users (typically
+ * followers). LB nests the payload under `metadata` — the bare-fields
+ * shape used by other write endpoints fails validation here.
+ */
+export async function submitRecommendation(
+  token: string,
+  opts: SubmitRecommendationOptions,
+): Promise<void> {
+  const metadata: Record<string, unknown> = {
+    recording_mbid: opts.recordingMbid,
+    users: opts.recipients,
+  };
+  if (opts.blurb !== undefined) metadata.blurb_content = opts.blurb;
+  await lbPost("/recommend-personal-recording", token, { metadata });
+}
