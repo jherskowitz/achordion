@@ -107,3 +107,25 @@ export async function recommendTrackAction(input: {
     };
   }
 }
+
+export async function addToPlaylistAction(input: {
+  playlistMbid: string;
+  recordingMbid: string;
+}): Promise<ActionResult> {
+  const auth = await requireUserToken();
+  if (!auth.ok) return auth;
+  try {
+    await addRecordingToPlaylist(
+      auth.token,
+      input.playlistMbid,
+      input.recordingMbid,
+    );
+    revalidateTag(`lb:playlist:${input.playlistMbid}`, "max");
+    return { ok: true };
+  } catch (e) {
+    return {
+      ok: false,
+      reason: e instanceof Error ? e.message : "Couldn't add to playlist.",
+    };
+  }
+}
