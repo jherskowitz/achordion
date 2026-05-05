@@ -7,6 +7,7 @@ import {
   ListMusic,
   Megaphone,
   MoreVertical,
+  PenLine,
   Pin,
   Plus,
   Trash2,
@@ -125,6 +126,9 @@ export function TrackActionsMenu({
             recordingMbid={track.recordingMbid ?? null}
             onChoosePeople={() => setRecommendOpen(true)}
           />
+          <DropdownMenuSeparator />
+          <DropdownMenuLabel>Tools</DropdownMenuLabel>
+          <WriteReviewItem />
           {canDelete ? (
             <>
               <DropdownMenuSeparator />
@@ -209,6 +213,30 @@ function PinItem({
       </TooltipTrigger>
       <TooltipContent side="left">
         No MusicBrainz ID for this recording.
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
+/**
+ * "Write a review…" placeholder. Always disabled — surfacing the
+ * affordance now so the menu shape is stable for users, with a tooltip
+ * explaining what's gating it. CritiqueBrainz integration lands later.
+ */
+function WriteReviewItem() {
+  const item = (
+    <DropdownMenuItem disabled>
+      <PenLine />
+      Write a review…
+    </DropdownMenuItem>
+  );
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span>{item}</span>
+      </TooltipTrigger>
+      <TooltipContent side="left">
+        Coming soon — needs CritiqueBrainz integration.
       </TooltipContent>
     </Tooltip>
   );
