@@ -2316,3 +2316,32 @@ export async function submitFeedback(
     score,
   });
 }
+
+// ─── Pin a recording ────────────────────────────────────────────────
+
+export interface SubmitPinOptions {
+  recordingMbid?: string;
+  recordingMsid?: string;
+  blurb?: string;
+  /** Unix seconds; LB defaults to 7 days when omitted. */
+  pinnedUntil?: number;
+}
+
+/**
+ * Pin a recording to the user's profile. LB requires at least one of
+ * MBID / MSID — we validate at the entry to avoid a confusing 400.
+ */
+export async function submitPin(
+  token: string,
+  opts: SubmitPinOptions,
+): Promise<void> {
+  if (!opts.recordingMbid && !opts.recordingMsid) {
+    throw new Error("submitPin requires recordingMbid or recordingMsid");
+  }
+  const body: Record<string, unknown> = {};
+  if (opts.recordingMbid) body.recording_mbid = opts.recordingMbid;
+  if (opts.recordingMsid) body.recording_msid = opts.recordingMsid;
+  if (opts.blurb !== undefined) body.blurb_content = opts.blurb;
+  if (opts.pinnedUntil !== undefined) body.pinned_until = opts.pinnedUntil;
+  await lbPost("/pin", token, body);
+}
