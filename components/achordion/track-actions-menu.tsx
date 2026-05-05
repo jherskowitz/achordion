@@ -5,13 +5,16 @@ import {
   Heart,
   ListPlus,
   ListMusic,
+  Megaphone,
   MoreVertical,
   Pin,
   Plus,
   Trash2,
+  Users,
+  UserPlus,
 } from "lucide-react";
 import { toast } from "sonner";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -33,12 +36,14 @@ import {
   addToPlaylistAction,
   deleteListenAction,
   feedbackTrackAction,
+  recommendTrackAction,
 } from "@/app/(app)/track/actions";
 import { parachordQueueAdd } from "@/lib/parachord";
 import { useLoved } from "./loved-tracks-provider";
 import { PinTrackDialog } from "./track-actions/pin-track-dialog";
 import { ConfirmDialog } from "./track-actions/confirm-dialog";
 import { NewPlaylistDialog } from "./track-actions/new-playlist-dialog";
+import { RecommendDialog } from "./track-actions/recommend-dialog";
 
 export type TrackRef = {
   recordingMbid?: string | null;
@@ -75,9 +80,11 @@ export function TrackActionsMenu({
   const [pinOpen, setPinOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [newPlaylistOpen, setNewPlaylistOpen] = useState(false);
+  const [recommendOpen, setRecommendOpen] = useState(false);
   if (!viewer) return null;
   const canPin = !!(track.recordingMbid || track.recordingMsid);
   const canPlaylist = !!track.recordingMbid;
+  const canRecommend = !!track.recordingMbid;
   // Delete only makes sense for an actual listen owned by the viewer:
   // we need a recording_msid + listened_at to address the listen, and
   // the row's owner must be the signed-in user.
@@ -113,6 +120,11 @@ export function TrackActionsMenu({
             recordingMbid={track.recordingMbid ?? null}
             onCreateNew={() => setNewPlaylistOpen(true)}
           />
+          <RecommendSub
+            disabled={!canRecommend}
+            recordingMbid={track.recordingMbid ?? null}
+            onChoosePeople={() => setRecommendOpen(true)}
+          />
           {canDelete ? (
             <>
               <DropdownMenuSeparator />
@@ -133,6 +145,13 @@ export function TrackActionsMenu({
           open={newPlaylistOpen}
           onOpenChange={setNewPlaylistOpen}
           recordingMbid={track.recordingMbid!}
+        />
+      ) : null}
+      {canRecommend ? (
+        <RecommendDialog
+          open={recommendOpen}
+          onOpenChange={setRecommendOpen}
+          track={track}
         />
       ) : null}
       {canDelete ? (
@@ -433,6 +452,144 @@ function AddToPlaylistSub({
         <DropdownMenuItem onClick={onCreateNew}>
           <Plus />
           New playlist…
+        </DropdownMenuItem>
+      </DropdownMenuSubContent>
+    </DropdownMenuSub>
+  );
+}
+
+type FollowersResponse = { followers: string[] };
+
+/**
+ * "Recommend" cascading submenu.
+ *
+ * Two paths: a one-tap "All followers" item that resolves the
+ * follower list on demand (via `queryClient.fetchQuery`, sharing the
+ * `["me","followers"]` cache with the picker dialog), and a
+ * "Choose people…" item that opens the full picker. The submenu's
+ * own `enabled`-gated query primes the cache when the user just
+ * hovers, so by the time they pick "All followers" the list is
+ * usually already in memory.
+ */
+function RecommendSub({
+  disabled,
+  recordingMbid,
+  onChoosePeople,
+}: {
+  disabled: boolean;
+  recordingMbid: string | null;
+  onChoosePeople: () => void;
+}) {
+  const [subOpen, setSubOpen] = useState(false);
+  const [sending, setSending] = useState(false);
+  const queryClient = useQueryClient();
+
+  const query = useQuery<FollowersResponse>({
+    queryKey: ["me", "followers"],
+    queryFn: async () => {
+      const res = await fetch("/api/me/followers");
+      if (!res.ok && res.status !== 401) {
+        throw new Error("Couldn't load followers.");
+      }
+      return (await res.json()) as FollowersResponse;
+    },
+    enabled: subOpen && !disabled,
+  });
+
+  async function handleAllFollowers() {
+    if (!recordingMbid) return;
+    setSending(true);
+    try {
+      // Use whatever the cache already has if the user hovered first;
+      // otherwise this kicks off a fetch and waits.
+      const data = await queryClient.fetchQuery<FollowersResponse>({
+        queryKey: ["me", "followers"],
+        queryFn: async () => {
+          const res = await fetch("/api/me/followers");
+          if (!res.ok && res.status !== 401) {
+            throw new Error("Couldn't load followers.");
+          }
+          return (await res.json()) as FollowersResponse;
+        },
+      });
+      const recipients = data.followers;
+      if (recipients.length === 0) {
+        toast.error("No followers to recommend to.");
+        return;
+      }
+      // Server caps at 50; surface the limit instead of silently
+      // truncating so the viewer can opt into the picker if they
+      // really need to send to a larger group.
+      if (recipients.length > 50) {
+        toast.error(
+          `You have ${recipients.length} followers; pick up to 50 via Choose people…`,
+        );
+        return;
+      }
+      const result = await recommendTrackAction({
+        recordingMbid,
+        recipients,
+      });
+      if (!result.ok) {
+        toast.error(result.reason);
+        return;
+      }
+      toast.success(
+        `Recommended to ${recipients.length} follower${
+          recipients.length === 1 ? "" : "s"
+        }`,
+      );
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Couldn't load followers.",
+      );
+    } finally {
+      setSending(false);
+    }
+  }
+
+  const trigger = (
+    <DropdownMenuSubTrigger disabled={disabled}>
+      <Megaphone />
+      Recommend
+    </DropdownMenuSubTrigger>
+  );
+
+  if (disabled) {
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span>{trigger}</span>
+        </TooltipTrigger>
+        <TooltipContent side="left">
+          No MusicBrainz ID for this recording.
+        </TooltipContent>
+      </Tooltip>
+    );
+  }
+
+  const followerCount = query.data?.followers.length ?? null;
+
+  return (
+    <DropdownMenuSub open={subOpen} onOpenChange={setSubOpen}>
+      {trigger}
+      <DropdownMenuSubContent className="min-w-56">
+        <DropdownMenuItem
+          disabled={sending || query.isLoading}
+          onClick={() => void handleAllFollowers()}
+        >
+          <Users />
+          {sending
+            ? "Sending…"
+            : query.isLoading
+              ? "All followers (loading…)"
+              : followerCount !== null
+                ? `All followers (${followerCount})`
+                : "All followers"}
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={onChoosePeople}>
+          <UserPlus />
+          Choose people…
         </DropdownMenuItem>
       </DropdownMenuSubContent>
     </DropdownMenuSub>
