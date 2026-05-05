@@ -2462,3 +2462,21 @@ export async function createPlaylistOnLb(
   const parsed = CreatePlaylistResponseSchema.parse(json);
   return { playlistMbid: parsed.playlist_mbid };
 }
+
+// ─── Delete a listen ────────────────────────────────────────────────
+
+/**
+ * Remove a single listen from the user's history. LB keys deletes by
+ * `(recording_msid, listened_at)` — the row's MBID isn't enough since
+ * the same recording can have many listens. Caller must own the listen.
+ */
+export async function deleteListen(
+  token: string,
+  recordingMsid: string,
+  listenedAt: number,
+): Promise<void> {
+  await lbPost("/delete-listen", token, {
+    recording_msid: recordingMsid,
+    listened_at: listenedAt,
+  });
+}
