@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown, SlidersHorizontal } from "lucide-react";
-import { ParachordCtaButton } from "./parachord-button";
+import { ChevronDown, Play, Radio } from "lucide-react";
 import { parachordPlayRadio } from "@/lib/parachord";
+import { useParachordPresence } from "@/lib/use-parachord-presence";
+import { IconTooltip } from "@/components/ui/icon-tooltip";
 import {
   STAT_RANGES,
   STAT_RANGE_LABELS,
@@ -14,63 +15,109 @@ import { cn } from "@/lib/utils";
 const DEFAULT_RANGE: StatRange = "week";
 
 /**
- * Per-profile LB-Radio widget. Fires a `parachord://play/radio?prompt=
- * stats:(<user>:<range>)` URL — Parachord calls the LB Radio API
- * client-side using the listener's own token, so we never have to
- * proxy the request server-side.
+ * Per-profile LB-Radio card. Same visual shape as <LbRadioSection>
+ * (rounded card, circular Radio icon, uppercase name + subtitle,
+ * chevron expand) so the right edge of the user header reads as a
+ * sibling of the LB Radio cards on /radio.
  *
- * Range picker is a 7-step slider tucked behind a small disclosure
- * (matching the `RadioModeSlider` accordion pattern). Default range
- * is "week" — same default LB itself uses for stats endpoints.
+ * Click the icon → fires `parachord://play/radio?prompt=stats:(<user>:
+ * <range>)`. Parachord calls the LB Radio API client-side using the
+ * listener's own token, so we never have to proxy the request.
+ *
+ * Range picker is a 7-step native slider (no step labels — the helper
+ * text below updates live as the slider moves) tucked inside the
+ * chevron accordion.
  */
 export function UserStatsRadioWidget({ username }: { username: string }) {
   const [range, setRange] = useState<StatRange>(DEFAULT_RANGE);
   const [open, setOpen] = useState(false);
+  const parachordRunning = useParachordPresence();
 
   const idx = STAT_RANGES.indexOf(range);
   const max = STAT_RANGES.length - 1;
-  const overridden = range !== DEFAULT_RANGE;
+  const rangeLabel = STAT_RANGE_LABELS[range];
 
+  const radioName = `${username} Radio`;
   const playHref = parachordPlayRadio({
     prompt: `stats:(${username}:${range})`,
-    displayName: `${username} — Stats Radio (${STAT_RANGE_LABELS[range]})`,
+    displayName: `${radioName} (${rangeLabel})`,
   });
 
+  const iconButtonBase =
+    "group/playbtn flex size-9 shrink-0 items-center justify-center rounded-full transition-colors";
+  const icon = parachordRunning ? (
+    <a
+      href={playHref}
+      aria-label={`Play ${radioName} in Parachord`}
+      className={cn(iconButtonBase, "bg-foreground/10 hover:text-white")}
+      style={{
+        ["--play-bg" as string]: "var(--parachord-accent)",
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.backgroundColor = "var(--play-bg)";
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.backgroundColor = "";
+      }}
+    >
+      <Radio className="size-4 group-hover/playbtn:hidden" />
+      <Play className="size-4 hidden fill-current group-hover/playbtn:block" />
+    </a>
+  ) : (
+    <span
+      aria-disabled
+      className={cn(
+        iconButtonBase,
+        "bg-muted text-muted-foreground cursor-not-allowed",
+      )}
+    >
+      <Radio className="size-4" />
+    </span>
+  );
+
   return (
-    <div className="flex flex-col items-end gap-1.5">
-      <ParachordCtaButton
-        href={playHref}
-        label="Stats Radio"
-        size="sm"
-      />
-      <button
-        type="button"
-        onClick={() => setOpen((x) => !x)}
-        aria-expanded={open}
-        aria-controls={`stats-radio-range-${username}`}
-        className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-[11px]"
-      >
-        <SlidersHorizontal className="size-3" />
-        <span>Range</span>
-        <span
-          className={cn(
-            "text-muted-foreground/70",
-            !overridden && "text-muted-foreground/50",
-          )}
+    <div className="border-border/60 w-72 max-w-[80vw] rounded-2xl border">
+      <div className="flex items-center gap-3 p-3">
+        <IconTooltip
+          side="top"
+          align="start"
+          label={
+            parachordRunning
+              ? `Play ${radioName} in Parachord`
+              : "Parachord isn't running"
+          }
         >
-          · {STAT_RANGE_LABELS[range]}
-        </span>
-        <ChevronDown
-          className={cn("size-3 transition-transform", open && "rotate-180")}
-        />
-      </button>
+          {icon}
+        </IconTooltip>
+        <div className="min-w-0 flex-1">
+          <h2 className="truncate text-sm font-semibold tracking-wide uppercase">
+            {radioName}
+          </h2>
+          <p className="text-muted-foreground/80 truncate text-xs">
+            {rangeLabel}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setOpen((x) => !x)}
+          aria-expanded={open}
+          aria-label={open ? "Hide range picker" : "Show range picker"}
+          aria-controls={`stats-radio-range-${username}`}
+          className="text-muted-foreground hover:bg-muted/40 hover:text-foreground inline-flex size-8 shrink-0 items-center justify-center rounded-md transition-colors"
+        >
+          <ChevronDown
+            className={cn(
+              "size-4 transition-transform duration-200",
+              open && "rotate-180",
+            )}
+          />
+        </button>
+      </div>
       {open && (
         <div
           id={`stats-radio-range-${username}`}
-          className="border-border/60 bg-muted/30 w-64 max-w-[80vw] rounded-lg border px-3 py-3"
+          className="border-border/60 border-t px-3 pb-3 pt-3"
         >
-          {/* Native range input — keyboard support comes free; click on
-              the track auto-snaps to the nearest step thanks to step=1. */}
           <input
             type="range"
             min={0}
@@ -81,61 +128,16 @@ export function UserStatsRadioWidget({ username }: { username: string }) {
             aria-label="Stats time range"
             className="accent-foreground h-1 w-full cursor-pointer"
           />
-          <div className="mt-2 flex items-center justify-between gap-1">
-            {STAT_RANGES.map((r) => {
-              const active = r === range;
-              return (
-                <button
-                  key={r}
-                  type="button"
-                  onClick={() => setRange(r)}
-                  aria-pressed={active}
-                  title={STAT_RANGE_LABELS[r]}
-                  className={cn(
-                    "text-[9px] tracking-wide uppercase transition-colors",
-                    active
-                      ? "text-foreground"
-                      : "text-muted-foreground/60 hover:text-foreground",
-                  )}
-                >
-                  {/* Single-letter step labels keep the slider tight;
-                      the full label sits above on the trigger button
-                      and as the title attribute for hover. */}
-                  {shortLabel(r)}
-                </button>
-              );
-            })}
-          </div>
-          <p className="text-muted-foreground/80 mt-2 text-[10px]">
-            Seeds Parachord with{" "}
+          <p className="text-muted-foreground/80 mt-2 text-[11px] leading-5">
+            <span className="text-foreground font-medium">{rangeLabel}</span> —
+            seeds Parachord with{" "}
             <span className="text-foreground">{username}</span>&rsquo;s top
             tracks from{" "}
-            <span className="text-foreground">
-              {STAT_RANGE_LABELS[range].toLowerCase()}
-            </span>
+            <span className="text-foreground">{rangeLabel.toLowerCase()}</span>
             .
           </p>
         </div>
       )}
     </div>
   );
-}
-
-function shortLabel(r: StatRange): string {
-  switch (r) {
-    case "this_week":
-      return "TW";
-    case "week":
-      return "W";
-    case "this_month":
-      return "TM";
-    case "month":
-      return "M";
-    case "this_year":
-      return "TY";
-    case "year":
-      return "Y";
-    case "all_time":
-      return "All";
-  }
 }
