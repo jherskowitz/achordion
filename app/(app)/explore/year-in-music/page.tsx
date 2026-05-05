@@ -9,6 +9,9 @@ import { ComingSoon } from "@/components/achordion/coming-soon";
 import { Button } from "@/components/ui/button";
 import { TopArtistsList } from "@/components/achordion/top-artists-list";
 import { TopTracksList } from "@/components/achordion/top-tracks-list";
+import { TrackListActionsMenu } from "@/components/achordion/track-list-actions-menu";
+import { OpenInParachordButton } from "@/components/achordion/open-in-parachord-button";
+import type { ParachordTrack } from "@/lib/parachord";
 import { TopAlbumsGrid } from "@/components/achordion/top-albums-grid";
 import { SimilarUsersList } from "@/components/achordion/similar-users-list";
 import { YearInMusicHero } from "@/components/achordion/year-in-music/hero";
@@ -140,9 +143,8 @@ export default async function ExploreYearInMusicPage({ searchParams }: PageParam
         </section>
 
         <section>
-          <SectionHeader title="Top tracks" />
-          <TopTracksList
-            tracks={(data.top_recordings ?? []).map((r) => ({
+          {(() => {
+            const yimTracks = (data.top_recordings ?? []).map((r) => ({
               track_name: r.track_name ?? "Unknown track",
               recording_mbid: r.recording_mbid ?? null,
               artist_name: r.artist_name ?? "Unknown artist",
@@ -152,8 +154,32 @@ export default async function ExploreYearInMusicPage({ searchParams }: PageParam
               listen_count: r.listen_count,
               caa_id: r.caa_id ?? null,
               caa_release_mbid: r.caa_release_mbid ?? null,
-            }))}
-          />
+            }));
+            const parachordTracks: ParachordTrack[] = yimTracks.map((t) => ({
+              title: t.track_name,
+              artist: t.artist_name,
+              ...(t.release_name ? { album: t.release_name } : {}),
+            }));
+            const title = `Year in Music ${year} — Top tracks`;
+            return (
+              <>
+                <SectionHeader title="Top tracks" />
+                <div className="mb-4 flex items-center gap-2">
+                  <OpenInParachordButton
+                    kind="playlist"
+                    tracks={parachordTracks}
+                    title={title}
+                  />
+                  <TrackListActionsMenu
+                    title={title}
+                    tracks={parachordTracks}
+                    triggerLabel="YIM top tracks actions"
+                  />
+                </div>
+                <TopTracksList tracks={yimTracks} />
+              </>
+            );
+          })()}
         </section>
 
         <section>

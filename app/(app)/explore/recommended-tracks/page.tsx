@@ -11,6 +11,7 @@ import type { ParachordTrack } from "@/lib/parachord";
 import { ExploreTrackList } from "@/components/achordion/explore-track-list";
 import { FamiliaritySlider } from "@/components/achordion/familiarity-slider";
 import { OpenInParachordButton } from "@/components/achordion/open-in-parachord-button";
+import { TrackListActionsMenu } from "@/components/achordion/track-list-actions-menu";
 import { PageShell } from "@/components/achordion/page-shell";
 import { ComingSoon } from "@/components/achordion/coming-soon";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -99,12 +100,23 @@ async function PlayAll({
 }) {
   const { parachordTracks } = await loadFilteredTracks(username, familiarity);
   if (parachordTracks.length === 0) return null;
+  const title = `${username} — Recommended tracks`;
   return (
-    <OpenInParachordButton
-      kind="playlist"
-      tracks={parachordTracks}
-      label="Play all"
-    />
+    <div className="flex items-center gap-2">
+      <OpenInParachordButton
+        kind="playlist"
+        tracks={parachordTracks}
+        title={title}
+        creator={username}
+        label="Play all"
+      />
+      <TrackListActionsMenu
+        title={title}
+        creator={username}
+        tracks={parachordTracks}
+        triggerLabel="Recommended-tracks actions"
+      />
+    </div>
   );
 }
 
