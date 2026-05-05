@@ -55,10 +55,12 @@ export function WordmarkMark({
       />
       <rect x="653" y="74" width="27" height="100" fill="currentColor" />
       <path
-        d="M683 49V56H678.811V69H654.189V56H650V49H683Z"
+        d="M653 54H680V68H653V54Z"
         style={{ fill: "var(--achordion-brand)" }}
-        stroke="currentColor"
-        strokeWidth="2"
+      />
+      <path
+        d="M648 50H685V55H648V50Z"
+        style={{ fill: "var(--achordion-brand)" }}
       />
       <rect x="462" y="113" width="27" height="60" fill="currentColor" />
       <path
