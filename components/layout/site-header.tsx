@@ -13,6 +13,7 @@ import {
 } from "./main-nav";
 import { Button } from "@/components/ui/button";
 import { UserAvatar } from "@/components/achordion/user-avatar";
+import { LiveOnAirIndicator } from "@/components/achordion/live-on-air-indicator";
 
 /**
  * Sitewide top header.
@@ -105,7 +106,22 @@ export function SiteHeader() {
             </>
           }
         />
-        <div className="ml-auto flex items-center gap-1">
+        <div className="ml-auto flex items-center gap-2">
+          {showAuthed && (
+            // Self-on-air pill — renders only while the viewer is
+            // actively listening (LiveOnAirIndicator returns null when
+            // playing-now is empty). hideListenAlong=true since
+            // listen-along to yourself loops back to nothing useful.
+            // max-w cap keeps long track names from blowing out the
+            // header on small viewports.
+            <LiveOnAirIndicator
+              username={username}
+              initialListen={null}
+              hideListenAlong
+              size="compact"
+              className="hidden max-w-[24ch] sm:inline-flex"
+            />
+          )}
           <Button
             variant="ghost"
             size="icon"
