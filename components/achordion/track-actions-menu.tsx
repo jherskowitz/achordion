@@ -1,6 +1,7 @@
 "use client";
 
-import { MoreVertical } from "lucide-react";
+import { Heart, MoreVertical } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -8,6 +9,13 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { feedbackTrackAction } from "@/app/(app)/track/actions";
+import { useLoved } from "./loved-tracks-provider";
 
 export type TrackRef = {
   recordingMbid?: string | null;
@@ -23,15 +31,9 @@ export type TrackRef = {
 /**
  * Track-level actions menu (⋮ icon) anchored to a row.
  *
- * Phase 1: shell only — renders a single disabled "Test item" so we
- * can prove the trigger and popup wire up correctly across the call
- * sites we care about (scrobble rows, top-track tiles, etc.) before
- * we layer real actions (love / unlove, pin, queue-in-Parachord,
- * delete-listen, …) on top in a follow-up.
- *
- * Returns `null` for signed-out viewers — none of the upcoming
- * actions are meaningful without an mbUsername attached to the
- * session, so don't take up the row's right-edge slot at all.
+ * Returns `null` for signed-out viewers — none of the actions in this
+ * menu are meaningful without an mbUsername attached to the session,
+ * so don't take up the row's right-edge slot at all.
  */
 export function TrackActionsMenu({
   track,
@@ -56,8 +58,80 @@ export function TrackActionsMenu({
         }
       />
       <DropdownMenuContent align="end" className="w-56">
-        <DropdownMenuItem disabled>Test item</DropdownMenuItem>
+        <LoveItem track={track} />
       </DropdownMenuContent>
     </DropdownMenu>
+  );
+}
+
+/**
+ * Love / Unlove menu item.
+ *
+ * Optimistically flips the local loved-set, then calls the LB
+ * feedback action. On failure, reverts the optimistic update and
+ * surfaces the reason via a toast. On success, surfaces an Undo
+ * affordance that re-fires the action with the previous score.
+ *
+ * Disabled when the row has no recording MBID, since LB feedback
+ * is keyed on MBID. A tooltip explains why.
+ */
+function LoveItem({ track }: { track: TrackRef }) {
+  const { isLoved, setLoved } = useLoved();
+  const mbid = track.recordingMbid ?? null;
+  const loved = isLoved(mbid);
+  const disabled = !mbid;
+
+  async function fire(targetMbid: string, score: 0 | 1, prevScore: 0 | 1) {
+    setLoved(targetMbid, score);
+    const result = await feedbackTrackAction({
+      recordingMbid: targetMbid,
+      score,
+    });
+    if (!result.ok) {
+      setLoved(targetMbid, prevScore);
+      toast.error(result.reason);
+      return;
+    }
+    toast.success(score ? "Loved" : "Removed from loved", {
+      action: {
+        label: "Undo",
+        onClick: () => {
+          // Re-fire with the previous score; this itself reverts on failure.
+          void fire(targetMbid, prevScore, score);
+        },
+      },
+    });
+  }
+
+  function handleClick() {
+    if (!mbid) return;
+    const nextScore: 0 | 1 = loved ? 0 : 1;
+    const prevScore: 0 | 1 = loved ? 1 : 0;
+    void fire(mbid, nextScore, prevScore);
+  }
+
+  const item = (
+    <DropdownMenuItem
+      disabled={disabled}
+      onClick={disabled ? undefined : handleClick}
+    >
+      <Heart
+        className={loved ? "text-rose-500" : ""}
+        fill={loved ? "currentColor" : "none"}
+      />
+      {loved ? "Unlove" : "Love track"}
+    </DropdownMenuItem>
+  );
+
+  if (!disabled) return item;
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span>{item}</span>
+      </TooltipTrigger>
+      <TooltipContent side="left">
+        No MusicBrainz ID for this recording.
+      </TooltipContent>
+    </Tooltip>
   );
 }
