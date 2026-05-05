@@ -929,6 +929,31 @@ export async function getFollowers(userName: string): Promise<string[]> {
   }
 }
 
+/**
+ * Followers list for the "Recommend to followers" picker. Same endpoint
+ * as `getFollowers` but with a longer revalidate window — the picker
+ * tolerates a few minutes of staleness in exchange for fewer LB hits
+ * across the many places it could be opened from.
+ */
+export async function getUserFollowers(username: string): Promise<string[]> {
+  try {
+    const result = await lbFetch(
+      `/user/${encodeURIComponent(username)}/followers`,
+      FollowersSchema,
+      { revalidate: 600, tags: [`lb:user:${username}:followers`] },
+    );
+    return result.followers;
+  } catch (err) {
+    if (
+      err instanceof ListenBrainzError &&
+      (err.status === 204 || err.status === 404)
+    ) {
+      return [];
+    }
+    throw err;
+  }
+}
+
 interface FollowResult {
   ok: boolean;
   status: number;
