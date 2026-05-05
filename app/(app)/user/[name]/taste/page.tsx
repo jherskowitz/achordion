@@ -8,9 +8,11 @@ import {
 } from "@/lib/clients/listenbrainz";
 import { caaReleaseUrl } from "@/lib/clients/coverart";
 import { parachordPlayTrack } from "@/lib/parachord";
+import { feedbackToParachordTracks } from "@/lib/parachord-listens";
 import { ComingSoon } from "@/components/achordion/coming-soon";
 import { CoverArt } from "@/components/achordion/cover-art";
 import { PageShell } from "@/components/achordion/page-shell";
+import { TrackListActionsMenu } from "@/components/achordion/track-list-actions-menu";
 import {
   artistHref,
   recordingHref,
@@ -238,17 +240,42 @@ function LovesSkeleton() {
   );
 }
 
+async function LovesActionsMenu({ name }: { name: string }) {
+  let tracks: ReturnType<typeof feedbackToParachordTracks> = [];
+  try {
+    const feedback = await getUserFeedback(name, { score: 1, count: 500 });
+    tracks = feedbackToParachordTracks(feedback);
+  } catch {
+    // Menu still renders; Save-to-Parachord just disables when empty.
+  }
+  return (
+    <TrackListActionsMenu
+      title={`${name} — Loved tracks`}
+      creator={name}
+      tracks={tracks}
+      xspfUrl={`/api/user/${encodeURIComponent(name)}/loved.xspf`}
+      xspfFilename={`${name}-loved`}
+      triggerLabel="Loved-tracks actions"
+    />
+  );
+}
+
 export default async function LovesPage({ params }: PageParams) {
   const { name } = await params;
   return (
     <PageShell className="pt-8">
-      <header className="mb-6">
-        <h2 className="text-sm font-semibold tracking-wide uppercase">
-          Loves
-        </h2>
-        <p className="text-muted-foreground mt-1 text-sm">
-          Tracks {name} has loved on ListenBrainz.
-        </p>
+      <header className="mb-6 flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-sm font-semibold tracking-wide uppercase">
+            Loves
+          </h2>
+          <p className="text-muted-foreground mt-1 text-sm">
+            Tracks {name} has loved on ListenBrainz.
+          </p>
+        </div>
+        <Suspense fallback={null}>
+          <LovesActionsMenu name={name} />
+        </Suspense>
       </header>
       <Suspense fallback={<LovesSkeleton />}>
         <LovesBody name={name} />

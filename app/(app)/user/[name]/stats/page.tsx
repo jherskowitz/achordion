@@ -14,6 +14,8 @@ import { StatRangePicker } from "@/components/achordion/stat-range-picker";
 import { TopArtistsList } from "@/components/achordion/top-artists-list";
 import { TopAlbumsGrid } from "@/components/achordion/top-albums-grid";
 import { TopTracksList } from "@/components/achordion/top-tracks-list";
+import { TrackListActionsMenu } from "@/components/achordion/track-list-actions-menu";
+import { topRecordingsToParachordTracks } from "@/lib/parachord-listens";
 import { ListeningActivityChart } from "@/components/achordion/listening-activity-chart";
 import { DailyHeatmap } from "@/components/achordion/daily-heatmap";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -87,6 +89,32 @@ async function TracksSection({
       />
     );
   }
+}
+
+async function TopTracksActionsMenu({
+  name,
+  range,
+}: {
+  name: string;
+  range: StatRange;
+}) {
+  let tracks: ReturnType<typeof topRecordingsToParachordTracks> = [];
+  try {
+    const recordings = await getUserTopRecordings(name, range, 100);
+    tracks = topRecordingsToParachordTracks(recordings);
+  } catch {
+    // Menu still renders; Save-to-Parachord just disables when empty.
+  }
+  return (
+    <TrackListActionsMenu
+      title={`${name} — Top tracks (${range.replace(/_/g, " ")})`}
+      creator={name}
+      tracks={tracks}
+      xspfUrl={`/api/user/${encodeURIComponent(name)}/top-tracks.xspf?range=${range}`}
+      xspfFilename={`${name}-top-tracks-${range}`}
+      triggerLabel="Top-tracks actions"
+    />
+  );
 }
 
 async function ActivitySection({
@@ -182,9 +210,14 @@ export default async function StatsPage({ params, searchParams }: PageParams) {
           </section>
 
           <section>
-            <h3 className="mb-3 text-xs tracking-wide uppercase text-muted-foreground">
-              Tracks
-            </h3>
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <h3 className="text-xs tracking-wide uppercase text-muted-foreground">
+                Tracks
+              </h3>
+              <Suspense key={`tracks-menu-${range}`} fallback={null}>
+                <TopTracksActionsMenu name={name} range={range} />
+              </Suspense>
+            </div>
             <Suspense key={`tracks-${range}`} fallback={<ListSkeleton />}>
               <TracksSection name={name} range={range} />
             </Suspense>
