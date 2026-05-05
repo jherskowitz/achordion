@@ -30,3 +30,21 @@ async function requireUserToken(): Promise<
   }
   return { ok: true, viewer, token };
 }
+
+export async function feedbackTrackAction(input: {
+  recordingMbid: string;
+  score: 0 | 1 | -1;
+}): Promise<ActionResult> {
+  const auth = await requireUserToken();
+  if (!auth.ok) return auth;
+  try {
+    await submitFeedback(auth.token, input.recordingMbid, input.score);
+    revalidateTag(`lb:user:${auth.viewer}:loved`, "max");
+    return { ok: true };
+  } catch (e) {
+    return {
+      ok: false,
+      reason: e instanceof Error ? e.message : "Couldn't update feedback.",
+    };
+  }
+}
