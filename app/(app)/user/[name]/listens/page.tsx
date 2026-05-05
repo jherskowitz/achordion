@@ -1,9 +1,11 @@
 import { Suspense } from "react";
 import { getRecentListens } from "@/lib/clients/listenbrainz";
 import { ScrobbleList } from "@/components/achordion/scrobble-list";
+import { TrackListActionsMenu } from "@/components/achordion/track-list-actions-menu";
 import { PageShell } from "@/components/achordion/page-shell";
 import { ComingSoon } from "@/components/achordion/coming-soon";
 import { Skeleton } from "@/components/ui/skeleton";
+import { listensToParachordTracks } from "@/lib/parachord-listens";
 
 interface PageParams {
   params: Promise<{ name: string }>;
@@ -33,6 +35,30 @@ async function ListensSection({
   }
 }
 
+async function ListensActionsMenu({ name }: { name: string }) {
+  // Pull a recent slice (same count as the visible list) to seed
+  // Save-to-Parachord. The XSPF download endpoint pulls its own
+  // canonical slice, so the menu's `tracks` is just for the import.
+  let tracks: ReturnType<typeof listensToParachordTracks> = [];
+  try {
+    const listens = await getRecentListens(name, { count: 100 });
+    tracks = listensToParachordTracks(listens);
+  } catch {
+    // Menu still renders; Save-to-Parachord just gets disabled when
+    // there are no tracks.
+  }
+  return (
+    <TrackListActionsMenu
+      title={`${name} — Recently played`}
+      creator={name}
+      tracks={tracks}
+      xspfUrl={`/api/user/${encodeURIComponent(name)}/recent-listens.xspf`}
+      xspfFilename={`${name}-recently-played`}
+      triggerLabel="Recently played actions"
+    />
+  );
+}
+
 function Fallback() {
   return (
     <ul className="border-border/60 divide-border/60 divide-y rounded-xl border px-4">
@@ -56,9 +82,14 @@ export default async function ListensPage({ params, searchParams }: PageParams) 
   const beforeTs = before ? Number(before) : undefined;
   return (
     <PageShell className="pt-8">
-      <h2 className="mb-4 text-sm font-semibold tracking-wide uppercase">
-        Listens
-      </h2>
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <h2 className="text-sm font-semibold tracking-wide uppercase">
+          Listens
+        </h2>
+        <Suspense fallback={null}>
+          <ListensActionsMenu name={name} />
+        </Suspense>
+      </div>
       <Suspense fallback={<Fallback />}>
         <ListensSection name={name} before={beforeTs} />
       </Suspense>
