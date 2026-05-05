@@ -15,6 +15,9 @@ import {
   ChartsSongsList,
 } from "@/components/achordion/charts-list";
 import { CountryPicker } from "@/components/achordion/country-picker";
+import { TrackListActionsMenu } from "@/components/achordion/track-list-actions-menu";
+import { OpenInParachordButton } from "@/components/achordion/open-in-parachord-button";
+import type { ParachordTrack } from "@/lib/parachord";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
@@ -73,6 +76,32 @@ async function ChartsBody({
         <ChartsAlbumsGrid items={items} />
       )}
     </>
+  );
+}
+
+async function SongsChartCta({ country }: { country: string }) {
+  const items = (await getAppleSongsChart(country)) ?? [];
+  const tracks: ParachordTrack[] = items.map((it) => ({
+    title: it.name,
+    artist: it.artistName,
+  }));
+  const countryInfo = getChartsCountry(country);
+  const title = `Apple Music — Top songs${countryInfo ? ` (${countryInfo.name})` : ""}`;
+  return (
+    <div className="flex items-center gap-2">
+      <OpenInParachordButton
+        kind="playlist"
+        tracks={tracks}
+        title={title}
+        creator="Apple Music"
+      />
+      <TrackListActionsMenu
+        title={title}
+        creator="Apple Music"
+        tracks={tracks}
+        triggerLabel="Songs chart actions"
+      />
+    </div>
   );
 }
 
@@ -135,6 +164,11 @@ export default async function AppleMusicChartsPage({
       </header>
 
       <div className="mb-6 flex flex-wrap items-center gap-3">
+        {tab === "songs" && (
+          <Suspense fallback={null}>
+            <SongsChartCta country={country} />
+          </Suspense>
+        )}
         <div
           role="tablist"
           aria-label="Chart kind"

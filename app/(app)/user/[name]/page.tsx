@@ -10,6 +10,9 @@ import {
 } from "@/lib/clients/musicbrainz";
 import { categoriseLinks } from "@/components/achordion/external-links";
 import { LiveScrobbleList } from "@/components/achordion/live-scrobble-list";
+import { TrackListActionsMenu } from "@/components/achordion/track-list-actions-menu";
+import { OpenInParachordButton } from "@/components/achordion/open-in-parachord-button";
+import { listensToParachordTracks } from "@/lib/parachord-listens";
 import { PinnedTrackCard } from "@/components/achordion/pinned-track-card";
 import { PageShell } from "@/components/achordion/page-shell";
 import { ComingSoon } from "@/components/achordion/coming-soon";
@@ -82,6 +85,34 @@ async function RecentListensSection({ name }: { name: string }) {
   }
 }
 
+async function RecentListensCta({ name }: { name: string }) {
+  let tracks: ReturnType<typeof listensToParachordTracks> = [];
+  try {
+    const listens = await getRecentListens(name, { count: 100 });
+    tracks = listensToParachordTracks(listens);
+  } catch {
+    // Both buttons still render; their actions just no-op when empty.
+  }
+  return (
+    <div className="flex items-center gap-2">
+      <OpenInParachordButton
+        kind="playlist"
+        tracks={tracks}
+        title={`${name} — Recently played`}
+        creator={name}
+      />
+      <TrackListActionsMenu
+        title={`${name} — Recently played`}
+        creator={name}
+        tracks={tracks}
+        xspfUrl={`/api/user/${encodeURIComponent(name)}/recent-listens.xspf`}
+        xspfFilename={`${name}-recently-played`}
+        triggerLabel="Recent listens actions"
+      />
+    </div>
+  );
+}
+
 function ScrobbleListSkeleton() {
   return (
     <ul className="border-border/60 divide-border/60 divide-y rounded-xl border px-4">
@@ -108,9 +139,14 @@ export default async function UserOverviewPage({ params }: PageParams) {
       </Suspense>
       <div className="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_280px]">
         <div className="min-w-0">
-          <h2 className="mb-4 text-sm font-semibold tracking-wide uppercase">
-            Recent listens
-          </h2>
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <h2 className="text-sm font-semibold tracking-wide uppercase">
+              Recent listens
+            </h2>
+            <Suspense fallback={null}>
+              <RecentListensCta name={name} />
+            </Suspense>
+          </div>
           <Suspense fallback={<ScrobbleListSkeleton />}>
             <RecentListensSection name={name} />
           </Suspense>

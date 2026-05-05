@@ -3,6 +3,7 @@ import type {
   Listen,
   FeedbackItem,
   PinnedRecording,
+  FeedEvent,
 } from "@/lib/clients/listenbrainz";
 
 /** Convert a list of LB listens to Parachord-import track shape. */
@@ -52,6 +53,40 @@ export function topRecordingsToParachordTracks(
     artist: r.artist_name,
     ...(r.release_name ? { album: r.release_name } : {}),
   }));
+}
+
+/**
+ * Pull tracks out of feed events. Only event types that carry
+ * track_metadata (e.g. recording_pin, recording_recommendation) yield
+ * a track; follows / notifications / etc. are silently skipped.
+ */
+export function feedEventsToParachordTracks(
+  events: FeedEvent[],
+): ParachordTrack[] {
+  const out: ParachordTrack[] = [];
+  for (const e of events) {
+    const meta = (e.metadata ?? {}) as Record<string, unknown>;
+    const tm =
+      (meta.track_metadata as Record<string, unknown> | undefined) ?? null;
+    if (!tm) continue;
+    const title = typeof tm.track_name === "string" ? tm.track_name : null;
+    const artist = typeof tm.artist_name === "string" ? tm.artist_name : null;
+    if (!title || !artist) continue;
+    const album =
+      typeof tm.release_name === "string" ? tm.release_name : null;
+    const additional = tm.additional_info as
+      | Record<string, unknown>
+      | undefined;
+    const durRaw = additional?.duration_ms;
+    const dur = typeof durRaw === "number" ? Math.round(durRaw / 1000) : null;
+    out.push({
+      title,
+      artist,
+      ...(album ? { album } : {}),
+      ...(dur ? { duration: dur } : {}),
+    });
+  }
+  return out;
 }
 
 /** Convert a list of LB pinned recordings to Parachord-import shape. */

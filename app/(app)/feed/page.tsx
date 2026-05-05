@@ -8,6 +8,8 @@ import { ComingSoon } from "@/components/achordion/coming-soon";
 import { FeedEventList } from "@/components/achordion/feed-event-list";
 import { FilterPills } from "@/components/achordion/filter-pills";
 import { TrackListActionsMenu } from "@/components/achordion/track-list-actions-menu";
+import { OpenInParachordButton } from "@/components/achordion/open-in-parachord-button";
+import { feedEventsToParachordTracks } from "@/lib/parachord-listens";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -51,6 +53,54 @@ async function FeedBody({
     ? events.filter((e) => (e.user_name ?? "") !== name)
     : events;
   return <FeedEventList events={filtered} />;
+}
+
+async function FeedCta({
+  name,
+  excludeSelf,
+}: {
+  name: string;
+  excludeSelf: boolean;
+}) {
+  const token = await getLbTokenForRequest();
+  if (!token) return null;
+  let tracks: ReturnType<typeof feedEventsToParachordTracks> = [];
+  try {
+    const events = await getUserFeed(name, token, { count: 50 });
+    if (events) {
+      const filtered = excludeSelf
+        ? events.filter((e) => (e.user_name ?? "") !== name)
+        : events;
+      tracks = feedEventsToParachordTracks(filtered);
+    }
+  } catch {
+    // Both buttons still render; their actions just no-op when empty.
+  }
+  const title = excludeSelf
+    ? `${name} — Feed (others)`
+    : `${name} — Feed`;
+  const xspfUrl = excludeSelf
+    ? "/api/me/feed.xspf?exclude_self=1"
+    : "/api/me/feed.xspf";
+  const xspfFilename = `${name}-feed${excludeSelf ? "-others" : ""}`;
+  return (
+    <div className="flex items-center gap-2">
+      <OpenInParachordButton
+        kind="playlist"
+        tracks={tracks}
+        title={title}
+        creator={name}
+      />
+      <TrackListActionsMenu
+        title={title}
+        creator={name}
+        tracks={tracks}
+        xspfUrl={xspfUrl}
+        xspfFilename={xspfFilename}
+        triggerLabel="Feed actions"
+      />
+    </div>
+  );
 }
 
 function FeedSkeleton() {
@@ -107,39 +157,18 @@ export default async function FeedPage({ searchParams }: FeedPageProps) {
     );
   }
 
-  const xspfUrl = excludeSelf
-    ? "/api/me/feed.xspf?exclude_self=1"
-    : "/api/me/feed.xspf";
-  const xspfFilename = `${viewer}-feed${excludeSelf ? "-others" : ""}`;
   return (
     <PageShell className="pt-8">
-      <header className="mb-6 flex items-start justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
-            My feed
-          </h1>
-          <p className="text-muted-foreground mt-1 text-sm">
-            Recent activity from accounts you follow on ListenBrainz, plus
-            system notifications.
-          </p>
-        </div>
-        {/* Tracks aren't pre-fetched at the page level — Save-to-Parachord
-            is omitted for the feed (events are heterogenous and the per-feed
-            track list isn't well-defined). XSPF download still works. */}
-        <TrackListActionsMenu
-          title={
-            excludeSelf
-              ? `${viewer} — Feed (others)`
-              : `${viewer} — Feed`
-          }
-          creator={viewer}
-          tracks={[]}
-          xspfUrl={xspfUrl}
-          xspfFilename={xspfFilename}
-          triggerLabel="Feed actions"
-        />
+      <header className="mb-6">
+        <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+          My feed
+        </h1>
+        <p className="text-muted-foreground mt-1 text-sm">
+          Recent activity from accounts you follow on ListenBrainz, plus
+          system notifications.
+        </p>
       </header>
-      <div className="mb-4">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <FilterPills
           param="source"
           active={sourceFilter}
@@ -147,6 +176,9 @@ export default async function FeedPage({ searchParams }: FeedPageProps) {
           defaultValue="all"
           ariaLabel="Filter feed by source"
         />
+        <Suspense fallback={null}>
+          <FeedCta name={viewer} excludeSelf={excludeSelf} />
+        </Suspense>
       </div>
       <Suspense fallback={<FeedSkeleton />}>
         <FeedBody name={viewer} excludeSelf={excludeSelf} />
