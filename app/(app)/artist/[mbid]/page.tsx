@@ -165,8 +165,23 @@ async function ArtistBody({
         </div>
       )}
 
+      {/* Single grid that absorbs everything below the hero/tags so
+          we can control mobile order independently from desktop
+          placement. On lg+ the layout is the original 2-column
+          (main + sidebar in row 1, discography + similar artists
+          spanning both columns in subsequent rows). On mobile,
+          DOM order = visual order, so we rearrange:
+            1. main column content
+            2. discography
+            3. similar artists
+            4. sidebar (info + top listeners) — pushed to the bottom
+
+          The sidebar at the bottom on mobile keeps the artist's
+          contextual facts (life-span / members / links / top
+          listeners) reachable without forcing the user to scroll
+          past them to get to the music. */}
       <div className="mt-6 grid grid-cols-1 gap-10 lg:grid-cols-[minmax(0,1fr)_240px]">
-        <div className="min-w-0 space-y-12">
+        <div className="min-w-0 space-y-12 lg:col-start-1 lg:row-start-1">
           {bioSource ? (
             <Suspense
               fallback={<Skeleton className="h-32 w-full rounded-xl" />}
@@ -200,49 +215,60 @@ async function ArtistBody({
             </Suspense>
           </section>
         </div>
-        <Suspense
-          fallback={
-            <ArtistInfoSidebar
-              artist={artist}
-              linksOverride={other}
-              // No topListeners during the initial paint — the section
-              // gets hidden, fills in below when listeners resolves.
+
+        {/* Discography — full-width on lg via col-span-2 col-start-1
+            so it sits below both columns of the hero row. mt-16
+            spacer is desktop-only; on mobile the gap-10 already
+            separates it from the popular-tracks list above. */}
+        <section className="lg:col-span-2 lg:col-start-1 lg:row-start-2 lg:mt-6">
+          <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-sm font-semibold tracking-wide uppercase">
+              Discography
+            </h2>
+            <FilterPills
+              param="type"
+              active={discographyType}
+              options={DISCOGRAPHY_TYPE_OPTIONS}
+              defaultValue="studio"
+              ariaLabel="Discography type"
             />
-          }
-        >
-          <SidebarWithListeners
-            artist={artist}
-            other={other}
-            promise={listenersPromise}
-          />
-        </Suspense>
-      </div>
+          </div>
+          <Suspense key={discographyType} fallback={<DiscographySkeleton />}>
+            <DiscographySection mbid={mbid} type={discographyType} />
+          </Suspense>
+        </section>
 
-      {/* Full-width sections — out of the 1fr/240px grid since the
-          sidebar's content (life-span / members / links) ends well
-          above where the discography starts. Lets the cover grid use
-          the entire page width. */}
-      <section className="mt-16">
-        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-sm font-semibold tracking-wide uppercase">
-            Discography
-          </h2>
-          <FilterPills
-            param="type"
-            active={discographyType}
-            options={DISCOGRAPHY_TYPE_OPTIONS}
-            defaultValue="studio"
-            ariaLabel="Discography type"
-          />
+        {/* Similar artists — full-width on lg. Wrapper div carries
+            the grid placement so the inner <section> doesn't have to
+            know about its layout context. */}
+        <div className="lg:col-span-2 lg:col-start-1 lg:row-start-3">
+          <Suspense fallback={<SimilarArtistsSkeleton />}>
+            <SimilarArtistsSection mbid={mbid} />
+          </Suspense>
         </div>
-        <Suspense key={discographyType} fallback={<DiscographySkeleton />}>
-          <DiscographySection mbid={mbid} type={discographyType} />
-        </Suspense>
-      </section>
 
-      <Suspense fallback={<SimilarArtistsSkeleton />}>
-        <SimilarArtistsSection mbid={mbid} />
-      </Suspense>
+        {/* Sidebar — DOM-last so it's at the bottom on mobile.
+            On lg, col-start-2 row-start-1 puts it back in the
+            right column of the hero row. */}
+        <div className="lg:col-start-2 lg:row-start-1">
+          <Suspense
+            fallback={
+              <ArtistInfoSidebar
+                artist={artist}
+                linksOverride={other}
+                // No topListeners during the initial paint — the section
+                // gets hidden, fills in below when listeners resolves.
+              />
+            }
+          >
+            <SidebarWithListeners
+              artist={artist}
+              other={other}
+              promise={listenersPromise}
+            />
+          </Suspense>
+        </div>
+      </div>
     </>
   );
 }
