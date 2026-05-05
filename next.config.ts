@@ -190,6 +190,10 @@ const nextConfig: NextConfig = {
         headers: [PUBLIC_ENTITY_CACHE],
       },
       {
+        source: "/apps",
+        headers: [PUBLIC_ENTITY_CACHE],
+      },
+      {
         source: "/login",
         headers: [PUBLIC_ENTITY_CACHE],
       },
