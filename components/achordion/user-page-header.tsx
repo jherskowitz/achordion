@@ -58,7 +58,7 @@ export async function UserPageHeader({ name }: { name: string }) {
   return (
     <header className="border-border/60 border-b">
       <div className="mx-auto max-w-7xl px-4 pt-10 pb-0 sm:px-6">
-        <div className="flex items-center gap-4 pb-6 sm:gap-6">
+        <div className="flex flex-col items-start gap-4 pb-6 sm:flex-row sm:items-center sm:gap-6">
           <UserAvatar
             username={name}
             className="size-16 sm:size-20"

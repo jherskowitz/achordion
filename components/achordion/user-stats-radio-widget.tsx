@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { ChevronDown, Play, Radio } from "lucide-react";
-import { parachordPlayRadio } from "@/lib/parachord";
+import { parachordPlayRadio, type ParachordTrack } from "@/lib/parachord";
 import { useParachordPresence } from "@/lib/use-parachord-presence";
 import { IconTooltip } from "@/components/ui/icon-tooltip";
 import {
@@ -11,6 +11,8 @@ import {
   type StatRange,
 } from "@/lib/types/stat-range";
 import { cn } from "@/lib/utils";
+
+const LB_RADIO_API = "https://api.listenbrainz.org/1/explore/lb-radio";
 
 const DEFAULT_RANGE: StatRange = "week";
 
@@ -38,18 +40,53 @@ export function UserStatsRadioWidget({ username }: { username: string }) {
   const rangeLabel = STAT_RANGE_LABELS[range];
 
   const radioName = `${username} Radio`;
-  const playHref = parachordPlayRadio({
-    prompt: `stats:(${username}:${range})`,
-    displayName: `${radioName} (${rangeLabel})`,
-  });
+  const prompt = `stats:${username}::${range}`;
+  // Parachord's `prompt:` mode (Mode B) hands off to its in-app seed
+  // pool, not LB Radio — so we fetch the initial pool ourselves on
+  // click and pass `tracks=` (initial) + `refill=` (LB Radio API URL)
+  // to match what the manual station builder produces. Format ref:
+  // https://troi.readthedocs.io/en/latest/lb_radio.html.
+  const refillUrl = `${LB_RADIO_API}?prompt=${encodeURIComponent(prompt)}&mode=easy`;
+  const [building, setBuilding] = useState(false);
+
+  async function handlePlay(e: React.MouseEvent) {
+    e.preventDefault();
+    if (building) return;
+    setBuilding(true);
+    try {
+      const res = await fetch(
+        `/api/lb-radio?prompt=${encodeURIComponent(prompt)}&mode=easy`,
+      );
+      const data = (await res.json().catch(() => null)) as
+        | { tracks?: ParachordTrack[]; error?: string }
+        | null;
+      const tracks = data?.tracks ?? [];
+      // Even if tracks is empty, hand the refill URL to Parachord —
+      // it'll do its own LB Radio call with the user's local token.
+      const href = parachordPlayRadio({
+        ...(tracks.length ? { tracks } : {}),
+        refill: refillUrl,
+        displayName: `${radioName} (${rangeLabel})`,
+      });
+      window.location.href = href;
+    } finally {
+      setBuilding(false);
+    }
+  }
 
   const iconButtonBase =
     "group/playbtn flex size-9 shrink-0 items-center justify-center rounded-full transition-colors";
   const icon = parachordRunning ? (
-    <a
-      href={playHref}
+    <button
+      type="button"
+      onClick={handlePlay}
+      disabled={building}
       aria-label={`Play ${radioName} in Parachord`}
-      className={cn(iconButtonBase, "bg-foreground/10 hover:text-white")}
+      className={cn(
+        iconButtonBase,
+        "bg-foreground/10 hover:text-white",
+        building && "opacity-60",
+      )}
       style={{
         ["--play-bg" as string]: "var(--parachord-accent)",
       }}
@@ -62,7 +99,7 @@ export function UserStatsRadioWidget({ username }: { username: string }) {
     >
       <Radio className="size-4 group-hover/playbtn:hidden" />
       <Play className="size-4 hidden fill-current group-hover/playbtn:block" />
-    </a>
+    </button>
   ) : (
     <span
       aria-disabled
@@ -116,7 +153,7 @@ export function UserStatsRadioWidget({ username }: { username: string }) {
       {open && (
         <div
           id={`stats-radio-range-${username}`}
-          className="border-border/60 bg-background absolute left-0 right-0 top-full z-30 mt-1 rounded-2xl border px-3 pb-3 pt-3 shadow-lg"
+          className="border-border/60 bg-background absolute left-0 right-0 top-full z-40 mt-1 rounded-2xl border px-3 pb-3 pt-3 shadow-lg"
         >
           <input
             type="range"
