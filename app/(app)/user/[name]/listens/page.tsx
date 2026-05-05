@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { getRecentListens } from "@/lib/clients/listenbrainz";
 import { ScrobbleList } from "@/components/achordion/scrobble-list";
 import { TrackListActionsMenu } from "@/components/achordion/track-list-actions-menu";
+import { OpenInParachordButton } from "@/components/achordion/open-in-parachord-button";
 import { PageShell } from "@/components/achordion/page-shell";
 import { ComingSoon } from "@/components/achordion/coming-soon";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -35,27 +36,34 @@ async function ListensSection({
   }
 }
 
-async function ListensActionsMenu({ name }: { name: string }) {
+async function ListensCta({ name }: { name: string }) {
   // Pull a recent slice (same count as the visible list) to seed
-  // Save-to-Parachord. The XSPF download endpoint pulls its own
-  // canonical slice, so the menu's `tracks` is just for the import.
+  // both Play-in-Parachord and Save-to-Parachord. The XSPF download
+  // endpoint pulls its own canonical slice.
   let tracks: ReturnType<typeof listensToParachordTracks> = [];
   try {
     const listens = await getRecentListens(name, { count: 100 });
     tracks = listensToParachordTracks(listens);
   } catch {
-    // Menu still renders; Save-to-Parachord just gets disabled when
-    // there are no tracks.
+    // Both buttons still render; their actions just no-op when empty.
   }
   return (
-    <TrackListActionsMenu
-      title={`${name} — Recently played`}
-      creator={name}
-      tracks={tracks}
-      xspfUrl={`/api/user/${encodeURIComponent(name)}/recent-listens.xspf`}
-      xspfFilename={`${name}-recently-played`}
-      triggerLabel="Recently played actions"
-    />
+    <div className="flex items-center gap-2">
+      <OpenInParachordButton
+        kind="playlist"
+        tracks={tracks}
+        title={`${name} — Recently played`}
+        creator={name}
+      />
+      <TrackListActionsMenu
+        title={`${name} — Recently played`}
+        creator={name}
+        tracks={tracks}
+        xspfUrl={`/api/user/${encodeURIComponent(name)}/recent-listens.xspf`}
+        xspfFilename={`${name}-recently-played`}
+        triggerLabel="Recently played actions"
+      />
+    </div>
   );
 }
 
@@ -87,7 +95,7 @@ export default async function ListensPage({ params, searchParams }: PageParams) 
           Listens
         </h2>
         <Suspense fallback={null}>
-          <ListensActionsMenu name={name} />
+          <ListensCta name={name} />
         </Suspense>
       </div>
       <Suspense fallback={<Fallback />}>

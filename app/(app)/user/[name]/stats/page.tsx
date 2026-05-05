@@ -15,6 +15,7 @@ import { TopArtistsList } from "@/components/achordion/top-artists-list";
 import { TopAlbumsGrid } from "@/components/achordion/top-albums-grid";
 import { TopTracksList } from "@/components/achordion/top-tracks-list";
 import { TrackListActionsMenu } from "@/components/achordion/track-list-actions-menu";
+import { OpenInParachordButton } from "@/components/achordion/open-in-parachord-button";
 import { topRecordingsToParachordTracks } from "@/lib/parachord-listens";
 import { ListeningActivityChart } from "@/components/achordion/listening-activity-chart";
 import { DailyHeatmap } from "@/components/achordion/daily-heatmap";
@@ -91,7 +92,7 @@ async function TracksSection({
   }
 }
 
-async function TopTracksActionsMenu({
+async function TopTracksCta({
   name,
   range,
 }: {
@@ -103,17 +104,26 @@ async function TopTracksActionsMenu({
     const recordings = await getUserTopRecordings(name, range, 100);
     tracks = topRecordingsToParachordTracks(recordings);
   } catch {
-    // Menu still renders; Save-to-Parachord just disables when empty.
+    // Both buttons still render; their actions just no-op when empty.
   }
+  const title = `${name} — Top tracks (${range.replace(/_/g, " ")})`;
   return (
-    <TrackListActionsMenu
-      title={`${name} — Top tracks (${range.replace(/_/g, " ")})`}
-      creator={name}
-      tracks={tracks}
-      xspfUrl={`/api/user/${encodeURIComponent(name)}/top-tracks.xspf?range=${range}`}
-      xspfFilename={`${name}-top-tracks-${range}`}
-      triggerLabel="Top-tracks actions"
-    />
+    <div className="flex items-center gap-2">
+      <OpenInParachordButton
+        kind="playlist"
+        tracks={tracks}
+        title={title}
+        creator={name}
+      />
+      <TrackListActionsMenu
+        title={title}
+        creator={name}
+        tracks={tracks}
+        xspfUrl={`/api/user/${encodeURIComponent(name)}/top-tracks.xspf?range=${range}`}
+        xspfFilename={`${name}-top-tracks-${range}`}
+        triggerLabel="Top-tracks actions"
+      />
+    </div>
   );
 }
 
@@ -215,7 +225,7 @@ export default async function StatsPage({ params, searchParams }: PageParams) {
                 Tracks
               </h3>
               <Suspense key={`tracks-menu-${range}`} fallback={null}>
-                <TopTracksActionsMenu name={name} range={range} />
+                <TopTracksCta name={name} range={range} />
               </Suspense>
             </div>
             <Suspense key={`tracks-${range}`} fallback={<ListSkeleton />}>

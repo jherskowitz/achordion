@@ -13,6 +13,7 @@ import { ComingSoon } from "@/components/achordion/coming-soon";
 import { CoverArt } from "@/components/achordion/cover-art";
 import { PageShell } from "@/components/achordion/page-shell";
 import { TrackListActionsMenu } from "@/components/achordion/track-list-actions-menu";
+import { OpenInParachordButton } from "@/components/achordion/open-in-parachord-button";
 import {
   artistHref,
   recordingHref,
@@ -240,23 +241,31 @@ function LovesSkeleton() {
   );
 }
 
-async function LovesActionsMenu({ name }: { name: string }) {
+async function LovesCta({ name }: { name: string }) {
   let tracks: ReturnType<typeof feedbackToParachordTracks> = [];
   try {
     const feedback = await getUserFeedback(name, { score: 1, count: 500 });
     tracks = feedbackToParachordTracks(feedback);
   } catch {
-    // Menu still renders; Save-to-Parachord just disables when empty.
+    // Both buttons still render; their actions just no-op when empty.
   }
   return (
-    <TrackListActionsMenu
-      title={`${name} — Loved tracks`}
-      creator={name}
-      tracks={tracks}
-      xspfUrl={`/api/user/${encodeURIComponent(name)}/loved.xspf`}
-      xspfFilename={`${name}-loved`}
-      triggerLabel="Loved-tracks actions"
-    />
+    <div className="flex items-center gap-2">
+      <OpenInParachordButton
+        kind="playlist"
+        tracks={tracks}
+        title={`${name} — Loved tracks`}
+        creator={name}
+      />
+      <TrackListActionsMenu
+        title={`${name} — Loved tracks`}
+        creator={name}
+        tracks={tracks}
+        xspfUrl={`/api/user/${encodeURIComponent(name)}/loved.xspf`}
+        xspfFilename={`${name}-loved`}
+        triggerLabel="Loved-tracks actions"
+      />
+    </div>
   );
 }
 
@@ -274,7 +283,7 @@ export default async function LovesPage({ params }: PageParams) {
           </p>
         </div>
         <Suspense fallback={null}>
-          <LovesActionsMenu name={name} />
+          <LovesCta name={name} />
         </Suspense>
       </header>
       <Suspense fallback={<LovesSkeleton />}>
