@@ -2400,3 +2400,65 @@ export async function addRecordingToPlaylist(
     },
   );
 }
+
+// ─── Create a playlist on LB ────────────────────────────────────────
+
+export interface CreatePlaylistOptions {
+  name: string;
+  isPublic: boolean;
+  /** Optional first track to seed the new playlist with. */
+  recordingMbid?: string;
+}
+
+const CreatePlaylistResponseSchema = z.object({
+  status: z.string().optional(),
+  playlist_mbid: z.string(),
+});
+
+/**
+ * Create a new playlist. Returns the LB-assigned playlist MBID so the
+ * caller can navigate / reference it immediately. When `recordingMbid`
+ * is set the playlist is created with that single track — saves a
+ * second round-trip vs. create-then-add.
+ */
+export async function createPlaylistOnLb(
+  token: string,
+  opts: CreatePlaylistOptions,
+): Promise<{ playlistMbid: string }> {
+  const playlist: Record<string, unknown> = {
+    title: opts.name,
+    extension: {
+      "https://musicbrainz.org/doc/jspf#playlist": { public: opts.isPublic },
+    },
+  };
+  if (opts.recordingMbid) {
+    playlist.track = [
+      {
+        identifier: [
+          `https://musicbrainz.org/recording/${opts.recordingMbid}`,
+        ],
+      },
+    ];
+  }
+  const res = await fetch(`${LB_BASE}/playlist/create`, {
+    method: "POST",
+    headers: {
+      Authorization: `Token ${token}`,
+      "Content-Type": "application/json",
+      "User-Agent": USER_AGENT,
+      Accept: "application/json",
+    },
+    body: JSON.stringify({ playlist }),
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new ListenBrainzError(
+      res.status,
+      `LB ${res.status} on /playlist/create: ${text.slice(0, 300)}`,
+    );
+  }
+  const json = await res.json();
+  const parsed = CreatePlaylistResponseSchema.parse(json);
+  return { playlistMbid: parsed.playlist_mbid };
+}
