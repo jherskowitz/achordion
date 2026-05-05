@@ -9,6 +9,7 @@ import { FeedEventList } from "@/components/achordion/feed-event-list";
 import { FilterPills } from "@/components/achordion/filter-pills";
 import { TrackListActionsMenu } from "@/components/achordion/track-list-actions-menu";
 import { OpenInParachordButton } from "@/components/achordion/open-in-parachord-button";
+import { MarkFeedSeen } from "@/components/achordion/mark-feed-seen";
 import { feedEventsToParachordTracks } from "@/lib/parachord-listens";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -183,6 +184,7 @@ export default async function FeedPage({ searchParams }: FeedPageProps) {
       <Suspense fallback={<FeedSkeleton />}>
         <FeedBody name={viewer} excludeSelf={excludeSelf} />
       </Suspense>
+      <MarkFeedSeen />
     </PageShell>
   );
 }
