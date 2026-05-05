@@ -159,3 +159,21 @@ export async function createPlaylistAction(input: {
     };
   }
 }
+
+export async function deleteListenAction(input: {
+  recordingMsid: string;
+  listenedAt: number;
+}): Promise<ActionResult> {
+  const auth = await requireUserToken();
+  if (!auth.ok) return auth;
+  try {
+    await deleteListen(auth.token, input.recordingMsid, input.listenedAt);
+    revalidateTag(`lb:user:${auth.viewer}:listens`, "max");
+    return { ok: true };
+  } catch (e) {
+    return {
+      ok: false,
+      reason: e instanceof Error ? e.message : "Couldn't delete listen.",
+    };
+  }
+}
