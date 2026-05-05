@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Heart, MoreVertical, Pin } from "lucide-react";
+import { Heart, ListPlus, MoreVertical, Pin } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,6 +18,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { feedbackTrackAction } from "@/app/(app)/track/actions";
+import { parachordQueueAdd } from "@/lib/parachord";
 import { useLoved } from "./loved-tracks-provider";
 import { PinTrackDialog } from "./track-actions/pin-track-dialog";
 
@@ -68,6 +69,9 @@ export function TrackActionsMenu({
           <DropdownMenuLabel>Track</DropdownMenuLabel>
           <LoveItem track={track} />
           <PinItem disabled={!canPin} onSelect={() => setPinOpen(true)} />
+          <DropdownMenuSeparator />
+          <DropdownMenuLabel>Add</DropdownMenuLabel>
+          <QueueAddItem track={track} />
         </DropdownMenuContent>
       </DropdownMenu>
       <PinTrackDialog open={pinOpen} onOpenChange={setPinOpen} track={track} />
@@ -178,5 +182,32 @@ function LoveItem({ track }: { track: TrackRef }) {
         No MusicBrainz ID for this recording.
       </TooltipContent>
     </Tooltip>
+  );
+}
+
+/**
+ * Send the track to a running Parachord via the `parachord://queue/add`
+ * deep link. Uses the existing helper, so the URL shape stays in sync
+ * with every other Parachord call site (artist+title, optional album).
+ *
+ * The protocol is fire-and-forget — we have no signal back from
+ * Parachord — so the toast just confirms we sent the URL.
+ */
+function QueueAddItem({ track }: { track: TrackRef }) {
+  function handleClick() {
+    const url = parachordQueueAdd({
+      artist: track.artistName,
+      title: track.trackName,
+    });
+    if (typeof window !== "undefined") {
+      window.location.href = url;
+    }
+    toast.success("Sent to Parachord");
+  }
+  return (
+    <DropdownMenuItem onClick={handleClick}>
+      <ListPlus />
+      Add to Parachord queue
+    </DropdownMenuItem>
   );
 }
