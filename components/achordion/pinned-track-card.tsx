@@ -107,7 +107,12 @@ export function PinnedTrackCard({
         className,
       )}
     >
-      <div className={cn("flex gap-4", isHero ? "sm:gap-6" : "sm:gap-5")}>
+      <div
+        className={cn(
+          "flex items-start gap-4",
+          isHero ? "sm:gap-6" : "sm:gap-5",
+        )}
+      >
         <CoverArt
           src={cover}
           alt={meta.release_name ?? meta.track_name}

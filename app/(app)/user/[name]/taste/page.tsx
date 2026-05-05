@@ -144,10 +144,13 @@ async function LovesBody({ name }: { name: string }) {
 
   return (
     <>
-      <p className="text-muted-foreground mb-4 text-xs">
-        {feedback.length.toLocaleString()} loved track
-        {feedback.length === 1 ? "" : "s"} · most recent first
-      </p>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <p className="text-muted-foreground text-xs">
+          {feedback.length.toLocaleString()} loved track
+          {feedback.length === 1 ? "" : "s"} · most recent first
+        </p>
+        <LovesCta name={name} />
+      </div>
       <ol className="border-border/60 divide-border/60 divide-y rounded-xl border px-4">
         {tracks.map((t, i) => {
           const playHref = parachordPlayTrack({
@@ -305,18 +308,13 @@ export default async function LovesPage({ params }: PageParams) {
   const { name } = await params;
   return (
     <PageShell className="pt-8">
-      <header className="mb-6 flex items-start justify-between gap-3">
-        <div>
-          <h2 className="text-sm font-semibold tracking-wide uppercase">
-            Loves
-          </h2>
-          <p className="text-muted-foreground mt-1 text-sm">
-            Tracks {name} has loved on ListenBrainz.
-          </p>
-        </div>
-        <Suspense fallback={null}>
-          <LovesCta name={name} />
-        </Suspense>
+      <header className="mb-6">
+        <h2 className="text-sm font-semibold tracking-wide uppercase">
+          Loves
+        </h2>
+        <p className="text-muted-foreground mt-1 text-sm">
+          Tracks {name} has loved on ListenBrainz.
+        </p>
       </header>
       <Suspense fallback={<LovesSkeleton />}>
         <LovesBody name={name} />
