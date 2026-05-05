@@ -4,6 +4,11 @@ import {
   getRecentListens,
   getCurrentPin,
 } from "@/lib/clients/listenbrainz";
+import {
+  getRecording,
+  partitionArtistRelations,
+} from "@/lib/clients/musicbrainz";
+import { categoriseLinks } from "@/components/achordion/external-links";
 import { LiveScrobbleList } from "@/components/achordion/live-scrobble-list";
 import { PinnedTrackCard } from "@/components/achordion/pinned-track-card";
 import { PageShell } from "@/components/achordion/page-shell";
@@ -22,7 +27,28 @@ async function PinnedSection({ name }: { name: string }) {
   try {
     const pin = await getCurrentPin(name);
     if (!pin) return null;
-    return <PinnedTrackCard pin={pin} variant="hero" />;
+    // Mirror the recording-page extraction: getRecording → relations →
+    // partitionArtistRelations → categoriseLinks. Fetch failure just
+    // drops the favicon row; the card still renders with the "+" tile
+    // (PinnedTrackCard handles the empty-links case).
+    const recordingMbid =
+      pin.track_metadata.mbid_mapping?.recording_mbid ??
+      pin.track_metadata.additional_info?.recording_mbid ??
+      pin.recording_mbid ??
+      null;
+    let streamingLinks: ReturnType<typeof categoriseLinks>["streaming"] = [];
+    if (recordingMbid) {
+      const recording = await getRecording(recordingMbid).catch(() => null);
+      if (recording) {
+        const { urls } = partitionArtistRelations({
+          relations: recording.relations,
+        });
+        streamingLinks = categoriseLinks(urls).streaming;
+      }
+    }
+    return (
+      <PinnedTrackCard pin={pin} variant="hero" streamingLinks={streamingLinks} />
+    );
   } catch {
     return null;
   }

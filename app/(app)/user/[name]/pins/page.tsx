@@ -1,5 +1,11 @@
 import { Suspense } from "react";
 import { getUserPins } from "@/lib/clients/listenbrainz";
+import {
+  getRecording,
+  partitionArtistRelations,
+  type ArtistExternalLink,
+} from "@/lib/clients/musicbrainz";
+import { categoriseLinks } from "@/components/achordion/external-links";
 import { PinnedTrackCard } from "@/components/achordion/pinned-track-card";
 import { PageShell } from "@/components/achordion/page-shell";
 import { ComingSoon } from "@/components/achordion/coming-soon";
@@ -31,6 +37,28 @@ async function PinsHistory({ name }: { name: string }) {
     );
   }
 
+  // Parallel-fetch each pin's MB recording so the favicon row on every
+  // card is consistent with the recording-page row. getRecording is
+  // cached + rate-limited at the client; per-pin failure quietly drops
+  // that card's favicon row (the card still renders).
+  const linksByPin = new Map<number, ArtistExternalLink[]>();
+  await Promise.all(
+    pins.map(async (p) => {
+      const mbid =
+        p.track_metadata.mbid_mapping?.recording_mbid ??
+        p.track_metadata.additional_info?.recording_mbid ??
+        p.recording_mbid ??
+        null;
+      if (!mbid) return;
+      const recording = await getRecording(mbid).catch(() => null);
+      if (!recording) return;
+      const { urls } = partitionArtistRelations({
+        relations: recording.relations,
+      });
+      linksByPin.set(p.row_id, categoriseLinks(urls).streaming);
+    }),
+  );
+
   const now = Math.floor(Date.now() / 1000);
   const active = pins.filter((p) => p.pinned_until > now);
   const past = pins.filter((p) => p.pinned_until <= now);
@@ -44,7 +72,11 @@ async function PinsHistory({ name }: { name: string }) {
           </h3>
           <div className="space-y-3">
             {active.map((p) => (
-              <PinnedTrackCard key={p.row_id} pin={p} />
+              <PinnedTrackCard
+                key={p.row_id}
+                pin={p}
+                streamingLinks={linksByPin.get(p.row_id) ?? []}
+              />
             ))}
           </div>
         </section>
@@ -60,7 +92,11 @@ async function PinsHistory({ name }: { name: string }) {
           </h3>
           <div className="space-y-3">
             {past.map((p) => (
-              <PinnedTrackCard key={p.row_id} pin={p} />
+              <PinnedTrackCard
+                key={p.row_id}
+                pin={p}
+                streamingLinks={linksByPin.get(p.row_id) ?? []}
+              />
             ))}
           </div>
         </section>
