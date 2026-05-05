@@ -2271,3 +2271,48 @@ export async function getUserFeed(
     return null;
   }
 }
+
+// ─── Write helper ───────────────────────────────────────────────────
+
+/**
+ * Shared POST wrapper for LB write endpoints. Throws ListenBrainzError
+ * on non-2xx with the response body included for debugging — callers
+ * (typically server actions) should catch and surface the message.
+ */
+async function lbPost(path: string, token: string, body: unknown): Promise<void> {
+  const res = await fetch(`${LB_BASE}${path}`, {
+    method: "POST",
+    headers: {
+      Authorization: `Token ${token}`,
+      "Content-Type": "application/json",
+      "User-Agent": USER_AGENT,
+      Accept: "application/json",
+    },
+    body: JSON.stringify(body),
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new ListenBrainzError(
+      res.status,
+      `LB ${res.status} on ${path}: ${text.slice(0, 300)}`,
+    );
+  }
+}
+
+// ─── Recording feedback (love / hate / clear) ───────────────────────
+
+/**
+ * Submit a love (`1`), hate (`-1`), or clear (`0`) for a recording.
+ * Idempotent on LB's side — re-sending the same score is a no-op.
+ */
+export async function submitFeedback(
+  token: string,
+  recordingMbid: string,
+  score: 0 | 1 | -1,
+): Promise<void> {
+  await lbPost("/feedback/recording-feedback", token, {
+    recording_mbid: recordingMbid,
+    score,
+  });
+}
