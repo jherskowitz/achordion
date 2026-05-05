@@ -23,6 +23,7 @@ import { PlayOverNumberCell } from "@/components/achordion/parachord-button";
 import { PlaylistCoverMosaic } from "@/components/achordion/playlist-cover-mosaic";
 import { PlaylistEditButton } from "@/components/achordion/playlist-edit-modal";
 import { PlaylistVisibilityToggle } from "@/components/achordion/playlist-visibility-toggle";
+import { TrackActionsMenuSlot } from "@/components/achordion/track-actions-menu-slot";
 import { IconTooltip } from "@/components/ui/icon-tooltip";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -373,6 +374,14 @@ async function PlaylistBody({ mbid }: { mbid: string }) {
                 <span className="text-muted-foreground shrink-0 tabular-nums text-xs">
                   {formatLength(t.durationMs)}
                 </span>
+                <TrackActionsMenuSlot
+                  track={{
+                    recordingMbid: t.recordingMbid,
+                    trackName: t.title,
+                    artistName: t.artistName,
+                    releaseMbid: t.releaseMbid,
+                  }}
+                />
               </li>
             );
           })}

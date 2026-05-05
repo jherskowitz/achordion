@@ -552,6 +552,59 @@ export function playlistMbidFromIdentifier(
   return m?.[1] ?? null;
 }
 
+export interface PlaylistSummary {
+  mbid: string;
+  title: string;
+  isPublic: boolean;
+  lastModifiedAt: string;
+}
+
+/**
+ * Owner-scoped playlist list for the *viewer* — passes their LB token so
+ * private playlists show up too. Flatter than `getUserPlaylists`: just the
+ * fields the track-actions "Add to playlist" submenu needs.
+ *
+ * The viewer-scoped response is personalised, so `lbFetch` skips the data
+ * cache (token forces no-store). We still attach a tag for downstream
+ * `revalidateTag` after writes — useful when Next caches the calling RSC.
+ */
+export async function getUserPlaylistsForViewer(
+  viewer: string,
+  token: string,
+  count = 10,
+): Promise<PlaylistSummary[]> {
+  try {
+    const params = new URLSearchParams({ count: String(count) });
+    const result = await lbFetch(
+      `/user/${encodeURIComponent(viewer)}/playlists?${params}`,
+      UserPlaylistsResponseSchema,
+      { token, revalidate: 300, tags: [`lb:user:${viewer}:playlists`] },
+    );
+    const out: PlaylistSummary[] = [];
+    for (const entry of result.playlists) {
+      const p = entry.playlist;
+      const mbid = playlistMbidFromIdentifier(p.identifier);
+      if (!mbid) continue;
+      const ext = p.extension?.["https://musicbrainz.org/doc/jspf#playlist"];
+      out.push({
+        mbid,
+        title: p.title,
+        isPublic: ext?.public ?? true,
+        lastModifiedAt: ext?.last_modified_at ?? p.date ?? "",
+      });
+    }
+    return out;
+  } catch (err) {
+    if (
+      err instanceof ListenBrainzError &&
+      (err.status === 204 || err.status === 404)
+    ) {
+      return [];
+    }
+    throw err;
+  }
+}
+
 // ─── Pinned recordings ─────────────────────────────────────────────
 
 const PinnedTrackMetaSchema = z
@@ -863,6 +916,31 @@ export async function getFollowers(userName: string): Promise<string[]> {
       `/user/${encodeURIComponent(userName)}/followers`,
       FollowersSchema,
       { revalidate: 60, tags: [`lb:user:${userName}:followers`] },
+    );
+    return result.followers;
+  } catch (err) {
+    if (
+      err instanceof ListenBrainzError &&
+      (err.status === 204 || err.status === 404)
+    ) {
+      return [];
+    }
+    throw err;
+  }
+}
+
+/**
+ * Followers list for the "Recommend to followers" picker. Same endpoint
+ * as `getFollowers` but with a longer revalidate window — the picker
+ * tolerates a few minutes of staleness in exchange for fewer LB hits
+ * across the many places it could be opened from.
+ */
+export async function getUserFollowers(username: string): Promise<string[]> {
+  try {
+    const result = await lbFetch(
+      `/user/${encodeURIComponent(username)}/followers`,
+      FollowersSchema,
+      { revalidate: 600, tags: [`lb:user:${username}:followers`] },
     );
     return result.followers;
   } catch (err) {
@@ -2066,6 +2144,37 @@ export async function getUserFeedback(
   }
 }
 
+/**
+ * Set of recording MBIDs the user has loved (score=1). Optimised for
+ * the track-actions menu, which checks "is this loved?" hundreds of
+ * times per render and wants O(1) membership. Drops feedback rows
+ * without a recording_mbid (older MSID-only entries) — the action
+ * menu can't act on them anyway since the LB write API requires an
+ * MBID.
+ */
+export async function getUserLovedRecordings(
+  username: string,
+): Promise<Set<string>> {
+  const params = new URLSearchParams({ score: "1", count: "1000" });
+  try {
+    const result = await lbFetch(
+      `/feedback/user/${encodeURIComponent(username)}/get-feedback?${params}`,
+      FeedbackResponseSchema,
+      {
+        revalidate: 60,
+        tags: [`lb:user:${username}:loved`, cacheTagsLB.user(username)],
+      },
+    );
+    const out = new Set<string>();
+    for (const f of result.feedback) {
+      if (f.recording_mbid) out.add(f.recording_mbid);
+    }
+    return out;
+  } catch {
+    return new Set();
+  }
+}
+
 // ─── User feed (events) ─────────────────────────────────────────────
 
 const FeedTrackMetadataSchema = z
@@ -2161,4 +2270,213 @@ export async function getUserFeed(
   } catch {
     return null;
   }
+}
+
+// ─── Write helper ───────────────────────────────────────────────────
+
+/**
+ * Shared POST wrapper for LB write endpoints. Throws ListenBrainzError
+ * on non-2xx with the response body included for debugging — callers
+ * (typically server actions) should catch and surface the message.
+ */
+async function lbPost(path: string, token: string, body: unknown): Promise<void> {
+  const res = await fetch(`${LB_BASE}${path}`, {
+    method: "POST",
+    headers: {
+      Authorization: `Token ${token}`,
+      "Content-Type": "application/json",
+      "User-Agent": USER_AGENT,
+      Accept: "application/json",
+    },
+    body: JSON.stringify(body),
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new ListenBrainzError(
+      res.status,
+      `LB ${res.status} on ${path}: ${text.slice(0, 300)}`,
+    );
+  }
+}
+
+// ─── Recording feedback (love / hate / clear) ───────────────────────
+
+/**
+ * Submit a love (`1`), hate (`-1`), or clear (`0`) for a recording.
+ * Idempotent on LB's side — re-sending the same score is a no-op.
+ */
+export async function submitFeedback(
+  token: string,
+  recordingMbid: string,
+  score: 0 | 1 | -1,
+): Promise<void> {
+  await lbPost("/feedback/recording-feedback", token, {
+    recording_mbid: recordingMbid,
+    score,
+  });
+}
+
+// ─── Pin a recording ────────────────────────────────────────────────
+
+export interface SubmitPinOptions {
+  recordingMbid?: string;
+  recordingMsid?: string;
+  blurb?: string;
+  /** Unix seconds; LB defaults to 7 days when omitted. */
+  pinnedUntil?: number;
+}
+
+/**
+ * Pin a recording to the user's profile. LB requires at least one of
+ * MBID / MSID — we validate at the entry to avoid a confusing 400.
+ */
+export async function submitPin(
+  token: string,
+  opts: SubmitPinOptions,
+): Promise<void> {
+  if (!opts.recordingMbid && !opts.recordingMsid) {
+    throw new Error("submitPin requires recordingMbid or recordingMsid");
+  }
+  const body: Record<string, unknown> = {};
+  if (opts.recordingMbid) body.recording_mbid = opts.recordingMbid;
+  if (opts.recordingMsid) body.recording_msid = opts.recordingMsid;
+  if (opts.blurb !== undefined) body.blurb_content = opts.blurb;
+  if (opts.pinnedUntil !== undefined) body.pinned_until = opts.pinnedUntil;
+  await lbPost("/pin", token, body);
+}
+
+// ─── Recommend personally to followers ──────────────────────────────
+
+export interface SubmitRecommendationOptions {
+  recordingMbid: string;
+  recipients: string[];
+  blurb?: string;
+}
+
+/**
+ * Send a personal recommendation to one or more LB users (typically
+ * followers). LB nests the payload under `metadata` — the bare-fields
+ * shape used by other write endpoints fails validation here.
+ */
+export async function submitRecommendation(
+  token: string,
+  opts: SubmitRecommendationOptions,
+): Promise<void> {
+  const metadata: Record<string, unknown> = {
+    recording_mbid: opts.recordingMbid,
+    users: opts.recipients,
+  };
+  if (opts.blurb !== undefined) metadata.blurb_content = opts.blurb;
+  await lbPost("/recommend-personal-recording", token, { metadata });
+}
+
+// ─── Add to existing playlist ───────────────────────────────────────
+
+/**
+ * Append a recording to the end of an existing LB playlist. Body uses
+ * the JSPF track shape — `identifier` is a string-array (matches the
+ * shape LB returns from `getPlaylist`'s tracks). Caller must own the
+ * playlist or be a collaborator.
+ */
+export async function addRecordingToPlaylist(
+  token: string,
+  playlistMbid: string,
+  recordingMbid: string,
+): Promise<void> {
+  await lbPost(
+    `/playlist/${encodeURIComponent(playlistMbid)}/item/add`,
+    token,
+    {
+      playlist: {
+        track: [
+          {
+            identifier: [
+              `https://musicbrainz.org/recording/${recordingMbid}`,
+            ],
+          },
+        ],
+      },
+    },
+  );
+}
+
+// ─── Create a playlist on LB ────────────────────────────────────────
+
+export interface CreatePlaylistOptions {
+  name: string;
+  isPublic: boolean;
+  /** Optional first track to seed the new playlist with. */
+  recordingMbid?: string;
+}
+
+const CreatePlaylistResponseSchema = z.object({
+  status: z.string().optional(),
+  playlist_mbid: z.string(),
+});
+
+/**
+ * Create a new playlist. Returns the LB-assigned playlist MBID so the
+ * caller can navigate / reference it immediately. When `recordingMbid`
+ * is set the playlist is created with that single track — saves a
+ * second round-trip vs. create-then-add.
+ */
+export async function createPlaylistOnLb(
+  token: string,
+  opts: CreatePlaylistOptions,
+): Promise<{ playlistMbid: string }> {
+  const playlist: Record<string, unknown> = {
+    title: opts.name,
+    extension: {
+      "https://musicbrainz.org/doc/jspf#playlist": { public: opts.isPublic },
+    },
+  };
+  if (opts.recordingMbid) {
+    playlist.track = [
+      {
+        identifier: [
+          `https://musicbrainz.org/recording/${opts.recordingMbid}`,
+        ],
+      },
+    ];
+  }
+  const res = await fetch(`${LB_BASE}/playlist/create`, {
+    method: "POST",
+    headers: {
+      Authorization: `Token ${token}`,
+      "Content-Type": "application/json",
+      "User-Agent": USER_AGENT,
+      Accept: "application/json",
+    },
+    body: JSON.stringify({ playlist }),
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new ListenBrainzError(
+      res.status,
+      `LB ${res.status} on /playlist/create: ${text.slice(0, 300)}`,
+    );
+  }
+  const json = await res.json();
+  const parsed = CreatePlaylistResponseSchema.parse(json);
+  return { playlistMbid: parsed.playlist_mbid };
+}
+
+// ─── Delete a listen ────────────────────────────────────────────────
+
+/**
+ * Remove a single listen from the user's history. LB keys deletes by
+ * `(recording_msid, listened_at)` — the row's MBID isn't enough since
+ * the same recording can have many listens. Caller must own the listen.
+ */
+export async function deleteListen(
+  token: string,
+  recordingMsid: string,
+  listenedAt: number,
+): Promise<void> {
+  await lbPost("/delete-listen", token, {
+    recording_msid: recordingMsid,
+    listened_at: listenedAt,
+  });
 }
