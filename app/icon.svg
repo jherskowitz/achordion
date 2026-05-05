@@ -1,7 +1,6 @@
-<svg width="179" height="179" viewBox="0 0 179 179" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <rect width="179" height="179" fill="#273441"/>
-  <path d="M89.5 41.5C113.725 41.5 134.5 62.3462 134.5 89.5C134.5 116.654 113.725 137.5 89.5 137.5C65.2754 137.5 44.5 116.654 44.5 89.5C44.5 62.3462 65.2754 41.5 89.5 41.5Z" stroke="white" stroke-width="27"/>
-  <rect x="123.5" y="28.5" width="24" height="122" fill="white" stroke="white"/>
-  <path d="M122.73 26.7778H148.27V40.0001H122.73V26.7778Z" fill="#774BE9"/>
-  <path d="M118 26.7778H153V31.5H118V26.7778Z" fill="#774BE9"/>
+<svg width="190" height="190" viewBox="0 0 190 190" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <circle cx="95" cy="95" r="94.5" fill="#273441" stroke="white"/>
+  <path d="M88.5 48.7222C112.725 48.7222 133.5 69.5684 133.5 96.7222C133.5 123.876 112.725 144.722 88.5 144.722C64.2754 144.722 43.5 123.876 43.5 96.7222C43.5 69.5684 64.2754 48.7222 88.5 48.7222Z" stroke="white" stroke-width="27"/>
+  <rect x="122.5" y="35.7222" width="24" height="122" fill="white" stroke="white"/>
+  <path d="M148.5 29.5V37.1426H144.852V45.5H122.148V37.1426H118.5V29.5H148.5Z" fill="#774BE9" stroke="white" stroke-width="3"/>
 </svg>
