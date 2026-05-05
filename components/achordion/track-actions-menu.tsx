@@ -1,12 +1,15 @@
 "use client";
 
-import { Heart, MoreVertical } from "lucide-react";
+import { useState } from "react";
+import { Heart, MoreVertical, Pin } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -16,6 +19,7 @@ import {
 } from "@/components/ui/tooltip";
 import { feedbackTrackAction } from "@/app/(app)/track/actions";
 import { useLoved } from "./loved-tracks-provider";
+import { PinTrackDialog } from "./track-actions/pin-track-dialog";
 
 export type TrackRef = {
   recordingMbid?: string | null;
@@ -42,25 +46,66 @@ export function TrackActionsMenu({
   track: TrackRef;
   viewer: { mbUsername: string } | null;
 }) {
+  const [pinOpen, setPinOpen] = useState(false);
   if (!viewer) return null;
+  const canPin = !!(track.recordingMbid || track.recordingMsid);
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger
-        render={
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            aria-label={`Track actions for ${track.trackName}`}
-            className="text-muted-foreground/70 hover:text-foreground"
-          >
-            <MoreVertical className="size-4" />
-          </Button>
-        }
-      />
-      <DropdownMenuContent align="end" className="w-56">
-        <LoveItem track={track} />
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          render={
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label={`Track actions for ${track.trackName}`}
+              className="text-muted-foreground/70 hover:text-foreground"
+            >
+              <MoreVertical className="size-4" />
+            </Button>
+          }
+        />
+        <DropdownMenuContent align="end" className="w-56">
+          <DropdownMenuLabel>Track</DropdownMenuLabel>
+          <LoveItem track={track} />
+          <PinItem disabled={!canPin} onSelect={() => setPinOpen(true)} />
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <PinTrackDialog open={pinOpen} onOpenChange={setPinOpen} track={track} />
+    </>
+  );
+}
+
+/**
+ * Pin menu item — opens the PinTrackDialog. Disabled when the track
+ * is missing both recording_mbid and recording_msid (LB pin needs at
+ * least one of those to identify the track).
+ */
+function PinItem({
+  disabled,
+  onSelect,
+}: {
+  disabled: boolean;
+  onSelect: () => void;
+}) {
+  const item = (
+    <DropdownMenuItem
+      disabled={disabled}
+      onClick={disabled ? undefined : onSelect}
+    >
+      <Pin />
+      Pin track…
+    </DropdownMenuItem>
+  );
+  if (!disabled) return item;
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span>{item}</span>
+      </TooltipTrigger>
+      <TooltipContent side="left">
+        No MusicBrainz ID for this recording.
+      </TooltipContent>
+    </Tooltip>
   );
 }
 
