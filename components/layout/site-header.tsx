@@ -119,7 +119,7 @@ export function SiteHeader() {
               initialListen={null}
               hideListenAlong
               size="compact"
-              className="hidden max-w-[24ch] sm:inline-flex"
+              className="max-w-[220px]"
             />
           )}
           <Button
