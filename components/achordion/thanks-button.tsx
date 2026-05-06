@@ -3,6 +3,11 @@
 import { useState, useTransition } from "react";
 import { Heart } from "lucide-react";
 import { thanksAction } from "@/app/(app)/feed/actions";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
 /**
@@ -53,30 +58,39 @@ export function ThanksButton({
   }
 
   const compact = size === "compact";
+  const tooltip = error
+    ? error
+    : thanked
+      ? "You thanked this"
+      : "Thank in ListenBrainz";
 
   return (
-    <button
-      type="button"
-      onClick={go}
-      disabled={pending || thanked}
-      title={error ?? (thanked ? "Thanked" : "Thank")}
-      aria-label={thanked ? "Thanked" : "Thank"}
-      className={cn(
-        "inline-flex shrink-0 items-center gap-1 rounded-full border font-medium transition-colors",
-        compact ? "h-6 px-2 text-[10px]" : "h-7 px-2.5 text-xs",
-        thanked
-          ? "border-rose-500/40 text-rose-500"
-          : "border-border/60 text-muted-foreground hover:border-foreground/40 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60",
-        className,
-      )}
-    >
-      <Heart
-        className={cn(
-          compact ? "size-2.5" : "size-3",
-          thanked && "fill-current",
-        )}
-      />
-      {thanked ? "Thanked" : "Thanks"}
-    </button>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          onClick={go}
+          disabled={pending || thanked}
+          aria-label={thanked ? "Thanked" : "Thank"}
+          className={cn(
+            "inline-flex shrink-0 items-center gap-1 rounded-full border font-medium transition-colors",
+            compact ? "h-6 px-2 text-[10px]" : "h-7 px-2.5 text-xs",
+            thanked
+              ? "border-rose-500/40 text-rose-500"
+              : "border-border/60 text-muted-foreground hover:border-foreground/40 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60",
+            className,
+          )}
+        >
+          <Heart
+            className={cn(
+              compact ? "size-2.5" : "size-3",
+              thanked && "fill-current",
+            )}
+          />
+          {thanked ? "Thanked" : "Thanks"}
+        </button>
+      </TooltipTrigger>
+      <TooltipContent>{tooltip}</TooltipContent>
+    </Tooltip>
   );
 }

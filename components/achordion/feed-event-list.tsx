@@ -13,14 +13,20 @@ import {
 } from "lucide-react";
 import { CoverArt } from "./cover-art";
 import { ThanksButton } from "./thanks-button";
-import { caaUrlFromListen } from "@/lib/clients/coverart";
+import {
+  caaReleaseGroupUrl,
+  caaUrlFromListen,
+} from "@/lib/clients/coverart";
 import { parachordPlayTrack } from "@/lib/parachord";
 import {
   artistHref,
   recordingHref,
   releaseGroupHref,
 } from "@/lib/entity-links";
-import type { FeedEvent } from "@/lib/clients/listenbrainz";
+import {
+  getRecordingMetadata,
+  type FeedEvent,
+} from "@/lib/clients/listenbrainz";
 
 function relativeTime(unixSeconds: number): string {
   const diff = Math.floor(Date.now() / 1000) - unixSeconds;
@@ -385,7 +391,16 @@ function entityHrefFor(
   }
 }
 
-function CritiqueBrainzReviewEvent({ event }: { event: FeedEvent }) {
+function CritiqueBrainzReviewEvent({
+  event,
+  coverUrl,
+}: {
+  event: FeedEvent;
+  /** Pre-resolved CAA URL for the reviewed entity. null when no
+   *  cover is available (artist reviews, or recordings whose
+   *  release-group lookup didn't return CAA hints). */
+  coverUrl: string | null;
+}) {
   const m = event.metadata as ReviewMeta | undefined;
   const entityName = m?.entity_name ?? "an entity";
   const entityHref = entityHrefFor(m?.entity_type, m?.entity_id, m?.entity_name);
@@ -414,8 +429,27 @@ function CritiqueBrainzReviewEvent({ event }: { event: FeedEvent }) {
         </>
       }
     >
-      {(rating !== null || snippet) && (
-        <div className="mt-2 space-y-1.5">
+      <div className="mt-2 flex items-start gap-3">
+        {/* Cover art for release_group / recording reviews so the
+            card reads as visually consistent with the pin/listen
+            cards above and below it. Artist reviews and reviews
+            whose entity didn't resolve a CAA hint render without
+            a cover slot — the placeholder Disc3 inside <CoverArt>
+            would be misleading for "artist reviewed" copy. */}
+        {coverUrl &&
+          (entityHref ? (
+            <Link
+              href={entityHref}
+              className="shrink-0 overflow-hidden rounded-md"
+            >
+              <CoverArt src={coverUrl} alt={entityName} size={48} />
+            </Link>
+          ) : (
+            <span className="block shrink-0 overflow-hidden rounded-md">
+              <CoverArt src={coverUrl} alt={entityName} size={48} />
+            </span>
+          ))}
+        <div className="min-w-0 flex-1 space-y-1.5">
           {rating !== null && rating !== undefined && (
             <p className="text-muted-foreground/80 inline-flex items-center gap-0.5 text-xs">
               {Array.from({ length: 5 }).map((_, i) => (
@@ -437,7 +471,7 @@ function CritiqueBrainzReviewEvent({ event }: { event: FeedEvent }) {
             </p>
           )}
         </div>
-      )}
+      </div>
     </EventShell>
   );
 }
@@ -550,7 +584,68 @@ function NotificationEvent({ event }: { event: FeedEvent }) {
 
 // ─── List ───────────────────────────────────────────────────────────
 
-export function FeedEventList({
+/**
+ * Pre-resolve cover-art URLs for every CritiqueBrainz review in the
+ * batch so the renderer can show a thumbnail without an extra round-
+ * trip per row. release_group reviews resolve to a direct CAA URL
+ * synchronously; recording reviews need a single LB metadata batch
+ * call (`getRecordingMetadata` accepts an MBID array) to learn the
+ * recording's release-group and CAA hints. Artist reviews don't get
+ * a cover — Wikidata photos are a separate lookup chain we don't pay
+ * for in feed context.
+ */
+async function resolveReviewCovers(
+  events: FeedEvent[],
+): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  const recordingIds = new Set<string>();
+
+  for (const e of events) {
+    if (e.event_type !== "critiquebrainz_review") continue;
+    const m = e.metadata as ReviewMeta | undefined;
+    const id = m?.entity_id;
+    if (!id) continue;
+    if (m?.entity_type === "release_group") {
+      out.set(id, caaReleaseGroupUrl(id, 250));
+    } else if (m?.entity_type === "recording") {
+      recordingIds.add(id);
+    }
+  }
+
+  if (recordingIds.size > 0) {
+    let metadata;
+    try {
+      metadata = await getRecordingMetadata(Array.from(recordingIds));
+    } catch {
+      metadata = null;
+    }
+    if (metadata) {
+      for (const id of recordingIds) {
+        const r = metadata.get(id)?.release;
+        if (!r) continue;
+        if (r.caa_release_mbid && r.caa_id) {
+          out.set(
+            id,
+            `https://archive.org/download/mbid-${r.caa_release_mbid}/mbid-${r.caa_release_mbid}-${r.caa_id}_thumb250.jpg`,
+          );
+        } else if (r.release_group_mbid) {
+          out.set(id, caaReleaseGroupUrl(r.release_group_mbid, 250));
+        } else if (r.mbid) {
+          // Fall back to the release-level CAA URL — slightly less
+          // canonical but still resolves for most well-known albums.
+          out.set(
+            id,
+            `https://coverartarchive.org/release/${r.mbid}/front-250`,
+          );
+        }
+      }
+    }
+  }
+
+  return out;
+}
+
+export async function FeedEventList({
   events,
   viewer = null,
 }: {
@@ -567,6 +662,7 @@ export function FeedEventList({
       </p>
     );
   }
+  const reviewCovers = await resolveReviewCovers(events);
   return (
     <ul className="border-border/60 divide-border/60 divide-y rounded-xl border px-4">
       {events.map((e, i) => {
@@ -592,8 +688,19 @@ export function FeedEventList({
                 key={key}
               />
             );
-          case "critiquebrainz_review":
-            return <CritiqueBrainzReviewEvent event={e} key={key} />;
+          case "critiquebrainz_review": {
+            const m = e.metadata as ReviewMeta | undefined;
+            const cover = m?.entity_id
+              ? (reviewCovers.get(m.entity_id) ?? null)
+              : null;
+            return (
+              <CritiqueBrainzReviewEvent
+                event={e}
+                coverUrl={cover}
+                key={key}
+              />
+            );
+          }
           case "thanks":
             return <ThanksEvent event={e} key={key} />;
           case "follow":
