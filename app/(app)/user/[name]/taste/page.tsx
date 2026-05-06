@@ -45,6 +45,13 @@ interface LovedTrack {
   releaseName: string | null;
   releaseMbid: string | null;
   /**
+   * Release-group MBID — used by the album link so it lands on the
+   * canonical "this is the album" entity rather than a specific
+   * edition. null when LB didn't ship one in either the metadata
+   * lookup or the listen's track_metadata.
+   */
+  releaseGroupMbid: string | null;
+  /**
    * Cover URL — preferred archive.org direct URL when LB gave us
    * caa_id+caa_release_mbid, otherwise fall back to caaReleaseUrl
    * which 302s to the right size.
@@ -123,6 +130,10 @@ async function loadLoves(
         releaseName:
           meta?.release?.name ?? f.track_metadata?.release_name ?? null,
         releaseMbid: meta?.release?.mbid ?? null,
+        releaseGroupMbid:
+          meta?.release?.release_group_mbid ??
+          f.track_metadata?.additional_info?.release_group_mbid ??
+          null,
         cover,
         lovedAt: f.created,
       },
@@ -206,24 +217,16 @@ async function LovesBody({ name }: { name: string }) {
                   {t.releaseName && (
                     <>
                       <span className="mx-1.5 opacity-50">·</span>
-                      {t.releaseMbid ? (
-                        <Link
-                          href={`/release/${t.releaseMbid}`}
-                          className="italic hover:text-foreground"
-                        >
-                          {t.releaseName}
-                        </Link>
-                      ) : (
-                        <Link
-                          href={releaseGroupHref({
-                            artist: t.artistName,
-                            title: t.releaseName,
-                          })}
-                          className="italic hover:text-foreground"
-                        >
-                          {t.releaseName}
-                        </Link>
-                      )}
+                      <Link
+                        href={releaseGroupHref({
+                          mbid: t.releaseGroupMbid,
+                          artist: t.artistName,
+                          title: t.releaseName,
+                        })}
+                        className="italic hover:text-foreground"
+                      >
+                        {t.releaseName}
+                      </Link>
                     </>
                   )}
                 </p>

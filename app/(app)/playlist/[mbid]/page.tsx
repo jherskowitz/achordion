@@ -356,27 +356,20 @@ async function PlaylistBody({ mbid }: { mbid: string }) {
                     {t.releaseName && (
                       <>
                         <span className="opacity-50"> · </span>
-                        {/* Release-MBID points at a specific edition.
-                            Without it, lookup at the release-group
-                            level since that's our canonical album page. */}
-                        {t.releaseMbid ? (
-                          <Link
-                            href={`/release/${t.releaseMbid}/album`}
-                            className="hover:text-foreground italic"
-                          >
-                            {t.releaseName}
-                          </Link>
-                        ) : (
-                          <Link
-                            href={releaseGroupHref({
-                              artist: t.artistName,
-                              title: t.releaseName,
-                            })}
-                            className="hover:text-foreground italic"
-                          >
-                            {t.releaseName}
-                          </Link>
-                        )}
+                        {/* Album text links at the release-group level
+                            (canonical "this is the album" entity).
+                            LbRadioTrack / JSPF only carries a release
+                            MBID — different edition — so we always
+                            lookup at click time via the helper. */}
+                        <Link
+                          href={releaseGroupHref({
+                            artist: t.artistName,
+                            title: t.releaseName,
+                          })}
+                          className="hover:text-foreground italic"
+                        >
+                          {t.releaseName}
+                        </Link>
                       </>
                     )}
                   </p>

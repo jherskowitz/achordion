@@ -6,6 +6,7 @@ import type {
 import { CoverArt } from "./cover-art";
 import { caaReleaseUrl } from "@/lib/clients/coverart";
 import { parachordPlayTrack } from "@/lib/parachord";
+import { releaseGroupHref } from "@/lib/entity-links";
 import { PlayOverNumberCell } from "./parachord-button";
 
 function coverFor(meta: RecordingMetadata | undefined): string | null {
@@ -41,7 +42,11 @@ export function ExploreTrackList({
         const artistName = artist?.name ?? "";
         const artistMbid = artist?.artists?.[0]?.artist_mbid ?? null;
         const releaseName = meta?.release?.name ?? null;
-        const releaseMbid = meta?.release?.mbid ?? null;
+        // Album text always links at the release-group level. When LB
+        // ships a release_group_mbid we link directly; otherwise the
+        // helper falls through to /release-group/lookup with the
+        // artist + title pair.
+        const releaseGroupMbid = meta?.release?.release_group_mbid ?? null;
         return (
           <li
             key={r.recording_mbid}
@@ -76,16 +81,16 @@ export function ExploreTrackList({
                 {releaseName && (
                   <>
                     <span className="opacity-50"> · </span>
-                    {releaseMbid ? (
-                      <Link
-                        href={`/release/${releaseMbid}/album`}
-                        className="hover:text-foreground italic"
-                      >
-                        {releaseName}
-                      </Link>
-                    ) : (
-                      <em>{releaseName}</em>
-                    )}
+                    <Link
+                      href={releaseGroupHref({
+                        mbid: releaseGroupMbid,
+                        artist: artistName,
+                        title: releaseName,
+                      })}
+                      className="hover:text-foreground italic"
+                    >
+                      {releaseName}
+                    </Link>
                   </>
                 )}
               </p>
