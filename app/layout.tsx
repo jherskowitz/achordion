@@ -22,7 +22,7 @@ const geistMono = Geist_Mono({
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://achordion.xyz";
 
 const SITE_DESCRIPTION =
-  "The independent music community and data layer. An open-source front-end for ListenBrainz with one-click playback through Parachord.";
+  "People-powered music discovery. An independent and open community experience built on ListenBrainz and MusicBrainz – with one-click playback on everything through Parachord.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
