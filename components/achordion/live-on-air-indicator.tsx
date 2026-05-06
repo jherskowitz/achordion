@@ -9,7 +9,14 @@ import { artistHref, recordingHref } from "@/lib/entity-links";
 import { cn } from "@/lib/utils";
 import { IconTooltip } from "@/components/ui/icon-tooltip";
 
-const POLL_INTERVAL_MS = 25_000;
+// Adaptive polling: when the user is actively on-air, run fast (track
+// changes feel snappy on the pill). When they're idle / not playing,
+// back off to a heartbeat — there's nothing to update until something
+// actually starts. Edge SWR on /api/user/<name>/playing-now collapses
+// concurrent polls from multiple viewers, so the per-origin call rate
+// stays roughly flat as viewer count scales.
+const POLL_INTERVAL_ACTIVE_MS = 10_000;
+const POLL_INTERVAL_IDLE_MS = 60_000;
 
 interface LiveOnAirIndicatorProps {
   username: string;
@@ -47,6 +54,9 @@ export function LiveOnAirIndicator({
   useEffect(() => {
     let cancelled = false;
     let timer: number | null = null;
+    // Track which cadence the timer is currently running at so we can
+    // skip pointless restarts when the listen state stays the same.
+    let currentInterval = 0;
 
     async function poll() {
       if (cancelled) return;
@@ -66,13 +76,25 @@ export function LiveOnAirIndicator({
           lastTrackKeyRef.current = newKey;
           setListen(data.listen);
         }
+        // Speed up while the user's actively playing something, slow
+        // down when they're not. Switch the interval whenever the
+        // active/idle state flips so we don't churn timers on every
+        // tick.
+        const desired = data.listen
+          ? POLL_INTERVAL_ACTIVE_MS
+          : POLL_INTERVAL_IDLE_MS;
+        if (desired !== currentInterval) {
+          stop();
+          start(desired);
+        }
       } catch {
         // swallow — try again next tick.
       }
     }
 
-    function start() {
-      timer = window.setInterval(poll, POLL_INTERVAL_MS);
+    function start(intervalMs: number) {
+      currentInterval = intervalMs;
+      timer = window.setInterval(poll, intervalMs);
     }
     function stop() {
       if (timer !== null) {
@@ -85,12 +107,27 @@ export function LiveOnAirIndicator({
         stop();
       } else {
         void poll();
-        if (timer === null) start();
+        if (timer === null) {
+          // Restart at the cadence appropriate to the last-known
+          // state — saves one fast tick when resuming from background
+          // and the user is already idle.
+          start(
+            lastTrackKeyRef.current
+              ? POLL_INTERVAL_ACTIVE_MS
+              : POLL_INTERVAL_IDLE_MS,
+          );
+        }
       }
     }
 
     void poll();
-    start();
+    // Seed the timer at the cadence implied by the initial state —
+    // the first poll() above will adjust if the live answer disagrees.
+    start(
+      lastTrackKeyRef.current
+        ? POLL_INTERVAL_ACTIVE_MS
+        : POLL_INTERVAL_IDLE_MS,
+    );
     document.addEventListener("visibilitychange", onVisibility);
     return () => {
       cancelled = true;
