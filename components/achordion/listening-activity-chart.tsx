@@ -1,3 +1,5 @@
+import { cn } from "@/lib/utils";
+
 interface ActivityBucket {
   from_ts: number;
   to_ts: number;
@@ -23,6 +25,19 @@ export function ListeningActivityChart({
     a.listen_count > b.listen_count ? a : b,
   );
 
+  // Bucket density determines bar gap. The chart lives in a ~240px
+  // sidebar; LB's `range=month` returns 61 daily buckets and `quarter`
+  // returns 182, so a flat gap-1 (4px) consumes the full container in
+  // gaps alone and crushes the bars to invisible. Shrink the gap as
+  // density grows; very dense ranges get no gap at all so each day
+  // still gets a real pixel.
+  const gapClass =
+    buckets.length > 60
+      ? "gap-0"
+      : buckets.length > 30
+        ? "gap-px"
+        : "gap-1 sm:gap-1.5";
+
   return (
     <div>
       <div className="text-muted-foreground mb-4 flex items-baseline gap-6 text-xs">
@@ -41,7 +56,7 @@ export function ListeningActivityChart({
         </span>
       </div>
       <div className="border-border/60 rounded-xl border p-4">
-        <div className="flex h-48 items-end gap-1 sm:gap-1.5">
+        <div className={cn("flex h-48 items-end", gapClass)}>
           {buckets.map((b) => {
             const pct = (b.listen_count / max) * 100;
             return (
