@@ -535,9 +535,12 @@ function FollowEvent({ event }: { event: FeedEvent }) {
     <EventShell
       icon={<UserPlus className="size-4" />}
       header={
+        // No nested `text-muted-foreground` span around "started
+        // following" — the EventShell wrapper is already muted, so the
+        // inner span was a no-op double-wrap that varied this row's
+        // typography slightly from the others.
         <>
-          <UserLink name={m?.user_name_0} />{" "}
-          <span className="text-muted-foreground">started following</span>{" "}
+          <UserLink name={m?.user_name_0} /> started following{" "}
           <UserLink name={m?.user_name_1} />
           <span className="text-muted-foreground/70">
             {" · "}
@@ -577,7 +580,12 @@ function NotificationEvent({ event }: { event: FeedEvent }) {
         </>
       }
     >
-      <p className="mt-1 text-sm leading-5">{text}</p>
+      {/* Match the rhythm of other event bodies: same text-foreground/80
+          tone + leading as pin/rec blurbs and review snippets, so a
+          notification card sits at the same visual weight as
+          everything else in the feed instead of dominating with a
+          full-strength text-foreground sentence. */}
+      <p className="text-foreground/80 mt-2 text-sm leading-5">{text}</p>
     </EventShell>
   );
 }
