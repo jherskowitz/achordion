@@ -150,7 +150,7 @@ export async function getRecentListens(
           tags: [cacheTagsLB.userListens(userName), cacheTagsLB.user(userName)],
         },
   );
-  return result.payload.listens;
+  return result.payload.listens.map(cleanListenInPlace);
 }
 
 /**
@@ -222,6 +222,33 @@ export async function getMusicServiceActivity(
   return activity;
 }
 
+/**
+ * Some scrobble clients write JS-string-literal-escaped values into
+ * track / artist / release fields ("Where We Fall We\\'ll Lie" with a
+ * literal backslash + apostrophe). LB stores the bytes verbatim and
+ * the API returns them unchanged, so they reach our UI as `We\'ll`.
+ *
+ * Strip the two escapes that are unambiguously wrong in a display
+ * string: `\\'` → `'` and `\\"` → `"`. We deliberately don't touch
+ * `\\\\` → `\\` because a literal backslash in a title is conceivable
+ * (file-name-derived titles, weird mixtape track names) and we
+ * haven't seen evidence of that leaking yet.
+ */
+function cleanLbText(s: string): string;
+function cleanLbText(s: string | null | undefined): string | null | undefined;
+function cleanLbText(s: string | null | undefined) {
+  if (typeof s !== "string") return s;
+  return s.replace(/\\(['"])/g, "$1");
+}
+
+function cleanListenInPlace<T extends Listen | PlayingNowListen>(l: T): T {
+  const m = l.track_metadata;
+  m.track_name = cleanLbText(m.track_name);
+  m.artist_name = cleanLbText(m.artist_name);
+  if (m.release_name) m.release_name = cleanLbText(m.release_name);
+  return l;
+}
+
 // LB's /playing-now response omits `listened_at` for the currently-
 // playing item (it isn't a finalised scrobble yet) and adds a
 // `playing_now: true` flag. Reuse ListenSchema's track_metadata but
@@ -254,7 +281,8 @@ export async function getPlayingNow(
         ? { noStore: true }
         : { revalidate: 30, tags: [cacheTagsLB.user(userName)] },
     );
-    return result.payload.listens[0] ?? null;
+    const listen = result.payload.listens[0];
+    return listen ? cleanListenInPlace(listen) : null;
   } catch (err) {
     if (err instanceof ListenBrainzError && err.status === 404) return null;
     throw err;
