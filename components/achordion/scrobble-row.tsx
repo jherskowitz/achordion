@@ -47,8 +47,12 @@ export function ScrobbleRow({
   const artistMbid =
     meta.mbid_mapping?.artist_mbids?.[0] ??
     meta.additional_info?.artist_mbids?.[0];
-  const releaseMbid =
-    meta.mbid_mapping?.release_mbid ?? meta.additional_info?.release_mbid;
+  // Album text always links at the release-group level (the canonical
+  // "this is the album" entity), not at a specific release/edition.
+  // LB sometimes ships release_group_mbid in additional_info — when
+  // it does, link directly; otherwise hand the lookup route the
+  // artist + title pair and let it resolve at click time.
+  const releaseGroupMbid = meta.additional_info?.release_group_mbid;
   const cover = caaUrlFromListen(meta, 250);
 
   return (
@@ -85,27 +89,16 @@ export function ScrobbleRow({
           {meta.release_name && (
             <>
               <span className={cn("mx-1.5 opacity-50")}>·</span>
-              {/* Release-MBID, when present, points at a specific
-                  edition. Without it we lookup at the release-group
-                  level since that's the canonical entity for albums. */}
-              {releaseMbid ? (
-                <Link
-                  href={`/release/${releaseMbid}`}
-                  className="italic hover:text-foreground"
-                >
-                  {meta.release_name}
-                </Link>
-              ) : (
-                <Link
-                  href={releaseGroupHref({
-                    artist: meta.artist_name,
-                    title: meta.release_name,
-                  })}
-                  className="italic hover:text-foreground"
-                >
-                  {meta.release_name}
-                </Link>
-              )}
+              <Link
+                href={releaseGroupHref({
+                  mbid: releaseGroupMbid,
+                  artist: meta.artist_name,
+                  title: meta.release_name,
+                })}
+                className="italic hover:text-foreground"
+              >
+                {meta.release_name}
+              </Link>
             </>
           )}
         </p>
