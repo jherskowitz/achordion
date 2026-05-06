@@ -45,23 +45,25 @@ interface ClientCategory {
 }
 
 /**
- * Mirrors the categorisation on https://listenbrainz.org/add-data/ so
- * the two pages map onto each other intuitively. We keep a couple of
+ * Sourced from https://listenbrainz.org/add-data/, plus a couple of
  * curated entries that LB doesn't list (Marvis Pro, NepTunes,
  * Symfonium) because they cover scrobble paths LB's directory misses.
+ *
+ * Four-bucket split that maps onto how a user actually decides:
+ *   - **Players** — apps you use to actively play music; scrobbling
+ *     is automatic.
+ *   - **Scrobblers** — capture plays from somewhere else (another
+ *     app, the OS, a hardware streamer) and submit to LB.
+ *   - **Playlist tools** — read/write LB playlists.
+ *   - **Other** — self-hosted music servers, integrations, bots,
+ *     reporting plugins.
  */
 const CATEGORIES: ClientCategory[] = [
   {
-    title: "Music players",
+    title: "Players",
+    blurb:
+      "Music apps you use directly. Scrobbling happens in the background.",
     clients: [
-      {
-        name: "Unstream",
-        platforms: ["Mac", "Browser", "iOS"],
-        blurb:
-          "Menu-bar app and browser extensions that detect what you're listening to in Spotify, Apple Music, or your browser, scrobble it to ListenBrainz, and surface direct-from-artist purchase links across Bandcamp, Mirlo, Qobuz, Beatport, and 15+ other marketplaces.",
-        url: "https://unstream.stream/",
-        featured: true,
-      },
       {
         name: "Ampcast",
         platforms: ["Web"],
@@ -84,6 +86,13 @@ const CATEGORIES: ClientCategory[] = [
         url: "https://chiselapp.com/user/MistressRemilia/repository/benben",
       },
       {
+        name: "Booming Music",
+        platforms: ["Android"],
+        blurb:
+          "A clean and fast Material You music player for Android with LB scrobbling.",
+        url: "https://boomingmusic.vercel.app/",
+      },
+      {
         name: "Cider",
         platforms: ["Mac", "Windows", "Linux"],
         blurb:
@@ -103,6 +112,19 @@ const CATEGORIES: ClientCategory[] = [
         blurb:
           "Full-fledged Windows music player. LB scrobbling via the foo_listenbrainz2 plugin.",
         url: "https://www.foobar2000.org/",
+      },
+      {
+        name: "Jewelcase",
+        platforms: ["iOS"],
+        blurb: "An offline music player for iOS with ListenBrainz scrobbling.",
+        url: "https://www.jewelcase.app/",
+      },
+      {
+        name: "Kodi",
+        platforms: ["Mac", "Windows", "Linux", "Android"],
+        blurb:
+          "Free open-source media center. LB scrobbling via the official add-on.",
+        url: "https://kodi.tv/",
       },
       {
         name: "Lollypop",
@@ -151,13 +173,6 @@ const CATEGORIES: ClientCategory[] = [
         url: "https://docs.ruuda.nl/musium/listenbrainz/",
       },
       {
-        name: "NepTunes",
-        platforms: ["Mac"],
-        blurb:
-          "Mac menu-bar app that scrobbles Apple Music and Spotify to ListenBrainz, Last.fm, and Libre.fm via system Now Playing APIs.",
-        url: "https://apps.apple.com/us/app/neptunes/id1006739057",
-      },
-      {
         name: "Poweramp",
         platforms: ["Android"],
         blurb:
@@ -177,11 +192,25 @@ const CATEGORIES: ClientCategory[] = [
         url: "https://wiki.gnome.org/Apps/Rhythmbox/",
       },
       {
+        name: "ScrobbleRadio",
+        platforms: ["Web"],
+        blurb:
+          "Streaming radio player for a curated list of global stations; submits listens to LB.",
+        url: "https://scrobblerad.io/",
+      },
+      {
         name: "Strawberry",
         platforms: ["Mac", "Windows", "Linux"],
         blurb:
           "Desktop music player (Clementine fork) with native LB scrobbling for local libraries and streams.",
         url: "https://www.strawberrymusicplayer.org",
+      },
+      {
+        name: "Symfonium",
+        platforms: ["Android"],
+        blurb:
+          "Polished Android music player for Plex / Jellyfin / Subsonic with built-in ListenBrainz scrobbling.",
+        url: "https://symfonium.app",
       },
       {
         name: "Tauon Music Box",
@@ -190,18 +219,18 @@ const CATEGORIES: ClientCategory[] = [
         url: "https://tauonmusicbox.rocks/",
       },
       {
+        name: "TIDAL",
+        platforms: ["Mac", "Windows", "Linux"],
+        blurb:
+          "Cross-platform streaming service. LB scrobbling via the TidaLuna client mod + ListenBrainz plugin.",
+        url: "https://tidal.com/",
+      },
+      {
         name: "TIDAL Hi-Fi",
         platforms: ["Mac", "Windows", "Linux"],
         blurb:
           "The web version of Tidal running in Electron with Hi-Fi (High & Max) support.",
         url: "https://github.com/Mastermindzh/tidal-hifi",
-      },
-      {
-        name: "TIDAL",
-        platforms: ["Mac", "Windows", "Linux"],
-        blurb:
-          "Cross-platform music player and streaming service. LB scrobbling via the TidaLuna client mod + ListenBrainz plugin.",
-        url: "https://tidal.com/",
       },
       {
         name: "VLC",
@@ -213,15 +242,17 @@ const CATEGORIES: ClientCategory[] = [
     ],
   },
   {
-    title: "Servers & streaming",
+    title: "Scrobblers",
     blurb:
-      "Self-hosted streamers, bridges, and standalone scrobblers that run alongside other software.",
+      "Capture plays from another app, the OS, or a hardware streamer and submit them to ListenBrainz.",
     clients: [
       {
-        name: "Airsonic-Advanced",
-        platforms: ["Server"],
-        blurb: "A free, web-based media streamer with LB scrobbling.",
-        url: "https://github.com/airsonic-advanced/airsonic-advanced",
+        name: "Unstream",
+        platforms: ["Mac", "Browser", "iOS"],
+        blurb:
+          "Menu-bar app and browser extensions that detect what you're listening to in Spotify, Apple Music, or your browser, scrobble it to ListenBrainz, and surface direct-from-artist purchase links across Bandcamp, Mirlo, Qobuz, Beatport, and 15+ other marketplaces.",
+        url: "https://unstream.stream/",
+        featured: true,
       },
       {
         name: "AMWin-RP",
@@ -250,62 +281,10 @@ const CATEGORIES: ClientCategory[] = [
         url: "https://github.com/simonxciv/eavesdrop.fm",
       },
       {
-        name: "Funkwhale",
-        platforms: ["Server", "Web"],
-        blurb:
-          "Federated, self-hosted music platform — scrobbles to LB and shares what you listen to with the fediverse.",
-        url: "https://funkwhale.audio",
-      },
-      {
-        name: "gonic",
-        platforms: ["Server", "Linux"],
-        blurb: "Free software Subsonic-compatible music server with LB scrobbling.",
-        url: "https://github.com/sentriz/gonic",
-      },
-      {
-        name: "Home Assistant",
-        platforms: ["Server"],
-        blurb:
-          "Open-source home automation. ListenBrainz scrobbling via the Music Assistant plugin.",
-        url: "https://www.home-assistant.io/",
-      },
-      {
-        name: "Jellyfin",
-        platforms: ["Server"],
-        blurb:
-          "Free software media streaming system. LB scrobbling via jellyfin-plugin-listenbrainz.",
-        url: "https://jellyfin.org/",
-      },
-      {
-        name: "Kodi",
-        platforms: ["Mac", "Windows", "Linux", "Android"],
-        blurb: "Free open-source media center. LB scrobbling via add-on.",
-        url: "https://kodi.tv/",
-      },
-      {
-        name: "Koito",
-        platforms: ["Server"],
-        blurb: "A self-hosted, themeable LB-compatible scrobbler.",
-        url: "https://koito.io/",
-      },
-      {
-        name: "Lyrion",
-        platforms: ["Server"],
-        blurb: "Open-source server software to control Squeezebox audio players.",
-        url: "https://lyrion.org/",
-      },
-      {
-        name: "Mopidy",
-        platforms: ["Linux", "Server"],
-        blurb:
-          "Headless music server (with mopidy-listenbrainz) — useful for Raspberry Pi setups and home audio.",
-        url: "https://mopidy.com",
-      },
-      {
-        name: "mpris-scrobbler",
-        platforms: ["Linux"],
-        blurb: "Minimalistic Unix scrobbler for MPRIS-enabled players.",
-        url: "https://github.com/mariusor/mpris-scrobbler",
+        name: "ListenBrainz macOS Scrobbler for Music.app",
+        platforms: ["Mac", "CLI"],
+        blurb: "macOS Bash script to submit Music.app listens to ListenBrainz.",
+        url: "https://codeberg.org/scaglio/listenbrainz-scrobbler",
       },
       {
         name: "Multi-Scrobbler",
@@ -315,11 +294,24 @@ const CATEGORIES: ClientCategory[] = [
         url: "https://github.com/FoxxMD/multi-scrobbler",
       },
       {
-        name: "Navidrome",
-        platforms: ["Server"],
+        name: "mpris-scrobbler",
+        platforms: ["Linux"],
+        blurb: "Minimalistic Unix scrobbler for MPRIS-enabled players.",
+        url: "https://github.com/mariusor/mpris-scrobbler",
+      },
+      {
+        name: "NepTunes",
+        platforms: ["Mac"],
         blurb:
-          "Free software music server compatible with Subsonic/Airsonic, with LB scrobbling.",
-        url: "https://www.navidrome.org/",
+          "Mac menu-bar app that scrobbles Apple Music and Spotify to ListenBrainz, Last.fm, and Libre.fm via system Now Playing APIs.",
+        url: "https://apps.apple.com/us/app/neptunes/id1006739057",
+      },
+      {
+        name: "Official ListenBrainz app",
+        platforms: ["Android"],
+        blurb:
+          "MetaBrainz's first-party Android app — scrobbles plays from any audio app on the device.",
+        url: "https://play.google.com/store/apps/details?id=org.listenbrainz.android",
       },
       {
         name: "OngakuKiroku",
@@ -329,17 +321,24 @@ const CATEGORIES: ClientCategory[] = [
         url: "https://github.com/Atelier-Shiori/OngakuKiroku",
       },
       {
+        name: "Pano Scrobbler",
+        platforms: ["Android"],
+        blurb:
+          "Open-source Android scrobbler that listens to any audio app on the device and posts to ListenBrainz, Last.fm, Libre.fm.",
+        url: "https://kawaiidango.github.io/pano-scrobbler/",
+      },
+      {
+        name: "phooks",
+        platforms: ["CLI", "Server"],
+        blurb:
+          "Python script that submits local Plex listens using web hooks and file lookups.",
+        url: "https://github.com/UnviableFriend/phooks",
+      },
+      {
         name: "Rescrobbled",
         platforms: ["Linux"],
         blurb: "Universal Linux scrobbler for MPRIS-enabled players.",
         url: "https://github.com/InputUsername/rescrobbled",
-      },
-      {
-        name: "ScrobbleRadio",
-        platforms: ["Web"],
-        blurb:
-          "Streaming radio player and listen submitter for a curated list of global radio stations.",
-        url: "https://scrobblerad.io/",
       },
       {
         name: "SmashTunes",
@@ -348,68 +347,12 @@ const CATEGORIES: ClientCategory[] = [
           "Mac menu-bar utility that displays the current track and submits Apple Music + Spotify listens.",
         url: "https://www.smashbits.nl/smashtunes/",
       },
-    ],
-  },
-  {
-    title: "Mobile",
-    clients: [
-      {
-        name: "Official ListenBrainz app",
-        platforms: ["Android"],
-        blurb: "MetaBrainz's first-party Android app for ListenBrainz.",
-        url: "https://play.google.com/store/apps/details?id=org.listenbrainz.android",
-      },
-      {
-        name: "Pano Scrobbler",
-        platforms: ["Android"],
-        blurb:
-          "Open-source Android scrobbler that listens to any audio app on the device and posts to ListenBrainz, Last.fm, Libre.fm.",
-        url: "https://kawaiidango.github.io/pano-scrobbler/",
-      },
-      {
-        name: "Symfonium",
-        platforms: ["Android"],
-        blurb:
-          "Polished Android music player for Plex / Jellyfin / Subsonic with built-in ListenBrainz scrobbling.",
-        url: "https://symfonium.app",
-      },
-      {
-        name: "Booming Music",
-        platforms: ["Android"],
-        blurb:
-          "A clean and fast Material You music player for Android with LB scrobbling.",
-        url: "https://boomingmusic.vercel.app/",
-      },
-      {
-        name: "Jewelcase",
-        platforms: ["iOS"],
-        blurb: "An offline music player for iOS with ListenBrainz scrobbling.",
-        url: "https://www.jewelcase.app/",
-      },
-    ],
-  },
-  {
-    title: "Browser extensions",
-    clients: [
       {
         name: "Web Scrobbler",
         platforms: ["Browser"],
         blurb:
           "Browser extension that scrobbles plays from 100+ web players (Bandcamp, YouTube Music, Tidal, etc.).",
         url: "https://webscrobbler.com/",
-      },
-    ],
-  },
-  {
-    title: "Scripts",
-    blurb: "Pluck listens from less obvious sources.",
-    clients: [
-      {
-        name: "phooks",
-        platforms: ["CLI", "Server"],
-        blurb:
-          "Python script that submits local Plex listens using web hooks and file lookups.",
-        url: "https://github.com/UnviableFriend/phooks",
       },
       {
         name: "ytm-extractor",
@@ -440,6 +383,13 @@ const CATEGORIES: ClientCategory[] = [
         url: "https://github.com/Serene-Arc/listenbrainz-playlist-uploader",
       },
       {
+        name: "ListenBrainz Playlist Tool",
+        platforms: ["Web"],
+        blurb:
+          "Standalone tool to select recent listens from a ListenBrainz account and add them to a ListenBrainz playlist.",
+        url: "https://yogo9.github.io/listenbrainz-recent-listens-to-playlist/",
+      },
+      {
         name: "ListenBrainz Tools (Infinity-Tools-SMP)",
         platforms: ["Windows"],
         blurb:
@@ -453,30 +403,80 @@ const CATEGORIES: ClientCategory[] = [
           "Foobar2000 plugin for syncing local playlists with ListenBrainz (and Spotify), with local-content + YouTube link resolution.",
         url: "https://github.com/regorxxx/Playlist-Manager-SMP",
       },
-      {
-        name: "ListenBrainz macOS Scrobbler for Music.app",
-        platforms: ["Mac", "CLI"],
-        blurb: "macOS Bash script to submit Music.app listens to ListenBrainz.",
-        url: "https://codeberg.org/scaglio/listenbrainz-scrobbler",
-      },
-      {
-        name: "ListenBrainz Playlist Tool",
-        platforms: ["Web"],
-        blurb:
-          "Standalone tool to select recent listens from a ListenBrainz account and add them to a ListenBrainz playlist.",
-        url: "https://yogo9.github.io/listenbrainz-recent-listens-to-playlist/",
-      },
     ],
   },
   {
-    title: "Other tools",
+    title: "Other",
+    blurb:
+      "Self-hosted music servers, home-automation integrations, bots, and reporting plugins.",
     clients: [
+      {
+        name: "Airsonic-Advanced",
+        platforms: ["Server"],
+        blurb: "A free, web-based media streamer with LB scrobbling.",
+        url: "https://github.com/airsonic-advanced/airsonic-advanced",
+      },
       {
         name: "BrainzBot",
         platforms: ["Discord"],
         blurb:
           "Discord bot — share what you're listening to, charts, album grids, and tag clouds in any server.",
         url: "https://github.com/coopw1/BrainzBot",
+      },
+      {
+        name: "Funkwhale",
+        platforms: ["Server", "Web"],
+        blurb:
+          "Federated, self-hosted music platform — scrobbles to LB and shares what you listen to with the fediverse.",
+        url: "https://funkwhale.audio",
+      },
+      {
+        name: "gonic",
+        platforms: ["Server", "Linux"],
+        blurb:
+          "Free software Subsonic-compatible music server with LB scrobbling.",
+        url: "https://github.com/sentriz/gonic",
+      },
+      {
+        name: "Home Assistant",
+        platforms: ["Server"],
+        blurb:
+          "Open-source home automation. ListenBrainz scrobbling via the Music Assistant plugin.",
+        url: "https://www.home-assistant.io/",
+      },
+      {
+        name: "Jellyfin",
+        platforms: ["Server"],
+        blurb:
+          "Free software media streaming system. LB scrobbling via jellyfin-plugin-listenbrainz.",
+        url: "https://jellyfin.org/",
+      },
+      {
+        name: "Koito",
+        platforms: ["Server"],
+        blurb: "A self-hosted, themeable LB-compatible scrobbler.",
+        url: "https://koito.io/",
+      },
+      {
+        name: "Lyrion",
+        platforms: ["Server"],
+        blurb:
+          "Open-source server software to control Squeezebox audio players.",
+        url: "https://lyrion.org/",
+      },
+      {
+        name: "Mopidy",
+        platforms: ["Linux", "Server"],
+        blurb:
+          "Headless music server (with mopidy-listenbrainz) — useful for Raspberry Pi setups and home audio.",
+        url: "https://mopidy.com",
+      },
+      {
+        name: "Navidrome",
+        platforms: ["Server"],
+        blurb:
+          "Free software music server compatible with Subsonic/Airsonic, with LB scrobbling.",
+        url: "https://www.navidrome.org/",
       },
       {
         name: "Wrapped (Infinity-Tools-SMP)",
@@ -607,11 +607,14 @@ function cnTitle(featured: boolean | undefined): string {
 
 /**
  * Curated list of third-party ListenBrainz scrobblers and players.
- * Organised to mirror https://listenbrainz.org/add-data/ so the two
- * pages map onto each other — Parachord stays at the top as the
- * featured-card showcase, then categories in roughly the same order
- * LB uses (Music players, Servers & streaming, Mobile, Browser
- * extensions, Scripts, Playlist tools, Other tools).
+ * Sourced from https://listenbrainz.org/add-data/ then re-bucketed
+ * into four user-facing categories (Players, Scrobblers, Playlist
+ * tools, Other) so a visitor can decide by job-to-be-done rather
+ * than by LB's editorial taxonomy.
+ *
+ * Parachord stays at the top as the featured-card showcase. Unstream
+ * is highlighted within Scrobblers via the inline "Featured" pill on
+ * its tile.
  *
  * Caller is responsible for any introductory copy / page header —
  * this component renders only the featured card + categorised tile
