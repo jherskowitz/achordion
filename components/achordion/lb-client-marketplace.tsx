@@ -49,14 +49,15 @@ interface ClientCategory {
  * curated entries that LB doesn't list (Marvis Pro, NepTunes,
  * Symfonium) because they cover scrobble paths LB's directory misses.
  *
- * Four-bucket split that maps onto how a user actually decides:
+ * Five-bucket split that maps onto how a user actually decides:
  *   - **Players** — apps you use to actively play music; scrobbling
  *     is automatic.
  *   - **Scrobblers** — capture plays from somewhere else (another
  *     app, the OS, a hardware streamer) and submit to LB.
+ *   - **Servers** — self-hosted music streamers and home-automation
+ *     platforms that scrobble what they play to LB.
  *   - **Playlist tools** — read/write LB playlists.
- *   - **Other** — self-hosted music servers, integrations, bots,
- *     reporting plugins.
+ *   - **Other** — bots, reporting plugins, miscellaneous tooling.
  */
 const CATEGORIES: ClientCategory[] = [
   {
@@ -406,22 +407,15 @@ const CATEGORIES: ClientCategory[] = [
     ],
   },
   {
-    title: "Other",
+    title: "Servers",
     blurb:
-      "Self-hosted music servers, home-automation integrations, bots, and reporting plugins.",
+      "Self-hosted streamers and home-automation platforms with built-in LB scrobbling.",
     clients: [
       {
         name: "Airsonic-Advanced",
         platforms: ["Server"],
         blurb: "A free, web-based media streamer with LB scrobbling.",
         url: "https://github.com/airsonic-advanced/airsonic-advanced",
-      },
-      {
-        name: "BrainzBot",
-        platforms: ["Discord"],
-        blurb:
-          "Discord bot — share what you're listening to, charts, album grids, and tag clouds in any server.",
-        url: "https://github.com/coopw1/BrainzBot",
       },
       {
         name: "Funkwhale",
@@ -477,6 +471,20 @@ const CATEGORIES: ClientCategory[] = [
         blurb:
           "Free software music server compatible with Subsonic/Airsonic, with LB scrobbling.",
         url: "https://www.navidrome.org/",
+      },
+    ],
+  },
+  {
+    title: "Other",
+    blurb:
+      "Bots, reporting plugins, and miscellaneous community-built tools.",
+    clients: [
+      {
+        name: "BrainzBot",
+        platforms: ["Discord"],
+        blurb:
+          "Discord bot — share what you're listening to, charts, album grids, and tag clouds in any server.",
+        url: "https://github.com/coopw1/BrainzBot",
       },
       {
         name: "Wrapped (Infinity-Tools-SMP)",
