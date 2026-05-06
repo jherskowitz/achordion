@@ -91,7 +91,21 @@ async function AlbumBody({ mbid }: { mbid: string }) {
   // Streaming services render as a favicon row above the tracklist;
   // everything else (Wikipedia, Discogs, lyrics, etc.) stays in the
   // sidebar's "Other Links" so we don't show Spotify/Apple twice.
-  const { streaming: streamingUrls, other: otherUrls } = categoriseLinks(urls);
+  const { streaming: streamingUrls, other: otherUrlsFromMb } =
+    categoriseLinks(urls);
+  // Always link back to MusicBrainz so users who care about a specific
+  // release / format / catalog number can drill in there. Append rather
+  // than prepend so MB sits below editorially-added rels (Wikipedia
+  // etc.) — those have richer info; MB is the dependable last stop.
+  // Dedupe in case a future MB editor adds the entity's own URL as a
+  // rel (rare but cheap to guard).
+  const mbReleaseGroupUrl = `https://musicbrainz.org/release-group/${mbid}`;
+  const otherUrls = otherUrlsFromMb.some((l) => l.url === mbReleaseGroupUrl)
+    ? otherUrlsFromMb
+    : [
+        ...otherUrlsFromMb,
+        { type: "musicbrainz entry", url: mbReleaseGroupUrl },
+      ];
 
   const listenCounts = release
     ? await fetchListenCounts(release, credit.primaryArtistId)
