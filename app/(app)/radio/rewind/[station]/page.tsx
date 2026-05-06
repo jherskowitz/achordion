@@ -3,9 +3,12 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, ExternalLink } from "lucide-react";
 import { getSpinbinPlaylist } from "@/lib/clients/spinbin";
 import { getSpinbinStation } from "@/lib/spinbin-stations";
+import { tileTextColor } from "@/lib/spinbin-tile";
+import { stationLogoUrl } from "@/lib/spinbin-logo";
 import { OpenInParachordButton } from "@/components/achordion/open-in-parachord-button";
 import { PageShell } from "@/components/achordion/page-shell";
 import { RadioRewindRow } from "@/components/achordion/radio-rewind-row";
+import { StationCover } from "@/components/achordion/station-cover";
 
 // User asked for "refreshes on each load" — opt every render of this
 // route into dynamic mode, even with future caching changes upstream.
@@ -13,18 +16,6 @@ export const dynamic = "force-dynamic";
 
 interface PageProps {
   params: Promise<{ station: string }>;
-}
-
-function tileTextColor(hex: string): string {
-  const m = hex.match(/^#?([a-f0-9]{6})$/i);
-  if (!m) return "#ffffff";
-  const n = parseInt(m[1], 16);
-  const r = (n >> 16) & 0xff;
-  const g = (n >> 8) & 0xff;
-  const b = n & 0xff;
-  return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.62
-    ? "#111111"
-    : "#ffffff";
 }
 
 function formatRefreshed(iso: string | null): string | null {
@@ -76,13 +67,19 @@ export default async function RewindStationPage({ params }: PageProps) {
       </div>
 
       <header className="mb-8 grid grid-cols-1 gap-6 sm:grid-cols-[200px_minmax(0,1fr)] sm:items-end sm:gap-8">
-        <div
-          className="flex aspect-square w-full max-w-[280px] items-center justify-center rounded-2xl text-center font-semibold tracking-tight sm:max-w-none"
-          style={{ backgroundColor: station.color, color: fg }}
-          aria-hidden
-        >
-          <span className="px-4 text-2xl leading-tight">{station.name}</span>
-        </div>
+        <StationCover
+          name={station.name}
+          color={station.color}
+          textColor={fg}
+          // Prefer the playlist-level <image> Spinbin emits in the
+          // XSPF; fall back to the predictable logos/<id>.svg URL for
+          // older feeds that pre-date the playlist <image> rollout.
+          // <StationCover> swaps to the brand-colour tile if both
+          // 404, matching the previous behaviour.
+          image={playlist?.image ?? stationLogoUrl(station.id)}
+          className="aspect-square w-full max-w-[280px] rounded-2xl sm:max-w-none"
+          textClassName="px-4 text-2xl leading-tight"
+        />
         <div className="min-w-0">
           <p className="text-muted-foreground text-xs tracking-wide uppercase">
             Radio Rewind

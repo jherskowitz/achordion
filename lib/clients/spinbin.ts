@@ -20,6 +20,13 @@ export interface SpinbinPlaylist {
   /** ISO timestamp pulled from `<date>` — when spinbin generated the file. */
   date: string | null;
   info: string | null;
+  /**
+   * Absolute URL to a playlist-level cover image. Spinbin emits this
+   * as `<image>` at the playlist level (above `<trackList>`) — used
+   * for station logos. `null` when the feed doesn't carry one, in
+   * which case the UI falls back to the brand-colour tile.
+   */
+  image: string | null;
   tracks: SpinbinTrack[];
 }
 
@@ -54,12 +61,15 @@ function pickTag(xml: string, tag: string): string | null {
 
 function parseXspf(xml: string): SpinbinPlaylist {
   const title = pickTag(xml, "title") ?? "";
-  // <creator> appears both at playlist level and per-track. The first
-  // hit is the playlist creator since spinbin emits it before <trackList>.
+  // <creator>, <image>, etc. appear both at playlist level and per-
+  // track. Restrict the playlist-level reads to the head of the file
+  // (everything before <trackList>) so we don't accidentally pick up
+  // the first track's value.
   const playlistHead = xml.split("<trackList", 2)[0] ?? xml;
   const creator = pickTag(playlistHead, "creator");
   const date = pickTag(playlistHead, "date");
   const info = pickTag(playlistHead, "info");
+  const image = pickTag(playlistHead, "image");
 
   const tracks: SpinbinTrack[] = [];
   const trackRe = /<track\b[^>]*>([\s\S]*?)<\/track>/gi;
@@ -80,6 +90,7 @@ function parseXspf(xml: string): SpinbinPlaylist {
     creator,
     date,
     info,
+    image,
     tracks,
   };
 }
