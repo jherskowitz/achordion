@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { auth } from "@/auth";
 import { getUserPins } from "@/lib/clients/listenbrainz";
 import { PinnedTrackCard } from "@/components/achordion/pinned-track-card";
 import { PageShell } from "@/components/achordion/page-shell";
@@ -9,7 +10,13 @@ interface PageParams {
   params: Promise<{ name: string }>;
 }
 
-async function PinsHistory({ name }: { name: string }) {
+async function PinsHistory({
+  name,
+  thankable,
+}: {
+  name: string;
+  thankable: boolean;
+}) {
   let pins;
   try {
     pins = await getUserPins(name, 50);
@@ -50,6 +57,7 @@ async function PinsHistory({ name }: { name: string }) {
               <PinnedTrackCard
                 key={p.row_id}
                 pin={p}
+                thankable={thankable}
               />
             ))}
           </div>
@@ -69,6 +77,7 @@ async function PinsHistory({ name }: { name: string }) {
               <PinnedTrackCard
                 key={p.row_id}
                 pin={p}
+                thankable={thankable}
               />
             ))}
           </div>
@@ -100,13 +109,16 @@ function Fallback() {
 
 export default async function PinsPage({ params }: PageParams) {
   const { name } = await params;
+  const session = await auth();
+  const viewer = session?.user?.mbUsername ?? null;
+  const thankable = !!viewer && viewer.toLowerCase() !== name.toLowerCase();
   return (
     <PageShell className="pt-8">
       <h2 className="mb-6 text-sm font-semibold tracking-wide uppercase">
         Pins
       </h2>
       <Suspense fallback={<Fallback />}>
-        <PinsHistory name={name} />
+        <PinsHistory name={name} thankable={thankable} />
       </Suspense>
     </PageShell>
   );

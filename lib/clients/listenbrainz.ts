@@ -2468,6 +2468,46 @@ export async function submitRecommendation(
   await lbPost("/recommend-personal-recording", token, { metadata });
 }
 
+// ─── Thanks (acknowledge a pin / rec / personal-rec) ────────────────
+
+/**
+ * Thank another user for a timeline event they posted (a pin, a public
+ * recording_recommendation, or a personal recording recommendation
+ * received). LB requires the thanker to be following the thankee
+ * (returns 401 otherwise) — we don't pre-check; the caller surfaces
+ * the error if it happens.
+ *
+ * `originalEventId` semantics depend on the event type, per LB:
+ *   - recording_pin                       → pin's row_id
+ *   - recording_recommendation            → timeline event id
+ *   - personal_recording_recommendation   → timeline event id
+ *
+ * Other event types are not thankable on the LB side.
+ */
+export async function submitThanks(
+  thanker: string,
+  token: string,
+  opts: {
+    originalEventType:
+      | "recording_pin"
+      | "recording_recommendation"
+      | "personal_recording_recommendation";
+    originalEventId: number;
+    blurb?: string;
+  },
+): Promise<void> {
+  const metadata: Record<string, unknown> = {
+    original_event_type: opts.originalEventType,
+    original_event_id: opts.originalEventId,
+  };
+  if (opts.blurb !== undefined) metadata.blurb_content = opts.blurb;
+  await lbPost(
+    `/user/${encodeURIComponent(thanker)}/timeline-event/create/thanks`,
+    token,
+    { metadata },
+  );
+}
+
 // ─── Add to existing playlist ───────────────────────────────────────
 
 /**

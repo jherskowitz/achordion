@@ -12,6 +12,7 @@ import { parachordPlayTrack } from "@/lib/parachord";
 import { ParachordCtaButton } from "./parachord-button";
 import { ExternalLinks, categoriseLinks } from "./external-links";
 import { TrackActionsMenuSlot } from "./track-actions-menu-slot";
+import { ThanksButton } from "./thanks-button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { artistHref, releaseGroupHref } from "@/lib/entity-links";
 import { cn } from "@/lib/utils";
@@ -111,12 +112,21 @@ interface PinnedTrackCardProps {
   /** Hero variant — bigger, more prominent. Used at the top of the overview. */
   variant?: "hero" | "row";
   className?: string;
+  /**
+   * When true, render a Thanks button alongside the existing actions.
+   * Caller is responsible for only setting this on pins the viewer
+   * can thank — i.e. not the viewer's own pins (LB 403s on those).
+   * If the viewer doesn't follow the pin owner LB will still 4xx; the
+   * button surfaces the error in its tooltip rather than pre-filtering.
+   */
+  thankable?: boolean;
 }
 
 export function PinnedTrackCard({
   pin,
   variant = "row",
   className,
+  thankable = false,
 }: PinnedTrackCardProps) {
   const meta = pin.track_metadata;
   const cover = caaUrlFromListen(meta, variant === "hero" ? 500 : 250);
@@ -222,6 +232,12 @@ export function PinnedTrackCard({
                 size="sm"
               />
               <TrackActionsMenuSlot track={trackRef} />
+              {thankable && (
+                <ThanksButton
+                  originalEventType="recording_pin"
+                  originalEventId={pin.row_id}
+                />
+              )}
               {/* Streaming favicons stream in via Suspense so the
                   Parachord button + ⋮ paint immediately. The "+" tile
                   always renders once the row resolves, even if MB has
@@ -244,6 +260,12 @@ export function PinnedTrackCard({
                 size="sm"
               />
               <TrackActionsMenuSlot track={trackRef} />
+              {thankable && (
+                <ThanksButton
+                  originalEventType="recording_pin"
+                  originalEventId={pin.row_id}
+                />
+              )}
               {recordingMbid && (
                 <Suspense fallback={<PinnedExternalLinksSkeleton />}>
                   <PinnedExternalLinks recordingMbid={recordingMbid} />

@@ -53,7 +53,10 @@ async function FeedBody({
   const filtered = excludeSelf
     ? events.filter((e) => (e.user_name ?? "") !== name)
     : events;
-  return <FeedEventList events={filtered} />;
+  // viewer = current user's mbUsername — lets FeedEventList hide the
+  // Thanks button on the viewer's own pins / recs (LB 403s in that
+  // case) while still rendering it for everyone else's.
+  return <FeedEventList events={filtered} viewer={name} />;
 }
 
 async function FeedCta({
