@@ -45,7 +45,7 @@ const FEATURES: Array<{
     body: (
       <>
         Pair Achordion with{" "}
-        <Ext href="https://parachord.com">Parachord</Ext> and every track row,
+        <Ext href="https://parachord.com">Parachord</Ext> and every track, every list, every station,
         every album, every recommendation has a Play button that resolves
         against your music library and services - and plays from whichever
         ranks highest. Without{" "}
