@@ -214,6 +214,27 @@ Concrete rules that cover the cases that have actually broken:
 
 If you can't actually preview at narrow widths in your environment, at minimum read the JSX and confirm every horizontal layout has either a stacking variant, a truncating child, or both.
 
+### 14. Touch / coarse-pointer affordances
+
+Every hover-revealed UI is invisible on touch. Tailwind 3.5+ gates `hover:` rules behind `(hover: hover)`, so `opacity-0 group-hover:opacity-100` patterns never fire on phones. The standard fix is the `pointer-coarse:` variant — same modifier the existing play family uses now:
+
+```tsx
+// Hover reveal (cursor only) + always-visible on touch
+className="opacity-0 group-hover:opacity-100 pointer-coarse:opacity-100"
+// Bigger on touch so hit area clears the 44px tap-target floor
+className="size-7 pointer-coarse:size-9"
+```
+
+Concrete rules:
+
+- **Don't hide primary actions behind hover.** Play buttons, follow buttons, action menus, "+" tiles — anything actionable — must have a visible coarse-pointer fallback. The four play affordances (`PlayOnHoverFab`, `ParachordPlayButton`, `PlayOverNumberCell`, `PlayOverCover`) follow this pattern; new ones should mirror it.
+- **Tap targets ≥ 44 CSS px on coarse pointers.** Use `pointer-coarse:size-9` / `pointer-coarse:size-11` to grow icon-only buttons. For tightly placed icons that can't grow visibly, expand the hit area via `pointer-coarse:before:absolute pointer-coarse:before:-inset-2`.
+- **Tooltips don't replace labels on touch.** Hover-only `<Tooltip>` and `<IconTooltip>` are decorative on phones. Always set `aria-label` on the trigger so screen readers + voice control still work, and promote text out of the tooltip when the label carries actual user-facing info ("Listen along", platform names, etc.).
+- **Hover-toggled disclosures must also support tap.** No "popover that only opens on hover" — Base UI menus and Radix dropdowns already handle both, but custom CSS-hover panels need an explicit click handler.
+- **Don't lean on `cursor-pointer` for affordance.** Touch users never see cursors; if a thing isn't a `<button>` / `<a>`, it isn't keyboard-focusable either, which hurts both touch and a11y.
+
+`useParachordPresence` short-circuits to `true` on coarse pointers (see `lib/use-parachord-presence.ts`) — phones can't reach the desktop WebSocket listener, so we trust the OS to handle the parachord:// deep-link instead. New play surfaces inherit this for free; don't try to gate them behind a separate "is mobile?" check.
+
 ---
 
 ## Browser-extension hydration gotchas
@@ -323,11 +344,38 @@ Reference implementations: server-side, `LbRadioSection` (used on `/radio` and t
 
 Don't try to use `parachord://play/radio?url=<lb-radio-api-url>` (Mode C, URL-only) for LB Radio — Parachord's URL-pool path expects a static playlist, not an LB-Radio JSPF endpoint that needs a token. Always pre-fetch and inline.
 
+### Mobile (iOS / Android) — Universal Links + App Links
+
+The desktop WS-presence story doesn't translate to phones: Parachord-mobile is a sandboxed app, not a process running a localhost listener, and iOS/Safari blocks `ws://127.0.0.1` from web pages anyway. So `useParachordPresence` short-circuits to `true` on `(pointer: coarse)` clients and trusts the OS to dispatch the deep-link.
+
+For that trust to be earned, **Parachord-mobile needs to register Universal Links (iOS) and App Links (Android)** for every `parachord://` URL shape Achordion produces:
+
+- **iOS — Universal Links**
+  - Pick a host you control for the universal version of the protocol — typically `https://parachord.com/play`, `https://parachord.com/play/album`, `https://parachord.com/listen-along`, etc., one path per protocol verb. Mirror the existing `parachord://` query-string shape verbatim so the same URL works in both forms.
+  - Host an `apple-app-site-association` (AASA) JSON at `https://parachord.com/.well-known/apple-app-site-association` with the app's team-id-prefixed bundle ID and the path patterns above. No file extension; served as `application/json`; no redirect.
+  - In the iOS app's entitlements, add `com.apple.developer.associated-domains = applinks:parachord.com`.
+  - Implement `application(_:continue:restorationHandler:)` (UIKit) or the SwiftUI `onOpenURL` / `onContinueUserActivity(type: NSUserActivityTypeBrowsingWeb, ...)` handler to receive the inbound URL and route it the same way the `parachord://` scheme handler does.
+  - **Fallback for users without the app installed:** the Universal-Link host page (`https://parachord.com/play?…`) should server-render a "Get Parachord" pitch with the destination context (track name, etc.) preserved. iOS only opens the app when the AASA permits the path *and* the app is installed; otherwise Safari renders the URL — meaning a not-installed user lands on a useful page instead of an OS error.
+
+- **Android — App Links**
+  - Same idea, different ceremony. Add `<intent-filter android:autoVerify="true">` for each Universal-Link path host on the activity that handles the deep link. Host the matching `assetlinks.json` at `https://parachord.com/.well-known/assetlinks.json` with the app's package name + signing-cert SHA-256 fingerprint.
+  - Verified App Links open the app directly without the OS chooser; an unverified or unmatched path opens the URL in the user's default browser, again landing on the install pitch.
+
+- **Custom-scheme fallback** (`parachord://...`) should keep working as today — it's still useful from contexts that don't go through a browser (in-app webviews, share sheets). On iOS in particular, `parachord://` URLs invoked from within Safari are subject to the same OS dialog ("Cannot Open Page") when the app isn't installed; that's why the Universal-Link form is preferred from web pages and we keep `parachord://` for app-to-app deep linking.
+
+If those pieces are in place, Achordion's mobile UX needs **no further changes** — every play surface taps a `parachord://` URL, the OS routes it to the app or the web fallback, and the user either plays the track or gets pitched on installing.
+
+If they aren't yet:
+- Tapping a play affordance on mobile from a non-installed user opens the OS's "Cannot Open Page" alert (iOS) or does nothing visible (Android).
+- The `parachord://` URL is still valid for installed users — they get correct behaviour.
+- We accept that as a bridging trade-off; the install pitch lives at the homepage / `/apps` Marketplace until the Universal-Link path is live.
+
 ### What Parachord expects from Achordion
 
 - Achordion never auto-fires a `parachord://` URL. Every link is user-initiated.
 - The smart-link pages at `go.parachord.com/<id>` use the same WS contract — Achordion's UX treats Parachord identically.
 - The "Get Parachord" disabled-state link points at `https://parachord.com` (constant `PARACHORD_HOMEPAGE` in `parachord-button.tsx` and `play-on-hover-fab.tsx`). If the canonical install URL changes, search both files.
+- On `(pointer: coarse)` clients we render every play surface as Parachord-present-by-default — assume installed, deep-link through the OS. Don't add a separate "is mobile?" check inside individual components; piggyback on `useParachordPresence` which handles the gate centrally.
 
 ---
 
