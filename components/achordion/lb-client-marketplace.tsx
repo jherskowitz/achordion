@@ -61,6 +61,135 @@ interface ClientCategory {
  */
 const CATEGORIES: ClientCategory[] = [
   {
+    title: "Scrobblers",
+    blurb:
+      "Capture plays from another app, the OS, or a hardware streamer and submit them to ListenBrainz.",
+    clients: [
+      {
+        name: "Unstream",
+        platforms: ["Mac", "Browser", "iOS"],
+        blurb:
+          "Menu-bar app and browser extensions that detect what you're listening to in Spotify, Apple Music, or your browser, scrobble it to ListenBrainz, and surface direct-from-artist purchase links across Bandcamp, Mirlo, Qobuz, Beatport, and 15+ other marketplaces.",
+        url: "https://unstream.stream/",
+        featured: true,
+      },
+      {
+        name: "AMWin-RP",
+        platforms: ["Windows"],
+        blurb:
+          "Discord Rich Presence client for Apple Music's native Windows app, with LB scrobbling support.",
+        url: "https://github.com/PKBeam/AMWin-RP",
+      },
+      {
+        name: "applescript-listenbrainz",
+        platforms: ["Mac"],
+        blurb: "An AppleScript service that submits Apple Music listens to LB.",
+        url: "https://github.com/golgote/applescript-listenbrainz",
+      },
+      {
+        name: "AudioStreamerScrobbler",
+        platforms: ["Server"],
+        blurb:
+          "Submit listens from hardware audiostreamers (Bluesound/BluOS, MusicCast, HEOS).",
+        url: "https://github.com/vvdleun/audiostreamerscrobbler",
+      },
+      {
+        name: "Eavesdrop.FM",
+        platforms: ["Server"],
+        blurb: "Submits Plex music listening data to ListenBrainz.",
+        url: "https://github.com/simonxciv/eavesdrop.fm",
+      },
+      {
+        name: "ListenBrainz macOS Scrobbler for Music.app",
+        platforms: ["Mac", "CLI"],
+        blurb: "macOS Bash script to submit Music.app listens to ListenBrainz.",
+        url: "https://codeberg.org/scaglio/listenbrainz-scrobbler",
+      },
+      {
+        name: "Multi-Scrobbler",
+        platforms: ["Server", "Docker"],
+        blurb:
+          "Self-hosted bridge that pulls from many sources (Spotify, Plex, Jellyfin, Subsonic, Mopidy) and writes to LB.",
+        url: "https://github.com/FoxxMD/multi-scrobbler",
+      },
+      {
+        name: "mpris-scrobbler",
+        platforms: ["Linux"],
+        blurb: "Minimalistic Unix scrobbler for MPRIS-enabled players.",
+        url: "https://github.com/mariusor/mpris-scrobbler",
+      },
+      {
+        name: "NepTunes",
+        platforms: ["Mac"],
+        blurb:
+          "Mac menu-bar app that scrobbles Apple Music and Spotify to ListenBrainz, Last.fm, and Libre.fm via system Now Playing APIs.",
+        url: "https://apps.apple.com/us/app/neptunes/id1006739057",
+      },
+      {
+        name: "Official ListenBrainz app",
+        platforms: ["Android"],
+        blurb:
+          "MetaBrainz's first-party Android app — scrobbles plays from any audio app on the device.",
+        url: "https://play.google.com/store/apps/details?id=org.listenbrainz.android",
+      },
+      {
+        name: "OngakuKiroku",
+        platforms: ["Mac"],
+        blurb:
+          "ListenBrainz submitter for Swinsian and Music.app on macOS devices.",
+        url: "https://github.com/Atelier-Shiori/OngakuKiroku",
+      },
+      {
+        name: "Pano Scrobbler",
+        platforms: ["Android"],
+        blurb:
+          "Open-source Android scrobbler that listens to any audio app on the device and posts to ListenBrainz, Last.fm, Libre.fm.",
+        url: "https://kawaiidango.github.io/pano-scrobbler/",
+      },
+      {
+        name: "phooks",
+        platforms: ["CLI", "Server"],
+        blurb:
+          "Python script that submits local Plex listens using web hooks and file lookups.",
+        url: "https://github.com/UnviableFriend/phooks",
+      },
+      {
+        name: "Rescrobbled",
+        platforms: ["Linux"],
+        blurb: "Universal Linux scrobbler for MPRIS-enabled players.",
+        url: "https://github.com/InputUsername/rescrobbled",
+      },
+      {
+        name: "SmashTunes",
+        platforms: ["Mac"],
+        blurb:
+          "Mac menu-bar utility that displays the current track and submits Apple Music + Spotify listens.",
+        url: "https://www.smashbits.nl/smashtunes/",
+      },
+      {
+        name: "Web Scrobbler",
+        platforms: ["Browser"],
+        blurb:
+          "Browser extension that scrobbles plays from 100+ web players (Bandcamp, YouTube Music, Tidal, etc.).",
+        url: "https://webscrobbler.com/",
+      },
+      {
+        name: "ytm-extractor",
+        platforms: ["CLI"],
+        blurb:
+          "Kotlin (Java) script to submit your YouTube Music watch history to ListenBrainz.",
+        url: "https://github.com/defvs/ytm-extractor",
+      },
+      {
+        name: "YTMusic2listenbrainz.py",
+        platforms: ["CLI"],
+        blurb:
+          "Python script to submit your YouTube Music watch history to ListenBrainz.",
+        url: "https://gist.github.com/fuddl/e17aa687df6ac1c7cbee5650ccfbc889",
+      },
+    ],
+  },
+  {
     title: "Players",
     blurb:
       "Music apps you use directly. Scrobbling happens in the background.",
@@ -239,135 +368,6 @@ const CATEGORIES: ClientCategory[] = [
         blurb:
           "Cross-platform multimedia player. LB scrobbling via the community VLC ListenBrainz plugin.",
         url: "https://www.videolan.org/vlc/",
-      },
-    ],
-  },
-  {
-    title: "Scrobblers",
-    blurb:
-      "Capture plays from another app, the OS, or a hardware streamer and submit them to ListenBrainz.",
-    clients: [
-      {
-        name: "Unstream",
-        platforms: ["Mac", "Browser", "iOS"],
-        blurb:
-          "Menu-bar app and browser extensions that detect what you're listening to in Spotify, Apple Music, or your browser, scrobble it to ListenBrainz, and surface direct-from-artist purchase links across Bandcamp, Mirlo, Qobuz, Beatport, and 15+ other marketplaces.",
-        url: "https://unstream.stream/",
-        featured: true,
-      },
-      {
-        name: "AMWin-RP",
-        platforms: ["Windows"],
-        blurb:
-          "Discord Rich Presence client for Apple Music's native Windows app, with LB scrobbling support.",
-        url: "https://github.com/PKBeam/AMWin-RP",
-      },
-      {
-        name: "applescript-listenbrainz",
-        platforms: ["Mac"],
-        blurb: "An AppleScript service that submits Apple Music listens to LB.",
-        url: "https://github.com/golgote/applescript-listenbrainz",
-      },
-      {
-        name: "AudioStreamerScrobbler",
-        platforms: ["Server"],
-        blurb:
-          "Submit listens from hardware audiostreamers (Bluesound/BluOS, MusicCast, HEOS).",
-        url: "https://github.com/vvdleun/audiostreamerscrobbler",
-      },
-      {
-        name: "Eavesdrop.FM",
-        platforms: ["Server"],
-        blurb: "Submits Plex music listening data to ListenBrainz.",
-        url: "https://github.com/simonxciv/eavesdrop.fm",
-      },
-      {
-        name: "ListenBrainz macOS Scrobbler for Music.app",
-        platforms: ["Mac", "CLI"],
-        blurb: "macOS Bash script to submit Music.app listens to ListenBrainz.",
-        url: "https://codeberg.org/scaglio/listenbrainz-scrobbler",
-      },
-      {
-        name: "Multi-Scrobbler",
-        platforms: ["Server", "Docker"],
-        blurb:
-          "Self-hosted bridge that pulls from many sources (Spotify, Plex, Jellyfin, Subsonic, Mopidy) and writes to LB.",
-        url: "https://github.com/FoxxMD/multi-scrobbler",
-      },
-      {
-        name: "mpris-scrobbler",
-        platforms: ["Linux"],
-        blurb: "Minimalistic Unix scrobbler for MPRIS-enabled players.",
-        url: "https://github.com/mariusor/mpris-scrobbler",
-      },
-      {
-        name: "NepTunes",
-        platforms: ["Mac"],
-        blurb:
-          "Mac menu-bar app that scrobbles Apple Music and Spotify to ListenBrainz, Last.fm, and Libre.fm via system Now Playing APIs.",
-        url: "https://apps.apple.com/us/app/neptunes/id1006739057",
-      },
-      {
-        name: "Official ListenBrainz app",
-        platforms: ["Android"],
-        blurb:
-          "MetaBrainz's first-party Android app — scrobbles plays from any audio app on the device.",
-        url: "https://play.google.com/store/apps/details?id=org.listenbrainz.android",
-      },
-      {
-        name: "OngakuKiroku",
-        platforms: ["Mac"],
-        blurb:
-          "ListenBrainz submitter for Swinsian and Music.app on macOS devices.",
-        url: "https://github.com/Atelier-Shiori/OngakuKiroku",
-      },
-      {
-        name: "Pano Scrobbler",
-        platforms: ["Android"],
-        blurb:
-          "Open-source Android scrobbler that listens to any audio app on the device and posts to ListenBrainz, Last.fm, Libre.fm.",
-        url: "https://kawaiidango.github.io/pano-scrobbler/",
-      },
-      {
-        name: "phooks",
-        platforms: ["CLI", "Server"],
-        blurb:
-          "Python script that submits local Plex listens using web hooks and file lookups.",
-        url: "https://github.com/UnviableFriend/phooks",
-      },
-      {
-        name: "Rescrobbled",
-        platforms: ["Linux"],
-        blurb: "Universal Linux scrobbler for MPRIS-enabled players.",
-        url: "https://github.com/InputUsername/rescrobbled",
-      },
-      {
-        name: "SmashTunes",
-        platforms: ["Mac"],
-        blurb:
-          "Mac menu-bar utility that displays the current track and submits Apple Music + Spotify listens.",
-        url: "https://www.smashbits.nl/smashtunes/",
-      },
-      {
-        name: "Web Scrobbler",
-        platforms: ["Browser"],
-        blurb:
-          "Browser extension that scrobbles plays from 100+ web players (Bandcamp, YouTube Music, Tidal, etc.).",
-        url: "https://webscrobbler.com/",
-      },
-      {
-        name: "ytm-extractor",
-        platforms: ["CLI"],
-        blurb:
-          "Kotlin (Java) script to submit your YouTube Music watch history to ListenBrainz.",
-        url: "https://github.com/defvs/ytm-extractor",
-      },
-      {
-        name: "YTMusic2listenbrainz.py",
-        platforms: ["CLI"],
-        blurb:
-          "Python script to submit your YouTube Music watch history to ListenBrainz.",
-        url: "https://gist.github.com/fuddl/e17aa687df6ac1c7cbee5650ccfbc889",
       },
     ],
   },
