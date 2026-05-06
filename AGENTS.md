@@ -267,6 +267,23 @@ The Recommended Artists / Recommended Tracks rails on `/explore` (and the dedica
 
 ---
 
+## Content-Security-Policy: report-only → enforcing rollout
+
+`next.config.ts` ships **two** CSP headers:
+
+- `Content-Security-Policy: frame-ancestors 'self'` — enforcing, the existing clickjacking defense. Nothing else is enforced yet.
+- `Content-Security-Policy-Report-Only: …` — full directive set (script-src / style-src / connect-src / img-src / font-src / base-uri / form-action / object-src / upgrade-insecure-requests). Browsers log violations against this header to the console but **don't block** the requests, which is the right posture for the iterative tuning the issue calls for.
+
+The allowlist is inventoried from the codebase — every external host the app intentionally talks to (LB, MB, Wikidata, Wikipedia, CAA, archive.org, DiceBear, Odesli, RSS / Earshot / Spinbin, Vercel telemetry, etc.) lives in the directives. **When adding a new external API / image source / favicon CDN, extend the right CSP directive in `next.config.ts` too** — otherwise the eventual flip to enforcing will silently drop those requests.
+
+### Promoting Report-Only to enforcing
+
+1. After a deploy, walk the major surfaces in DevTools (`/`, `/explore`, `/charts`, `/radio`, `/artist/{mbid}`, `/release-group/{mbid}`, `/user/{name}`, `/search`, `/settings`, `/login`, `/faq`, `/about`, `/donate`).
+2. Watch for `[Report Only] Refused to …` console messages. Each names the directive (`script-src`, `connect-src`, etc.) and the URL.
+3. Add the host to the matching directive in `CSP_REPORT_ONLY` and re-deploy.
+4. When a clean console-walk says zero violations, promote: change `Content-Security-Policy: frame-ancestors 'self'` to `Content-Security-Policy: <CSP_REPORT_ONLY contents>`, drop the report-only header, ship.
+5. Keep the smoke suite at `tests/e2e/` running across the rollout so a CSP misstep that lands in enforcing mode regresses visibly (it'd show up as console errors the helper allowlist doesn't cover).
+
 ## API route caching pattern
 
 For routes that resolve identifiers via expensive external calls (`/api/track-cover`, `/api/artist-image`), the cache stack is layered:

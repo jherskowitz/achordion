@@ -1,22 +1,82 @@
 import type { NextConfig } from "next";
 
 /**
- * Baseline security headers applied to every route. Kept narrow on
- * purpose — a maximalist CSP would risk breaking Next's inline boot
- * scripts and Tailwind's runtime class injection, so we lead with the
- * cheap-and-safe wins (clickjacking defense, MIME sniffing, referrer
- * policy, HSTS) and leave a real `Content-Security-Policy` with
- * `script-src` / `connect-src` allowlists as a separate, iterative
- * pass once we've got DevTools open against the deployed site.
+ * Full Content-Security-Policy allowlist (`#4`). Two headers:
+ *   1. Enforcing CSP carries only `frame-ancestors 'self'` — the
+ *      modern clickjacking defense already in place. Everything
+ *      else stays in report-only mode for now.
+ *   2. Report-Only CSP carries the full directive set below
+ *      (script-src / style-src / connect-src / img-src / font-src /
+ *      base-uri / form-action / object-src / upgrade-insecure-
+ *      requests). Browsers log violations to the console but
+ *      don't block, which is the right posture for the "deploy,
+ *      walk every major route, tighten" iteration loop the issue
+ *      describes.
  *
- * `frame-ancestors 'self'` (via CSP) is the modern replacement for
- * `X-Frame-Options`; we set both for compatibility with older
- * browsers / agents that haven't picked up the CSP directive.
+ * Once a Vercel preview round-trip shows the report-only header
+ * clean across the major surfaces (/, /explore, /charts, /radio,
+ * /artist/{mbid}, /release-group/{mbid}, /user/{name}, /search,
+ * /settings, /login, /faq, /about, /donate), promote the directive
+ * set to the enforcing header and remove the report-only one.
+ *
+ * Allowlist contents are inventoried from the codebase: every
+ * external host the app intentionally talks to lives below. When
+ * adding a new third-party API / image source / favicon CDN,
+ * extend the right directive here too — otherwise the eventual
+ * enforcing flip will silently drop those requests.
  */
+const CSP_REPORT_ONLY = [
+  "default-src 'self'",
+  // 'unsafe-inline' covers Next 16 inline boot scripts; 'unsafe-eval'
+  // covers Turbopack/webpack dev runtimes (no-op effect in prod since
+  // bundled output doesn't eval). Vercel telemetry script lives at
+  // va.vercel-scripts.com.
+  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://va.vercel-scripts.com",
+  // Tailwind v4 + Radix style props inject runtime inline styles.
+  "style-src 'self' 'unsafe-inline'",
+  // Fonts: Geist comes via next/font (served from /_next/static, so
+  // covered by 'self'); data: covers any inlined fallback metrics.
+  "font-src 'self' data:",
+  // Image hosts the app actually fetches from. Mirrors next.config
+  // remotePatterns + favicons (Google s2) + Wikidata photos
+  // (upload.wikimedia.org) + DiceBear avatars + Spinbin station
+  // logos. data: + blob: cover dynamic SVG / canvas-derived URLs.
+  "img-src 'self' data: blob: https://archive.org https://*.archive.org https://coverartarchive.org https://musicbrainz.org https://gravatar.com https://api.dicebear.com https://upload.wikimedia.org https://www.google.com https://jherskowitz.github.io",
+  // Same-origin XHR / fetch / WS plus every external API the
+  // server-side code reaches through the browser at any point. The
+  // bulk are server-only (LB, MB, Wikidata, Odesli, RSS feeds, Earshot)
+  // and don't strictly need to be allowlisted here — but the LB Radio
+  // Mode-C-inline `refill` URL is hit FROM Parachord, and DiceBear
+  // avatars + s2 favicons are loaded by the browser. Keep the list
+  // permissive on the API hosts so a future client-side fetch doesn't
+  // get blocked.
+  "connect-src 'self' https://api.listenbrainz.org https://labs.api.listenbrainz.org https://listenbrainz.org https://musicbrainz.org https://api.musicbrainz.org https://www.wikidata.org https://en.wikipedia.org https://commons.wikimedia.org https://upload.wikimedia.org https://api.dicebear.com https://api.song.link https://archive.org https://*.archive.org https://coverartarchive.org https://rss.applemarketingtools.com https://www.earshot-online.com https://jherskowitz.github.io https://va.vercel-scripts.com https://vitals.vercel-insights.com",
+  // Iframe whitelist — empty for now since we don't embed anything,
+  // but keeping `frame-src 'none'` would block any future LB review
+  // embed without warning. Allow same-origin only.
+  "frame-src 'self'",
+  "frame-ancestors 'self'",
+  // No <object>/<embed>/<applet>; closes a small XSS surface.
+  "object-src 'none'",
+  // Pin form posts to same origin (pairs with the existing referrer
+  // policy and base-uri).
+  "base-uri 'self'",
+  "form-action 'self'",
+  // Browsers retry http subresources over https when this is set —
+  // safety net for any URL that might have slipped through with a
+  // bare http scheme. Vercel terminates TLS for every request anyway.
+  "upgrade-insecure-requests",
+].join("; ");
+
 const SECURITY_HEADERS = [
   // Modern clickjacking defense. CSP `frame-ancestors` supersedes XFO
   // but XFO is still honored by some embedded webviews.
   { key: "Content-Security-Policy", value: "frame-ancestors 'self'" },
+  // Report-Only CSP — browsers log violations against this header
+  // without blocking. Once preview-walk shows the console clean,
+  // promote `value` to the enforcing `Content-Security-Policy` and
+  // drop the report-only header in the same change.
+  { key: "Content-Security-Policy-Report-Only", value: CSP_REPORT_ONLY },
   { key: "X-Frame-Options", value: "SAMEORIGIN" },
   // Disable MIME-type sniffing so a CSS / image response can't be
   // re-interpreted as JS by a permissive browser.
