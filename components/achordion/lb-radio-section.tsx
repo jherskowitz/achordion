@@ -81,8 +81,11 @@ export function LbRadioSection({
         e.currentTarget.style.backgroundColor = "";
       }}
     >
-      <Radio className="size-4 group-hover/playbtn:hidden" />
-      <Play className="size-4 hidden fill-current group-hover/playbtn:block" />
+      {/* Cursor: Radio (identifies the kind) swaps to Play on
+          hover. Touch: no hover state, render Play directly so the
+          affordance is unambiguously actionable. */}
+      <Radio className="size-4 group-hover/playbtn:hidden pointer-coarse:hidden" />
+      <Play className="size-4 hidden fill-current group-hover/playbtn:block pointer-coarse:block" />
     </a>
   ) : (
     <span
@@ -126,7 +129,7 @@ export function LbRadioSection({
           aria-expanded={expanded}
           aria-label={expanded ? "Hide tracks" : "Show all tracks"}
           aria-controls="lb-radio-tracks"
-          className="text-muted-foreground hover:bg-muted/40 hover:text-foreground inline-flex size-8 shrink-0 items-center justify-center rounded-md transition-colors"
+          className="text-muted-foreground hover:bg-muted/40 hover:text-foreground inline-flex size-8 shrink-0 items-center justify-center rounded-md transition-colors pointer-coarse:size-11"
         >
           <ChevronDown
             className={cn(

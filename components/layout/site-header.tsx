@@ -138,7 +138,12 @@ export function SiteHeader() {
               aria-label={`Settings for ${displayName}`}
               title={displayName}
               suppressHydrationWarning
-              className="hover:ring-ring/40 ml-1 inline-flex rounded-full transition-shadow hover:ring-2"
+              // Hit-area expansion on coarse pointers via an
+              // invisible ::before ring. Keeps the visible avatar at
+              // size-7 (matches the rest of the trailing slot's
+              // visual rhythm) while widening the tap area to ~44px
+              // for thumb-friendliness.
+              className="hover:ring-ring/40 ml-1 inline-flex rounded-full transition-shadow hover:ring-2 pointer-coarse:relative pointer-coarse:before:absolute pointer-coarse:before:-inset-2 pointer-coarse:before:content-['']"
             >
               <UserAvatar
                 username={username}

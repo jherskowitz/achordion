@@ -97,8 +97,12 @@ export function UserStatsRadioWidget({ username }: { username: string }) {
         e.currentTarget.style.backgroundColor = "";
       }}
     >
-      <Radio className="size-4 group-hover/playbtn:hidden" />
-      <Play className="size-4 hidden fill-current group-hover/playbtn:block" />
+      {/* Cursor: Radio (identifies the station kind) swaps to Play
+          on hover so the affordance reads as actionable. Touch:
+          there's no hover, so go straight to Play — the surrounding
+          "{name} RADIO" text already supplies the kind context. */}
+      <Radio className="size-4 group-hover/playbtn:hidden pointer-coarse:hidden" />
+      <Play className="size-4 hidden fill-current group-hover/playbtn:block pointer-coarse:block" />
     </button>
   ) : (
     <span
@@ -140,7 +144,7 @@ export function UserStatsRadioWidget({ username }: { username: string }) {
           aria-expanded={open}
           aria-label={open ? "Hide range picker" : "Show range picker"}
           aria-controls={`stats-radio-range-${username}`}
-          className="text-muted-foreground hover:bg-muted/40 hover:text-foreground inline-flex size-8 shrink-0 items-center justify-center rounded-md transition-colors"
+          className="text-muted-foreground hover:bg-muted/40 hover:text-foreground inline-flex size-8 shrink-0 items-center justify-center rounded-md transition-colors pointer-coarse:size-11"
         >
           <ChevronDown
             className={cn(

@@ -252,9 +252,14 @@ export function LiveOnAirIndicator({
           <a
             href={listenAlongHref}
             aria-label={`Listen along with ${username} in Parachord`}
-            className="bg-primary/90 text-primary-foreground hover:bg-primary inline-flex size-4 shrink-0 items-center justify-center rounded-full transition-colors"
+            // Cursor: tiny round icon (tooltip carries the label).
+            // Touch: grow to a labeled pill so the affordance is
+            // self-explanatory without the (never-firing) tooltip
+            // and the hit area clears the 44px tap-target floor.
+            className="bg-primary/90 text-primary-foreground hover:bg-primary inline-flex size-4 shrink-0 items-center justify-center gap-1 rounded-full transition-colors pointer-coarse:h-6 pointer-coarse:w-auto pointer-coarse:px-2 pointer-coarse:text-[10px] pointer-coarse:font-medium"
           >
             <Radio className="size-2.5" />
+            <span className="hidden pointer-coarse:inline">Listen along</span>
           </a>
         </IconTooltip>
       )}

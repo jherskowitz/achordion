@@ -169,7 +169,7 @@ function FaviconLink({
           rel="noopener noreferrer"
           aria-label={label}
           suppressHydrationWarning
-          className="border-border/60 hover:border-foreground/40 hover:bg-muted/40 inline-flex size-9 items-center justify-center rounded-md border transition-colors"
+          className="border-border/60 hover:border-foreground/40 hover:bg-muted/40 inline-flex size-9 items-center justify-center rounded-md border transition-colors pointer-coarse:size-11"
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
