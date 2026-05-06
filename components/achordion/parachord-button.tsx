@@ -59,8 +59,12 @@ export function ParachordPlayButton({
 }) {
   const running = useParachordPresence();
 
+  // Touch override (pointer-coarse:): always visible, larger hit area
+  // so the affordance clears the 44px tap-target floor. Without it
+  // Tailwind's `hover:` rules — gated behind `(hover: hover)` — never
+  // fire on phones, so the play button would be invisible there.
   const baseClasses =
-    "inline-flex size-7 shrink-0 items-center justify-center rounded-full opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100";
+    "inline-flex size-7 shrink-0 items-center justify-center rounded-full opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 pointer-coarse:size-9 pointer-coarse:opacity-100";
 
   if (running) {
     return (
@@ -142,7 +146,7 @@ export function PlayOverNumberCell({
         <a
           href={href}
           aria-label={label}
-          className="text-foreground absolute inset-0 flex items-center justify-center opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
+          className="text-foreground absolute inset-0 flex items-center justify-center opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 pointer-coarse:opacity-100"
         >
           <Play className="size-3 fill-current" />
         </a>
@@ -175,7 +179,11 @@ export function PlayOverNumberCell({
     >
       <span
         className={cn(
-          "block transition-opacity group-hover:opacity-0",
+          // Number fades out as the play overlay fades in. On touch
+          // (pointer-coarse:) we hide the number permanently since
+          // both visible at once would crowd the tiny `w-5/w-8` cell
+          // — the play affordance wins because it's actionable.
+          "block transition-opacity group-hover:opacity-0 pointer-coarse:opacity-0",
           numberAlign,
         )}
         aria-hidden
@@ -230,6 +238,10 @@ export function PlayOverCover({
         className={cn(
           "absolute inset-0 flex items-center justify-center bg-black/45 opacity-0 transition-opacity",
           "group-hover/cover:opacity-100 group-focus-within/cover:opacity-100",
+          // On touch the scrim is always visible (otherwise there's
+          // no play affordance to find), but we lighten it to bg-
+          // black/30 so the cover art stays legible underneath.
+          "pointer-coarse:opacity-100 pointer-coarse:bg-black/30",
           rounded === "sm"
             ? "rounded-sm"
             : rounded === "md"

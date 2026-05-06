@@ -40,8 +40,14 @@ export function PlayOnHoverFab({
   // between the two states. We keep `pointer-events-auto` even when
   // `opacity-0` so the tooltip / hover-fade can fire as soon as the
   // parent cover container is hovered.
+  //
+  // Touch-pointer override: `pointer-coarse:` variants force the fab
+  // visible (and slightly bigger for the 44px tap-target floor) on
+  // devices without a real hover state. Otherwise the affordance is
+  // unreachable on phones because Tailwind's `hover:` rules sit
+  // behind a `(hover: hover)` media query.
   const baseClasses =
-    "absolute right-2 bottom-2 inline-flex size-9 translate-y-1 items-center justify-center rounded-full opacity-0 shadow-md transition-all group-hover:translate-y-0 group-hover:opacity-100 hover:opacity-100 focus-visible:opacity-100 focus-visible:translate-y-0";
+    "absolute right-2 bottom-2 inline-flex size-9 translate-y-1 items-center justify-center rounded-full opacity-0 shadow-md transition-all group-hover:translate-y-0 group-hover:opacity-100 hover:opacity-100 focus-visible:opacity-100 focus-visible:translate-y-0 pointer-coarse:size-11 pointer-coarse:translate-y-0 pointer-coarse:opacity-100";
 
   if (running) {
     return (
