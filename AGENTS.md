@@ -451,6 +451,7 @@ If they aren't yet:
 - `npm run dev` for local. **The dev server uses webpack, not Turbopack.** See the next subsection for the why.
 - **Typecheck before committing:** `npx --no-install tsc --noEmit`. The project ships TS strict.
 - **Lint:** `npx --no-install eslint <files>`.
+- **Smoke tests:** `npm run e2e` runs the Playwright suite under `tests/e2e/` against a fresh `next build && next start` boot. The same suite runs against an arbitrary deployment via `E2E_BASE_URL=https://… npm run e2e` (skips the local web server). CI runs it on every PR + push to main via `.github/workflows/e2e.yml`. Coverage is intentionally a small surface area: static pages, charts, one canonical artist/release-group/recording, and the utility routes (robots, sitemap, OG image, auth providers). Add to it when you find a regression class the existing specs would have caught.
 - Commits follow a focused-and-themed style — see `git log --oneline` for the cadence. Subject lines describe what the user-facing change does, not the implementation.
 - Do not amend commits unless explicitly requested.
 - Production deploy is Vercel from `main`; the WS-to-localhost approach works in production because Chrome / Edge / Firefox treat `ws://127.0.0.1` as a "potentially trustworthy origin" exception from mixed-content blocks.
