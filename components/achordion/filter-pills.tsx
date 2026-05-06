@@ -1,6 +1,5 @@
 "use client";
 
-import { useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 
@@ -26,7 +25,6 @@ export function FilterPills<T extends string>({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const router = useRouter();
-  const [, startTransition] = useTransition();
 
   function makeHref(value: T) {
     const next = new URLSearchParams(searchParams.toString());
@@ -66,12 +64,16 @@ export function FilterPills<T extends string>({
             role="tab"
             aria-selected={isActive}
             onClick={() => {
-              // Wrap in a transition so the downstream Suspense
-              // boundary (DiscographySection, keyed on type) shows
-              // its skeleton while the server re-renders.
-              startTransition(() => {
-                router.push(href, { scroll: false });
-              });
+              // Eager router.push (NOT wrapped in startTransition).
+              // useTransition keeps the previous UI visible during
+              // the navigation, which reads as "the pill click did
+              // nothing" — same lesson as the FamiliaritySlider
+              // (AGENTS.md "Recommendation filtering"). The
+              // downstream Suspense boundary (e.g. DiscographySection
+              // keyed on `type`) is the right feedback channel: with
+              // an eager push it unmounts and shows its skeleton
+              // immediately, telling the user the click registered.
+              router.push(href, { scroll: false });
             }}
             className={cn(
               "flex h-7 cursor-pointer items-center justify-center rounded-md px-3 text-xs font-medium transition-colors",
