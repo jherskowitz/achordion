@@ -112,8 +112,12 @@ export default async function ConnectionsPage() {
           </a>
           .
         </p>
-        <LbTokenForm hasToken={tokenConfigured} />
-        {tokenConfigured && (
+        {tokenConfigured ? (
+          // Hide the paste field once a token is on file — the
+          // "Token saved" badge above already confirms it. To rotate
+          // the token, click Remove first; that clears server-side
+          // state, the page re-renders with !tokenConfigured, and
+          // the form comes back so a fresh one can be pasted.
           <form action={clearLbTokenAction}>
             <button
               type="submit"
@@ -122,6 +126,8 @@ export default async function ConnectionsPage() {
               Remove saved token
             </button>
           </form>
+        ) : (
+          <LbTokenForm hasToken={false} />
         )}
       </section>
 
