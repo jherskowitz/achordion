@@ -2,6 +2,15 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
+/* Explicit source paths so Tailwind v4's class detector doesn't lean
+   on its auto-detect heuristics — those have been flaky under Next 16
+   + Turbopack in practice (see AGENTS.md "Tailwind v4 + Next 16 dev
+   cache" workflow note). Pinning the scan paths here means new files
+   and new class strings are picked up deterministically on rebuild. */
+@source "../app";
+@source "../components";
+@source "../lib";
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
