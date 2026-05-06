@@ -308,7 +308,7 @@ function siteNameFromHost(url: string): string | null {
 }
 
 /** Friendly label used in the tooltip — never the raw MB rel type. */
-function tooltipLabel(link: ArtistExternalLink): string {
+export function tooltipLabel(link: ArtistExternalLink): string {
   const u = link.url.toLowerCase();
   for (const [needle, label] of HOST_LABEL_RULES) {
     if (u.includes(needle)) return label;

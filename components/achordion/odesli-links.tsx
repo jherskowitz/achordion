@@ -1,7 +1,8 @@
+import type { ArtistExternalLink } from "@/lib/clients/musicbrainz";
 import { getOdesliLinks } from "@/lib/clients/odesli";
 import { IconTooltip } from "@/components/ui/icon-tooltip";
 import { AddSourcesButton } from "./add-sources-button";
-import { normalizeStreamingUrl } from "./external-links";
+import { normalizeStreamingUrl, tooltipLabel } from "./external-links";
 
 /**
  * Server component that takes a streaming URL we have for the entity
@@ -55,6 +56,19 @@ function favicon(host: string): string {
 interface OdesliLinksProps {
   /** Service URL to seed Odesli with — typically the first MB streaming url-rel. */
   seedUrl?: string | null;
+  /**
+   * Full set of MB streaming url-rels for the entity. Used two ways:
+   *   1. Bandcamp / Qobuz / etc. that Odesli doesn't return — we
+   *      surface them at the end of the row instead of dropping
+   *      them on the floor.
+   *   2. Fallback when Odesli is empty / rate-limited — we still
+   *      render whatever MB knew about so the user keeps their
+   *      streaming affordances.
+   * Deduped against Odesli output by hostname so users never see the
+   * same service twice. Pass `[]` (or omit) when no MB streaming
+   * rels are available.
+   */
+  mbStreamingLinks?: ArtistExternalLink[];
   /** When provided, append a "+" tile linking to the recording's MB
    *  edit-relationships page so users can wire up additional URLs. */
   recordingMbid?: string | null;
@@ -62,6 +76,7 @@ interface OdesliLinksProps {
 
 export async function OdesliLinks({
   seedUrl,
+  mbStreamingLinks = [],
   recordingMbid,
 }: OdesliLinksProps) {
   const data = seedUrl ? await getOdesliLinks(seedUrl) : null;
@@ -75,8 +90,31 @@ export async function OdesliLinks({
     }
   }
 
-  // Render nothing if Odesli has nothing AND we have no MBID for the
-  // "Add sources" affordance — no signal to show.
+  // Append MB-only services Odesli didn't cover (Bandcamp, Qobuz, niche
+  // services). Dedupe by checking whether the MB link's hostname already
+  // contains any host string from the items already added — that catches
+  // open.spotify.com vs spotify.com, music.apple.com vs apple.com, etc.
+  for (const mb of mbStreamingLinks) {
+    const normalised = normalizeStreamingUrl(mb.url);
+    if (!normalised) continue;
+    let hostname: string;
+    try {
+      hostname = new URL(normalised).hostname.toLowerCase();
+    } catch {
+      continue;
+    }
+    const dup = items.some((it) => hostname.includes(it.host));
+    if (dup) continue;
+    // Use the same friendly-label rules ExternalLinks would for tooltips.
+    items.push({
+      url: normalised,
+      label: tooltipLabel(mb),
+      host: hostname.replace(/^(www|m|open|music|web|en)\./, ""),
+    });
+  }
+
+  // Render nothing if we have no items AND no MBID for the "Add sources"
+  // affordance — no signal to show.
   if (items.length === 0 && !recordingMbid) return null;
 
   return (

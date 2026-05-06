@@ -87,7 +87,12 @@ async function RecordingBody({ mbid }: { mbid: string }) {
   // Use the first MB streaming url-rel (Spotify / Apple / etc.) as the
   // seed for Odesli's cross-service lookup. Sidebar "Other Links" gets
   // everything that isn't a streaming service so we don't double-show
-  // Spotify both there and in the favicon row.
+  // Spotify both there and in the favicon row. The full MB streaming
+  // list is also handed to OdesliLinks so it can surface MB-only
+  // services Odesli doesn't return (Bandcamp, Qobuz, etc.) at the end
+  // of the row, and fall back gracefully when Odesli is empty —
+  // dedupe-by-hostname on the OdesliLinks side keeps Spotify et al.
+  // from rendering twice.
   const { streaming: streamingUrls, other: otherUrls } = categoriseLinks(urls);
   const odesliSeed = streamingUrls[0]?.url ?? null;
   const tags = (recording.genres?.length
@@ -224,6 +229,7 @@ async function RecordingBody({ mbid }: { mbid: string }) {
             <Suspense fallback={null}>
               <OdesliLinks
                 seedUrl={odesliSeed}
+                mbStreamingLinks={streamingUrls}
                 recordingMbid={recording.id}
               />
             </Suspense>
