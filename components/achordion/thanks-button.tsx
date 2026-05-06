@@ -71,7 +71,18 @@ export function ThanksButton({
           type="button"
           onClick={go}
           disabled={pending || thanked}
-          aria-label={thanked ? "Thanked" : "Thank"}
+          // No explicit aria-label — the visible "Thanks" / "Thanked"
+          // text is already the button's accessible name via the
+          // default WAI-ARIA name calc, and *adding* aria-label invites
+          // a class of accessibility extensions / screen-reader bridges
+          // to mirror it into a `title` attribute on the DOM, which
+          // then surfaces as a hydration mismatch ("server has
+          // title='Thank' / client has title=null"). suppressHydration-
+          // Warning here as belt-and-suspenders for the same family of
+          // extension mutations + Radix's known SSR gap on data-state /
+          // data-slot for TooltipTrigger asChild — these are attribute-
+          // only mismatches that don't affect the rendered tree.
+          suppressHydrationWarning
           className={cn(
             "inline-flex shrink-0 items-center gap-1 rounded-full border font-medium transition-colors",
             compact ? "h-6 px-2 text-[10px]" : "h-7 px-2.5 text-xs",
