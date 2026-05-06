@@ -96,14 +96,49 @@ function teardownIfIdle() {
 }
 
 /**
- * Returns true when Parachord's desktop app is reachable. The first
- * client render returns `false` deterministically so SSR and
- * hydration agree; the value flips once the WebSocket opens.
+ * Detect whether the running environment can't reach the desktop
+ * Parachord app via the localhost WebSocket — touch devices, mostly.
+ * Phones don't run a Parachord listener on 127.0.0.1 (Parachord-mobile
+ * is a sandboxed app), and iOS / Safari additionally block ws://
+ * connections to localhost from web pages. So the WS detection always
+ * reads `false` on those clients regardless of whether the user
+ * actually has Parachord-mobile installed.
+ *
+ * Heuristic: `(pointer: coarse)` matches devices whose primary input
+ * is touch — phones and most tablets. We treat those as
+ * "Parachord-assumed-installed" and route taps to the parachord://
+ * URL. The OS handles both branches: app installed → opens; not
+ * installed → OS shows its own install / fallback prompt (Universal
+ * Links can route to a fallback web URL when wired up properly on
+ * the Parachord side).
+ */
+function isCoarsePointer(): boolean {
+  if (typeof window === "undefined") return false;
+  return window.matchMedia?.("(pointer: coarse)").matches ?? false;
+}
+
+/**
+ * Returns true when Parachord's desktop app is reachable, OR when the
+ * client is a touch device where we optimistically assume Parachord-
+ * mobile is installed (see `isCoarsePointer`). The first client
+ * render returns `false` deterministically so SSR and hydration
+ * agree; the value flips once the WebSocket opens (desktop) or once
+ * the post-mount media-query check confirms a coarse pointer (touch).
  */
 export function useParachordPresence(): boolean {
   const [running, setRunning] = useState(false);
 
   useEffect(() => {
+    // Touch fast-path: skip the WS handshake entirely. Parachord-
+    // mobile doesn't expose a localhost listener, so the WS would
+    // always close and we'd render the muted "Get Parachord" state
+    // for users who probably do have the app. Trust the OS to deal
+    // with the deep-link instead.
+    if (isCoarsePointer()) {
+      setRunning(true);
+      return;
+    }
+
     listeners.add(setRunning);
     // Sync the new subscriber to whatever the singleton already
     // knows so they don't get a stale `false` after the connection
