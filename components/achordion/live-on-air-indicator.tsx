@@ -11,12 +11,20 @@ import { IconTooltip } from "@/components/ui/icon-tooltip";
 
 // Adaptive polling: when the user is actively on-air, run fast (track
 // changes feel snappy on the pill). When they're idle / not playing,
-// back off to a heartbeat — there's nothing to update until something
-// actually starts. Edge SWR on /api/user/<name>/playing-now collapses
-// concurrent polls from multiple viewers, so the per-origin call rate
-// stays roughly flat as viewer count scales.
+// back off to a slower heartbeat — there's nothing to update until
+// something actually starts. Edge SWR on /api/user/<name>/playing-now
+// collapses concurrent polls from multiple viewers, so the per-origin
+// call rate stays roughly flat as viewer count scales.
+//
+// Idle is 20s rather than something heavier so first-play detection
+// has a bounded floor; an interaction-driven poll (focus, pointerdown,
+// keydown — see below) further trims the perceived lag for users who
+// touch the page right after starting playback.
 const POLL_INTERVAL_ACTIVE_MS = 10_000;
-const POLL_INTERVAL_IDLE_MS = 60_000;
+const POLL_INTERVAL_IDLE_MS = 20_000;
+/** Floor on extra polls fired by user interaction — keeps a busy
+ *  pointer / typing loop from hammering the endpoint. */
+const INTERACTION_POLL_COOLDOWN_MS = 10_000;
 
 interface LiveOnAirIndicatorProps {
   username: string;
@@ -57,10 +65,15 @@ export function LiveOnAirIndicator({
     // Track which cadence the timer is currently running at so we can
     // skip pointless restarts when the listen state stays the same.
     let currentInterval = 0;
+    // Timestamp of the last poll fire. Lets the interaction handler
+    // decide whether an extra fetch is worth it (vs. a noisy click
+    // burst right after a scheduled tick).
+    let lastPollAt = 0;
 
     async function poll() {
       if (cancelled) return;
       if (typeof document !== "undefined" && document.hidden) return;
+      lastPollAt = Date.now();
       try {
         const res = await fetch(
           `/api/user/${encodeURIComponent(username)}/playing-now`,
@@ -119,6 +132,17 @@ export function LiveOnAirIndicator({
         }
       }
     }
+    // Cheap "user is back" signal: if they focus the window or
+    // touch the page after a quiet stretch, fire one extra poll so
+    // first-play detection doesn't have to wait for the next idle
+    // tick. Cooldown keeps a click-heavy session from hammering
+    // the endpoint.
+    function onInteraction() {
+      if (cancelled) return;
+      if (typeof document !== "undefined" && document.hidden) return;
+      if (Date.now() - lastPollAt < INTERACTION_POLL_COOLDOWN_MS) return;
+      void poll();
+    }
 
     void poll();
     // Seed the timer at the cadence implied by the initial state —
@@ -129,10 +153,16 @@ export function LiveOnAirIndicator({
         : POLL_INTERVAL_IDLE_MS,
     );
     document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("focus", onInteraction);
+    document.addEventListener("pointerdown", onInteraction, { passive: true });
+    document.addEventListener("keydown", onInteraction);
     return () => {
       cancelled = true;
       stop();
       document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("focus", onInteraction);
+      document.removeEventListener("pointerdown", onInteraction);
+      document.removeEventListener("keydown", onInteraction);
     };
   }, [username]);
 
