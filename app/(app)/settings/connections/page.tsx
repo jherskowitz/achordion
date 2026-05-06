@@ -3,9 +3,38 @@ import { redirect } from "next/navigation";
 import { Check, ExternalLink } from "lucide-react";
 import { auth } from "@/auth";
 import { hasUserLbToken } from "@/lib/lb-token";
+import {
+  getMusicServiceActivity,
+  type MusicServiceActivity,
+} from "@/lib/clients/listenbrainz";
 import { LbTokenForm } from "@/components/achordion/lb-token-form";
 import { MusicServicesCard } from "@/components/achordion/music-services-card";
 import { clearLbTokenAction } from "../actions";
+
+function relativeTimeFromUnix(unixSeconds: number): string {
+  const now = Math.floor(Date.now() / 1000);
+  const diff = now - unixSeconds;
+  if (diff < 60) return "just now";
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  if (diff < 86400 * 7) return `${Math.floor(diff / 86400)}d ago`;
+  const date = new Date(unixSeconds * 1000);
+  return date.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: now - unixSeconds > 86400 * 365 ? "numeric" : undefined,
+  });
+}
+
+function activityToLabels(activity: MusicServiceActivity) {
+  return {
+    spotify: activity.spotify ? relativeTimeFromUnix(activity.spotify) : null,
+    lastfm: activity.lastfm ? relativeTimeFromUnix(activity.lastfm) : null,
+    librefm: activity.librefm
+      ? relativeTimeFromUnix(activity.librefm)
+      : null,
+  };
+}
 
 export const metadata = { title: "Connections" };
 
@@ -14,6 +43,8 @@ export default async function ConnectionsPage() {
   if (!session?.user?.mbUsername) redirect("/login");
 
   const tokenConfigured = await hasUserLbToken();
+  const activity = await getMusicServiceActivity(session.user.mbUsername);
+  const activityLabels = activityToLabels(activity);
 
   return (
     <div className="space-y-10">
@@ -94,7 +125,7 @@ export default async function ConnectionsPage() {
         )}
       </section>
 
-      <MusicServicesCard />
+      <MusicServicesCard activity={activityLabels} />
 
       <section className="space-y-3">
         <header>

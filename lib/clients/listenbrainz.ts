@@ -153,6 +153,75 @@ export async function getRecentListens(
   return result.payload.listens;
 }
 
+/**
+ * Most-recent activity per LB scrobble integration, used by
+ * /settings/connections to surface "Last Spotify scrobble: 2h ago"
+ * pills next to the Manage links.
+ *
+ * **This is a heuristic, not a true connection-state read.** LB has
+ * no public API for "is the user's Spotify importer enabled right
+ * now"; we infer activity from the `submission_client` field LB
+ * stamps on each listen. A connected service that hasn't scrobbled
+ * inside the recent window will read as null here. False positives
+ * are possible too — old Last.fm-imported history persists even
+ * after the user disconnects. The right read is "we've recently
+ * seen this submission source," not "the connection is live."
+ */
+export interface MusicServiceActivity {
+  /** Latest listened_at (unix seconds) for each known submitter. null = none seen. */
+  spotify: number | null;
+  lastfm: number | null;
+  librefm: number | null;
+}
+
+const SUBMISSION_CLIENT_MATCHERS: Array<{
+  service: keyof MusicServiceActivity;
+  re: RegExp;
+}> = [
+  { service: "spotify", re: /spotify/i },
+  // LB's Last.fm importer historically ships under several names —
+  // "ListenBrainz lastfm importer v2" is current, older listens may
+  // show "lastfmscraper" / "Last.fm Importer" / similar.
+  { service: "lastfm", re: /(last\.?fm)/i },
+  { service: "librefm", re: /(libre\.?fm)/i },
+];
+
+/**
+ * Walks the user's most recent listens and groups them by which LB
+ * integration submitted each one, returning the latest timestamp per
+ * service. Used for the connections-page status pills.
+ */
+export async function getMusicServiceActivity(
+  userName: string,
+): Promise<MusicServiceActivity> {
+  const activity: MusicServiceActivity = {
+    spotify: null,
+    lastfm: null,
+    librefm: null,
+  };
+  let listens: Listen[];
+  try {
+    listens = await getRecentListens(userName, { count: 100 });
+  } catch {
+    return activity;
+  }
+  for (const l of listens) {
+    const client = l.track_metadata.additional_info?.submission_client;
+    if (typeof client !== "string") continue;
+    for (const { service, re } of SUBMISSION_CLIENT_MATCHERS) {
+      if (!re.test(client)) continue;
+      const ts = l.listened_at;
+      if (typeof ts !== "number") continue;
+      const prev = activity[service];
+      if (prev === null || ts > prev) {
+        activity[service] = ts;
+      }
+      break;
+    }
+  }
+  return activity;
+}
+
 // LB's /playing-now response omits `listened_at` for the currently-
 // playing item (it isn't a finalised scrobble yet) and adds a
 // `playing_now: true` flag. Reuse ListenSchema's track_metadata but
