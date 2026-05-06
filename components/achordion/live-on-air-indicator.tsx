@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import Link from "next/link";
 import { Radio } from "lucide-react";
 import type { PlayingNowListen } from "@/lib/clients/listenbrainz";
@@ -129,13 +129,23 @@ export function LiveOnAirIndicator({
     />
   );
 
+  const trackText = (
+    <OnAirText
+      trackName={meta.track_name}
+      trackLink={trackLink}
+      artistName={meta.artist_name}
+      artistLink={artistLink}
+      sizeVariant={size}
+    />
+  );
+
   if (size === "default") {
     return (
       <div
         className={cn(
           // `flex max-w-full` instead of `inline-flex` so the
           // container is bounded by its parent and the inner
-          // `truncate` actually clips long track / artist names
+          // overflow-clip actually clips long track / artist names
           // on mobile. The compact variant below already does
           // this — keep them consistent.
           "text-muted-foreground flex max-w-full items-center gap-2 text-xs",
@@ -143,21 +153,7 @@ export function LiveOnAirIndicator({
         )}
       >
         {dot}
-        <span className="min-w-0 truncate">
-          <Link
-            href={trackLink}
-            className="text-foreground font-medium hover:underline"
-          >
-            {meta.track_name}
-          </Link>
-          <span className="text-muted-foreground"> — </span>
-          <Link
-            href={artistLink}
-            className="text-muted-foreground hover:text-foreground hover:underline"
-          >
-            {meta.artist_name}
-          </Link>
-        </span>
+        {trackText}
         {!hideListenAlong && (
           <IconTooltip
             label={`Listen along with ${username} in Parachord`}
@@ -183,21 +179,7 @@ export function LiveOnAirIndicator({
       )}
     >
       {dot}
-      <span className="min-w-0 truncate">
-        <Link
-          href={trackLink}
-          className="text-foreground/90 hover:underline"
-        >
-          {meta.track_name}
-        </Link>
-        <span className="text-muted-foreground"> — </span>
-        <Link
-          href={artistLink}
-          className="text-muted-foreground hover:text-foreground hover:underline"
-        >
-          {meta.artist_name}
-        </Link>
-      </span>
+      {trackText}
       {!hideListenAlong && (
         <IconTooltip label={`Listen along with ${username} in Parachord`}>
           <a
@@ -210,6 +192,91 @@ export function LiveOnAirIndicator({
         </IconTooltip>
       )}
     </div>
+  );
+}
+
+/**
+ * Track + artist span. When the rendered text would otherwise be
+ * clipped by the container, switches to a marquee that scrolls the
+ * full string into view and bounces back, so users on the SiteHeader
+ * pill can actually read long titles like "G.O.D. And The Broken Ribs
+ * — Jack White" without having to navigate elsewhere.
+ *
+ * Detection runs via ResizeObserver on both the clip container and
+ * the inner content, so it adapts to viewport changes (mobile rotate,
+ * sidebar collapse) and to track changes that swap shorter/longer
+ * text. When the content fits, no animation runs — short titles stay
+ * static.
+ */
+function OnAirText({
+  trackName,
+  trackLink,
+  artistName,
+  artistLink,
+  sizeVariant,
+}: {
+  trackName: string;
+  trackLink: string;
+  artistName: string;
+  artistLink: string;
+  sizeVariant: "default" | "compact";
+}) {
+  const containerRef = useRef<HTMLSpanElement>(null);
+  const innerRef = useRef<HTMLSpanElement>(null);
+  const [shiftPx, setShiftPx] = useState(0);
+
+  useEffect(() => {
+    function measure() {
+      const c = containerRef.current;
+      const i = innerRef.current;
+      if (!c || !i) return;
+      const overflow = i.scrollWidth - c.clientWidth;
+      setShiftPx(overflow > 4 ? -overflow : 0);
+    }
+    measure();
+    if (typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(measure);
+    if (containerRef.current) ro.observe(containerRef.current);
+    if (innerRef.current) ro.observe(innerRef.current);
+    return () => ro.disconnect();
+  }, [trackName, artistName]);
+
+  const trackClass =
+    sizeVariant === "default"
+      ? "text-foreground font-medium hover:underline"
+      : "text-foreground/90 hover:underline";
+
+  const animating = shiftPx < 0;
+
+  return (
+    <span
+      ref={containerRef}
+      className="min-w-0 flex-1 overflow-hidden"
+    >
+      <span
+        ref={innerRef}
+        className={cn(
+          "inline-block whitespace-nowrap",
+          animating && "on-air-marquee",
+        )}
+        style={
+          animating
+            ? ({ ["--marquee-shift" as string]: `${shiftPx}px` } as CSSProperties)
+            : undefined
+        }
+      >
+        <Link href={trackLink} className={trackClass}>
+          {trackName}
+        </Link>
+        <span className="text-muted-foreground"> — </span>
+        <Link
+          href={artistLink}
+          className="text-muted-foreground hover:text-foreground hover:underline"
+        >
+          {artistName}
+        </Link>
+      </span>
+    </span>
   );
 }
 

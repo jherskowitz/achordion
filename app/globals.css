@@ -153,3 +153,30 @@
     @apply font-sans;
   }
 }
+
+/* On-air pill marquee — used by <LiveOnAirIndicator>'s <OnAirText>
+   when the track/artist string overflows its container. The component
+   sets --marquee-shift inline to the negative pixel offset that puts
+   the right edge of the text flush with the right edge of the clip
+   container, so the animation scrolls until everything's been shown,
+   pauses, and bounces back. Defined in raw CSS rather than as a
+   Tailwind utility to dodge the dev-cache flakiness for one-off
+   animation tokens. Honours prefers-reduced-motion. */
+@keyframes on-air-marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(var(--marquee-shift, 0));
+  }
+}
+
+.on-air-marquee {
+  animation: on-air-marquee 8s ease-in-out 1s infinite alternate;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .on-air-marquee {
+    animation: none;
+  }
+}
