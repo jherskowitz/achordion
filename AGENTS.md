@@ -448,22 +448,27 @@ If they aren't yet:
 
 ## Workflow notes
 
-- `npm run dev` for local. The dev server uses Turbopack.
+- `npm run dev` for local. **The dev server uses webpack, not Turbopack.** See the next subsection for the why.
 - **Typecheck before committing:** `npx --no-install tsc --noEmit`. The project ships TS strict.
 - **Lint:** `npx --no-install eslint <files>`.
 - Commits follow a focused-and-themed style — see `git log --oneline` for the cadence. Subject lines describe what the user-facing change does, not the implementation.
 - Do not amend commits unless explicitly requested.
 - Production deploy is Vercel from `main`; the WS-to-localhost approach works in production because Chrome / Edge / Firefox treat `ws://127.0.0.1` as a "potentially trustworthy origin" exception from mixed-content blocks.
 
-### Tailwind v4 + Next 16 dev cache: stop the server before wiping `.next`
+### Why local dev runs webpack, not Turbopack
 
-If a freshly-added Tailwind utility (`sm:inline-flex`, `z-30`, `max-w-[24ch]`, `lg:grid-cols-[minmax(0,1fr)_280px]` etc.) silently doesn't apply on `localhost`, *but works in production*, you've got a stale dev scan. Symptom: the class is in your TSX file, the bundle 200s, but the rule isn't in the served CSS.
+Turbopack + Tailwind v4 + Next 16 had a recurring dev-cache class drop: a fresh utility (`sm:inline-flex`, `z-30`, `max-w-[24ch]`, `lg:grid-cols-[minmax(0,1fr)_280px]`, etc.) would be missing from the served CSS even though the class string was right there in the TSX file. Symptom: ships fine in production (where `next build` does a clean full scan), broken on localhost. Fixing each occurrence cost a stop-server / `rm -rf .next` / restart cycle, and that *still* didn't always evict the bad scan state.
 
-`rm -rf .next` alone won't fix it — the still-running dev server immediately recreates `.next/dev` with its in-memory state. The dance:
+Two changes that, together, ended the dance:
 
-1. Stop the dev server completely.
-2. `rm -rf .next` (and `.turbo` if it exists at the repo root). `node_modules/.cache` may also be involved if it exists.
-3. Start the server.
+1. **`npm run dev` uses `--webpack`.** Slower initial compile (~5–10s) but the bundler/Tailwind v4 interop is consistent, so a new class string in a TSX file is in the served CSS the moment the dev server has rebuilt. `npm run dev:turbo` is still wired up if you specifically want Turbopack's speed and accept the dance.
+2. **`globals.css` pins `@source "../app"`, `@source "../components"`, `@source "../lib"`.** Default Tailwind v4 source detection is heuristic-based and would occasionally miss our edits; explicit paths force a deterministic scan tree.
+
+If you ever do hit the symptom again on webpack:
+
+1. Stop the dev server.
+2. `rm -rf .next` (plus `.turbo` and `node_modules/.cache` if either exists).
+3. Restart.
 4. Hard-reload the browser.
 
-Once you've eaten the cost, prefer classes Tailwind has already emitted in similar locations — repeat use cases are scanned reliably. Brand-new arbitrary values in a single new file are the failure mode.
+Production `next build` has been unaffected throughout — that pipeline always did a clean full scan and produced correct CSS regardless.
