@@ -24,7 +24,9 @@ import {
   categoriseLinks,
 } from "@/components/achordion/external-links";
 import { EmptyState } from "@/components/achordion/empty-state";
+import { AlbumReviews } from "@/components/achordion/album-reviews";
 import { Skeleton } from "@/components/ui/skeleton";
+import { isFeatureEnabledForViewer } from "@/lib/flags";
 
 interface PageParams {
   params: Promise<{ mbid: string }>;
@@ -111,6 +113,16 @@ async function AlbumBody({ mbid }: { mbid: string }) {
     ? await fetchListenCounts(release, credit.primaryArtistId)
     : new Map<string, number>();
 
+  // Either flag enables the Reviews section — `flag:reviews` shows
+  // existing reviews from CritiqueBrainz / Wikipedia, `flag:write_reviews`
+  // shows the inline write-a-review form. AlbumReviews decides what
+  // to render based on which flags are on for this viewer.
+  const [reviewsEnabled, writeReviewsEnabled] = await Promise.all([
+    isFeatureEnabledForViewer("reviews"),
+    isFeatureEnabledForViewer("write_reviews"),
+  ]);
+  const showReviews = reviewsEnabled || writeReviewsEnabled;
+
   const parachordTracks: ParachordTrack[] | undefined = release
     ? release.media
         ?.flatMap((m) => m.tracks ?? [])
@@ -174,6 +186,11 @@ async function AlbumBody({ mbid }: { mbid: string }) {
             )}
           </section>
 
+          {showReviews && (
+            <Suspense fallback={null}>
+              <AlbumReviews mbid={mbid} urls={urls} />
+            </Suspense>
+          )}
         </div>
 
         <aside className="space-y-8">

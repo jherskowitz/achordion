@@ -94,3 +94,61 @@ export async function getArtistImageFromWikidata(
   if (!filename) return null;
   return commonsImageUrl(filename, width);
 }
+
+interface WikidataSitelink {
+  title?: string;
+  url?: string;
+}
+
+interface WikidataEntityWithSitelinks {
+  sitelinks?: Record<string, WikidataSitelink | undefined>;
+}
+
+interface WikidataSitelinksResponse {
+  entities?: Record<string, WikidataEntityWithSitelinks | undefined>;
+}
+
+/**
+ * Resolve a Wikidata QID to its English Wikipedia URL via the entity's
+ * `sitelinks.enwiki` slot. Used when MB has a wikidata url-rel but no
+ * direct wikipedia rel — common for albums (e.g. Radiohead's "In
+ * Rainbows": MB stores `https://www.wikidata.org/wiki/Q223295`, no
+ * Wikipedia rel, but the Q-id sitelinks back to the en.wikipedia
+ * article we want for the "Critical reception" preview).
+ *
+ * Cached weekly — sitelinks change rarely and a stale link still
+ * gracefully degrades to null in the consumer.
+ */
+export async function getWikidataEnWikipediaUrl(
+  wikidataUrl: string | null | undefined,
+): Promise<string | null> {
+  const qid = extractWikidataQid(wikidataUrl);
+  if (!qid) return null;
+  try {
+    const res = await fetch(
+      `https://www.wikidata.org/wiki/Special:EntityData/${qid}.json`,
+      {
+        headers: {
+          "User-Agent": USER_AGENT,
+          Accept: "application/json",
+        },
+        next: {
+          revalidate: 60 * 60 * 24 * 7,
+          tags: [`wikidata-sitelinks:${qid}`],
+        },
+      },
+    );
+    if (!res.ok) return null;
+    const data = (await res.json()) as WikidataSitelinksResponse;
+    const enwiki = data?.entities?.[qid]?.sitelinks?.enwiki;
+    if (enwiki?.url) return enwiki.url;
+    if (enwiki?.title) {
+      return `https://en.wikipedia.org/wiki/${encodeURIComponent(
+        enwiki.title.replace(/ /g, "_"),
+      )}`;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}

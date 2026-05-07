@@ -275,6 +275,57 @@ The Recommended Artists / Recommended Tracks rails on `/explore` (and the dedica
 
 The smoke suite at `tests/e2e/` catches the gross-regression case (own-origin failures + console errors), so a missed allowlist that breaks rendering surfaces as a red CI run on the PR that introduced it. For a soft rollout when adding a particularly risky new directive, swap `key: "Content-Security-Policy"` to `key: "Content-Security-Policy-Report-Only"` for one deploy, walk the routes again, then re-flip.
 
+## Feature flags
+
+`lib/flags.ts` gates new surfaces behind a runtime allowlist so we can dogfood / canary in production without redeploying. Identity is the MusicBrainz username from the Auth.js session (`session.user.mbUsername`). Logged-out users are never on an allowlist — only flags whose default is `on` reach them.
+
+**Usage from a server component / page:**
+
+```ts
+import { isFeatureEnabledForViewer } from "@/lib/flags";
+import { FeatureFlag } from "@/components/achordion/feature-flag";
+
+// Imperative — branch on the flag:
+if (await isFeatureEnabledForViewer("reviews")) { … }
+
+// Declarative — wrap the gated surface:
+<FeatureFlag flag="reviews"><AlbumReviews mbid={mbid} /></FeatureFlag>
+```
+
+`isFeatureEnabled(flag, user)` is also exported when you need to gate by an explicit username (e.g. an API route that already has the session in hand).
+
+**Resolution order (first match wins):**
+
+1. Redis `GET flag:<name>:default` = `"on"` → enabled for everyone (rollout / kill-switch override-on).
+2. Redis `GET flag:<name>:default` = `"off"` → disabled for everyone (kill switch).
+3. Redis `SISMEMBER flag:<name>:users <mb-username>` → enabled for that user (allowlist).
+4. Default → disabled.
+
+**Local-dev fallback when Upstash isn't configured** — the same resolution but against env vars: `FEATURE_<NAME>` ∈ `"on"|"off"` and `FEATURE_<NAME>_USERS` (comma-separated list).
+
+**Admin ops** — run against the same Upstash database that backs the MB rate limiter (Upstash console "CLI" tab, `redis-cli --tls -u …`, or the REST API):
+
+```redis
+SADD flag:reviews:users alice bob   # add to allowlist
+SREM flag:reviews:users alice       # remove
+SET  flag:reviews:default on        # ship to everyone
+SET  flag:reviews:default off       # kill switch
+DEL  flag:reviews:default           # back to allowlist mode
+```
+
+The helper is per-request memoized via React `cache()` (so multiple checks on one render share one Redis round trip), but **not** cached across requests — a flag flip takes effect on the very next page load. No CDN cache invalidation needed.
+
+**When to add a flag:** any user-facing surface that you want to dogfood for a few days before opening up, any feature that depends on an external API whose stability is unproven (so you can kill the surface fast without a deploy), and anything you'd want to A/B test later. **When not to:** internal refactors, bugfixes, or changes you'd never want to dark-launch — those should ship unconditionally.
+
+**Active flags:**
+
+| Flag | What it gates |
+|---|---|
+| `reviews` | The Reviews section on `/release-group/<mbid>` (CritiqueBrainz reviews + Wikipedia "Critical reception" fallback). |
+| `write_reviews` | The inline write-a-review form on the same album page; posts to CritiqueBrainz via the OAuth flow under `app/api/critiquebrainz/`. Requires `AUTH_CRITIQUEBRAINZ_ID` / `_SECRET` to be configured. The server action also re-checks this flag, so flipping the flag off mid-session blocks new submissions even from clients that already had the form rendered. |
+
+---
+
 ## API route caching pattern
 
 For routes that resolve identifiers via expensive external calls (`/api/track-cover`, `/api/artist-image`), the cache stack is layered:

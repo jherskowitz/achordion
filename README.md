@@ -74,6 +74,10 @@ Open http://localhost:3000.
 
 Register an OAuth application at <https://musicbrainz.org/account/applications> with redirect URI `http://localhost:3000/api/auth/callback/musicbrainz` for local dev. Paste the generated client ID and secret into `.env.local`. For production, register a second app with your deployed origin's callback URI — MusicBrainz only allows one redirect URI per OAuth application.
 
+### CritiqueBrainz OAuth setup (optional)
+
+Required only if you want the "write a review" flow on album pages (gated behind `flag:write_reviews`). CritiqueBrainz runs its own OAuth provider, separate from MusicBrainz. Sign in to CritiqueBrainz, then register an app at <https://critiquebrainz.org/profile/applications/> with redirect URI `http://localhost:3000/api/critiquebrainz/callback` for local dev (and a second app for production). Paste the generated client ID and secret into `.env.local` as `AUTH_CRITIQUEBRAINZ_ID` / `AUTH_CRITIQUEBRAINZ_SECRET`.
+
 Generate `AUTH_SECRET` with:
 
 ```bash
