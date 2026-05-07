@@ -54,6 +54,12 @@ jobs:
           # The smoke suite hits unauthenticated surfaces only — any
           # 32-byte random string suffices for token signing in CI.
           AUTH_SECRET: ci-smoke-secret-not-used-anywhere-real
+          # `next start` runs in production mode. Auth.js v5 in prod
+          # rejects untrusted hosts unless AUTH_TRUST_HOST is set —
+          # which is what we want for the localhost-bound CI run.
+          # (Vercel deployments don't need this; Vercel sets the
+          # equivalent automatically.)
+          AUTH_TRUST_HOST: "true"
           # MusicBrainz OAuth client identifier. The provider list
           # endpoint references it; a placeholder keeps the catalogue
           # render path happy without any real OAuth flow being
@@ -66,6 +72,7 @@ jobs:
         env:
           CI: "true"
           AUTH_SECRET: ci-smoke-secret-not-used-anywhere-real
+          AUTH_TRUST_HOST: "true"
           AUTH_MUSICBRAINZ_ID: ci-smoke-no-oauth-flow-tested
           AUTH_MUSICBRAINZ_SECRET: ci-smoke-no-oauth-flow-tested
 
