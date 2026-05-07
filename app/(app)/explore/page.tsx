@@ -176,7 +176,11 @@ async function ThisWeekReleasesSection({ username }: { username: string }) {
       </p>
     );
   }
-  return <FreshReleasesGrid releases={thisWeek} />;
+  // Overview's "New this week" header already frames the time
+  // range — `hideWeekHeaders` suppresses redundant per-bucket
+  // sub-labels ("Last week") on items that fall on the prior
+  // Monday-anchored boundary.
+  return <FreshReleasesGrid releases={thisWeek} hideWeekHeaders />;
 }
 
 function FreshReleaseSkeleton({ cols = 5 }: { cols?: number }) {

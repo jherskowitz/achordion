@@ -49,8 +49,17 @@ function coverFor(r: FreshRelease): string | null {
 
 export function FreshReleasesGrid({
   releases,
+  /**
+   * Suppress the per-week subheadings ("This week" / "Last week" /
+   * etc.). Use on surfaces that already frame the time range in a
+   * parent heading — the explore overview's "New this week" tile
+   * doesn't want a second "Last week" sub-label below it for items
+   * that happen to fall in the previous Monday-anchored bucket.
+   */
+  hideWeekHeaders = false,
 }: {
   releases: FreshRelease[];
+  hideWeekHeaders?: boolean;
 }) {
   if (releases.length === 0) {
     return (
@@ -77,9 +86,11 @@ export function FreshReleasesGrid({
     <div className="space-y-12">
       {Array.from(buckets.entries()).map(([weekStart, items]) => (
         <section key={weekStart}>
-          <h3 className="text-muted-foreground mb-4 text-xs tracking-wide uppercase">
-            {weekLabel(weekStart, today)}
-          </h3>
+          {!hideWeekHeaders && (
+            <h3 className="text-muted-foreground mb-4 text-xs tracking-wide uppercase">
+              {weekLabel(weekStart, today)}
+            </h3>
+          )}
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
             {items.map((r) => {
               const target = r.release_group_mbid
