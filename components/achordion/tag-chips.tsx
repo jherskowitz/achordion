@@ -327,51 +327,58 @@ function TagChip({
 }) {
   const upActive = userVote === "upvote";
   const downActive = userVote === "downvote";
+  // Two-zone pill: left half is a link to the tag page, right half
+  // is the vote controls. A vertical divider sits between them.
+  // Each half independently shifts background on hover so the
+  // affordance is obvious — name highlights when hovered for
+  // navigation, voting half highlights when hovered for action.
   return (
-    <span
-      className={
-        "border-border/60 bg-muted/40 inline-flex items-center gap-1 rounded-full border px-1 py-0.5 text-xs"
-      }
-    >
+    <span className="border-border/60 bg-muted/40 inline-flex items-stretch overflow-hidden rounded-full border text-xs">
       <Link
         href={`/tag/${encodeURIComponent(tag.name)}`}
-        className="text-foreground/90 hover:underline px-1.5"
+        className="text-foreground/90 hover:bg-muted hover:text-foreground inline-flex items-center px-2.5 py-0.5 transition-colors"
       >
         {tag.name}
       </Link>
-      {displayCount > 0 && (
-        <span className="text-muted-foreground tabular-nums">
-          {displayCount}
-        </span>
-      )}
-      <button
-        type="button"
-        onClick={() => onVote(upActive ? "withdraw" : "upvote")}
-        disabled={disabled}
-        aria-label={upActive ? `Withdraw upvote on ${tag.name}` : `Upvote ${tag.name}`}
-        className={
-          (upActive
-            ? "text-emerald-600 dark:text-emerald-400"
-            : "text-muted-foreground hover:text-foreground") +
-          " inline-flex size-5 items-center justify-center rounded-full disabled:opacity-50"
-        }
-      >
-        <ChevronUp className="size-3.5" />
-      </button>
-      <button
-        type="button"
-        onClick={() => onVote(downActive ? "withdraw" : "downvote")}
-        disabled={disabled}
-        aria-label={downActive ? `Withdraw downvote on ${tag.name}` : `Downvote ${tag.name}`}
-        className={
-          (downActive
-            ? "text-rose-600 dark:text-rose-400"
-            : "text-muted-foreground hover:text-foreground") +
-          " inline-flex size-5 items-center justify-center rounded-full disabled:opacity-50"
-        }
-      >
-        <ChevronDown className="size-3.5" />
-      </button>
+      <span
+        aria-hidden="true"
+        className="border-border/60 self-stretch border-l"
+      />
+      <span className="hover:bg-muted inline-flex items-center gap-1 px-1.5 py-0.5 transition-colors">
+        <button
+          type="button"
+          onClick={() => onVote(upActive ? "withdraw" : "upvote")}
+          disabled={disabled}
+          aria-label={upActive ? `Withdraw upvote on ${tag.name}` : `Upvote ${tag.name}`}
+          className={
+            (upActive
+              ? "text-emerald-600 dark:text-emerald-400"
+              : "text-muted-foreground hover:text-foreground") +
+            " inline-flex size-4 items-center justify-center rounded-full disabled:opacity-50"
+          }
+        >
+          <ChevronUp className="size-3.5" />
+        </button>
+        {displayCount > 0 && (
+          <span className="text-muted-foreground tabular-nums">
+            {displayCount}
+          </span>
+        )}
+        <button
+          type="button"
+          onClick={() => onVote(downActive ? "withdraw" : "downvote")}
+          disabled={disabled}
+          aria-label={downActive ? `Withdraw downvote on ${tag.name}` : `Downvote ${tag.name}`}
+          className={
+            (downActive
+              ? "text-rose-600 dark:text-rose-400"
+              : "text-muted-foreground hover:text-foreground") +
+            " inline-flex size-4 items-center justify-center rounded-full disabled:opacity-50"
+          }
+        >
+          <ChevronDown className="size-3.5" />
+        </button>
+      </span>
     </span>
   );
 }
