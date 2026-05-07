@@ -27,6 +27,7 @@ import { OdesliLinks } from "@/components/achordion/odesli-links";
 import { PageHeader } from "@/components/achordion/page-header";
 import { PageShell } from "@/components/achordion/page-shell";
 import { TopListenersList } from "@/components/achordion/top-listeners-list";
+import { TagChips } from "@/components/achordion/tag-chips";
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface PageProps {
@@ -242,19 +243,9 @@ async function RecordingBody({ mbid }: { mbid: string }) {
         }
       />
 
-      {tags.length > 0 && (
-        <div className="-mt-2 flex flex-wrap gap-1.5 pb-4">
-          {tags.map((t) => (
-            <Link
-              key={t.name}
-              href={`/tag/${encodeURIComponent(t.name)}`}
-              className="bg-muted text-muted-foreground hover:bg-foreground/15 hover:text-foreground rounded-full px-2.5 py-0.5 text-xs transition-colors"
-            >
-              {t.name}
-            </Link>
-          ))}
-        </div>
-      )}
+      <div className="-mt-2 flex flex-wrap gap-1.5 pb-4">
+        <TagChips entity="recording" mbid={recording.id} initialTags={tags} />
+      </div>
 
       {/* Two-column layout for the body: "Also appears on" fills the
           left rail, sidebar (Top listeners + Other Links) anchors the

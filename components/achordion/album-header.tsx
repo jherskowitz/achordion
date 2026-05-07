@@ -9,6 +9,7 @@ import type {
 import { formatArtistCredit } from "@/lib/clients/musicbrainz";
 import { ParachordCtaButton } from "./parachord-button";
 import { ExternalLinks } from "./external-links";
+import { TagChips } from "./tag-chips";
 import { parachordPlayAlbum, type ParachordTrack } from "@/lib/parachord";
 
 interface AlbumHeaderProps {
@@ -131,19 +132,13 @@ export function AlbumHeader({
             </p>
           )
         )}
-        {tags.length > 0 && (
-          <div className="mt-4 flex flex-wrap gap-1.5">
-            {tags.map((t) => (
-              <Link
-                key={t.name}
-                href={`/tag/${encodeURIComponent(t.name)}`}
-                className="bg-muted text-muted-foreground hover:bg-foreground/15 hover:text-foreground rounded-full px-2.5 py-0.5 text-xs transition-colors"
-              >
-                {t.name}
-              </Link>
-            ))}
-          </div>
-        )}
+        <div className="mt-4 flex flex-wrap gap-1.5">
+          <TagChips
+            entity="release-group"
+            mbid={rg.id}
+            initialTags={tags}
+          />
+        </div>
         {/* Prefer the MBID — Parachord picks the best resolver. Fall back
             to title+artist or an inline tracklist if needed. The
             streaming favicon row sits inline with the Play button on
