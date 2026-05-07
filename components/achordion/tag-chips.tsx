@@ -664,10 +664,18 @@ function AddTagForm({
         })
         .slice(0, 8)
     : [];
+  const isExactMatch = trimmed.length > 0 && pool.includes(trimmed);
+  const canSubmit = trimmed.length > 0;
 
   return (
     <form
       onSubmit={onSubmit}
+      onKeyDown={(e) => {
+        if (e.key === "Escape") {
+          e.preventDefault();
+          onCancel();
+        }
+      }}
       // Mount-in animation so the form swaps in smoothly when the
       // user clicks "+ tag" — the button collapses, the input fades
       // and slides in from the left over 150ms.
@@ -675,12 +683,12 @@ function AddTagForm({
     >
       <div className="relative">
         <input
-          autoFocus
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           placeholder="new tag"
           maxLength={80}
           autoComplete="off"
+          autoFocus
           className="border-border/60 bg-background h-7 rounded-full border px-3 text-xs outline-none focus:ring-2 focus:ring-ring/30"
         />
         {matches.length > 0 && (
@@ -707,6 +715,31 @@ function AddTagForm({
           </ul>
         )}
       </div>
+      {/* Explicit submit button — replaces the prior "Enter is the
+          only commit path" UX which made typo'd freeform tags too
+          easy to ship. When the draft matches a curated genre exactly
+          the button gets full prominence; when it's freeform the
+          button styles down a notch so the user can see they're
+          submitting something off-vocabulary. */}
+      <button
+        type="submit"
+        disabled={!canSubmit}
+        title={
+          isExactMatch
+            ? `Add ${trimmed}`
+            : trimmed.length > 0
+              ? `Add "${trimmed}" (custom tag)`
+              : "Type a tag first"
+        }
+        className={
+          (isExactMatch
+            ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+            : "border-border/60 hover:border-foreground/50 hover:bg-muted/30 text-muted-foreground") +
+          " inline-flex items-center rounded-full border px-3 py-0.5 text-xs disabled:opacity-40 disabled:cursor-not-allowed"
+        }
+      >
+        Add
+      </button>
       <button
         type="button"
         onClick={onCancel}
