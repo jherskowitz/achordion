@@ -50,6 +50,15 @@ export async function visit(
   // deployment runs.
   const baseURL = process.env.E2E_BASE_URL ?? "http://localhost:3000";
   const baseHost = new URL(baseURL).host;
+  // The top-level navigation response is asserted separately by
+  // `expectedStatus` in `assertCleanRoute` — its status is the
+  // *point* of the request, not a hidden failure. Track its URL
+  // here so the response listener can ignore it (otherwise a
+  // deliberate 404 smoke like `/this-route-does-not-exist` would
+  // double-count: once for `expectedStatus`, once as a "same-
+  // origin failure"). Compare on pathname, not full URL, to handle
+  // any trailing-slash / query normalization Playwright does.
+  const navPath = new URL(path, baseURL).pathname;
 
   // URL substrings whose 4xx/5xx responses are expected outside of
   // Vercel deploys (i.e. the local CI stack). Vercel Analytics +
@@ -74,6 +83,13 @@ export async function visit(
     }
     if (host !== baseHost) return;
     if (RESPONSE_NOISE_ALLOWLIST.some((re) => re.test(resp.url()))) return;
+    // Don't double-report the navigation's own response — the
+    // caller asserts its status via `expectedStatus`.
+    try {
+      if (new URL(resp.url()).pathname === navPath) return;
+    } catch {
+      // unparseable URL — fall through and report it
+    }
     ownOriginFailures.push(
       `[${status}] ${resp.request().method()} ${resp.url()}`,
     );
@@ -88,7 +104,14 @@ export async function visit(
     /detected as the Largest Contentful Paint/i,
     /Image with src .* has either width or height modified/i,
     /Download the React DevTools/i,
-    /Failed to load resource: the server responded with a status of 4(0[34]|29)/i,
+    // 4xx/5xx without URLs — Chromium strips the URL on the
+    // console.error log line, so we can't tell same- from cross-
+    // origin here. Same-origin failures are already caught with
+    // their URLs by the `onResponse` listener above; anything that
+    // surfaces here without a URL is necessarily third-party noise
+    // (cover-art-archive thumb 500s, archive.org 404s, gstatic
+    // favicons, ListenBrainz hiccups, etc.). Cover 4xx + 5xx.
+    /Failed to load resource: the server responded with a status of [45]\d\d/i,
     // useParachordPresence opens ws://127.0.0.1:9876 to detect the
     // desktop app. In CI (or any non-developer environment) the WS
     // refuses, Chromium logs it at error level, and we'd flag a

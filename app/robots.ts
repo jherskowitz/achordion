@@ -69,5 +69,9 @@ export default function robots(): MetadataRoute.Robots {
       },
     ],
     host: "https://achordion.xyz",
+    // Advertise the sitemap so well-behaved crawlers can discover the
+    // curated surfaces (home, /about, /charts, etc.) without walking
+    // the catalog-explosion routes we disallow above.
+    sitemap: "https://achordion.xyz/sitemap.xml",
   };
 }
