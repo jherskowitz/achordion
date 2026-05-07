@@ -327,13 +327,19 @@ function TagChip({
 }) {
   const upActive = userVote === "upvote";
   const downActive = userVote === "downvote";
-  // Two-zone pill: left half is a link to the tag page, right half
-  // is the vote controls. A vertical divider sits between them.
-  // Each half independently shifts background on hover so the
-  // affordance is obvious — name highlights when hovered for
-  // navigation, voting half highlights when hovered for action.
+  // Two-zone pill: left half is always a link to the tag page; right
+  // half (vote controls) hides by default and reveals on hover so
+  // visitors who don't vote get a clean chip row. Active votes
+  // (`upActive` / `downActive`) keep the right half visible always —
+  // a green/red caret would otherwise vanish into a generic chip and
+  // the user would lose track of how they voted.
+  //
+  // Touch devices have no hover, so `pointer-coarse:inline-flex`
+  // forces the controls visible on phones / tablets rather than
+  // hiding behind an inaccessible hover gesture.
+  const voteVisible = upActive || downActive;
   return (
-    <span className="border-border/60 bg-muted/40 inline-flex items-stretch overflow-hidden rounded-full border text-xs">
+    <span className="group border-border/60 bg-muted/40 inline-flex items-stretch overflow-hidden rounded-full border text-xs">
       <Link
         href={`/tag/${encodeURIComponent(tag.name)}`}
         className="text-foreground/90 hover:bg-muted hover:text-foreground inline-flex items-center px-2.5 py-0.5 transition-colors"
@@ -342,9 +348,17 @@ function TagChip({
       </Link>
       <span
         aria-hidden="true"
-        className="border-border/60 self-stretch border-l"
+        className={
+          (voteVisible ? "inline-block " : "hidden group-hover:inline-block pointer-coarse:inline-block ") +
+          "border-border/60 self-stretch border-l"
+        }
       />
-      <span className="hover:bg-muted inline-flex items-center gap-1 px-1.5 py-0.5 transition-colors">
+      <span
+        className={
+          (voteVisible ? "inline-flex " : "hidden group-hover:inline-flex pointer-coarse:inline-flex ") +
+          "hover:bg-muted items-center gap-1 px-1.5 py-0.5 transition-colors"
+        }
+      >
         <button
           type="button"
           onClick={() => onVote(upActive ? "withdraw" : "upvote")}
