@@ -7,7 +7,6 @@ import type { WikipediaCriticalReception } from "@/lib/clients/wikipedia";
 import { stripHtml } from "@/lib/strip-html";
 import { safeHttpUrl } from "./external-links";
 import { WriteReviewForm } from "./write-review-form";
-import { Skeleton } from "@/components/ui/skeleton";
 
 /**
  * Client island for the album Reviews section.
@@ -55,20 +54,13 @@ export function AlbumReviewsClient({ mbid }: { mbid: string }) {
   // strictly better than a broken-state pseudo-card.
   if (error) return null;
 
-  // While loading, render a skeleton with the same outer shape as
-  // the loaded section so the page doesn't reflow when content fills
-  // in. We don't know yet whether the section will render at all
-  // (depends on flags + data), so the skeleton is conservative.
-  if (isLoading || !data) {
-    return (
-      <section>
-        <h2 className="mb-4 text-sm font-semibold tracking-wide uppercase">
-          Reviews
-        </h2>
-        <Skeleton className="h-32 w-full rounded-xl" />
-      </section>
-    );
-  }
+  // Render nothing while loading. The section may turn out to be
+  // empty (no flags, no CB reviews, no Wikipedia preview) and we'd
+  // rather pop the header in only when there's content to show
+  // than tease "Reviews" with a skeleton that resolves to nothing.
+  // The page already has plenty of above/below content so the
+  // delayed pop-in doesn't create a perceived load gap.
+  if (isLoading || !data) return null;
 
   const { canWrite, cbConnected, cbReviews, reception } = data;
 

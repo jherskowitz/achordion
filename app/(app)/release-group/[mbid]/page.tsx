@@ -36,7 +36,12 @@ async function fetchListenCounts(
   artistId: string | null,
 ): Promise<Map<string, number>> {
   if (!artistId) return new Map();
-  const recordings = await getTopRecordingsForArtist(artistId);
+  // Listen counts are an enrichment, never load-bearing — degrade
+  // to empty on any LB hiccup (429, transient 5xx) rather than
+  // taking the whole album page down with a generic error.
+  const recordings = await getTopRecordingsForArtist(artistId).catch(
+    () => [] as Awaited<ReturnType<typeof getTopRecordingsForArtist>>,
+  );
   const trackIds = new Set<string>();
   for (const m of release.media ?? []) {
     for (const t of m.tracks ?? []) {
@@ -109,7 +114,9 @@ async function AlbumBody({ mbid }: { mbid: string }) {
       ];
 
   const listenCounts = release
-    ? await fetchListenCounts(release, credit.primaryArtistId)
+    ? await fetchListenCounts(release, credit.primaryArtistId).catch(
+        () => new Map<string, number>(),
+      )
     : new Map<string, number>();
 
   // Reviews are gated by per-user feature flags. We mount the
