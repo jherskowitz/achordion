@@ -79,6 +79,18 @@ export async function visit(
     /Image with src .* has either width or height modified/i,
     /Download the React DevTools/i,
     /Failed to load resource: the server responded with a status of 4(0[34]|29)/i,
+    // useParachordPresence opens ws://127.0.0.1:9876 to detect the
+    // desktop app. In CI (or any non-developer environment) the WS
+    // refuses, Chromium logs it at error level, and we'd flag a
+    // false-positive on every page that mounts a play button. Real
+    // browsers do the same in production for users without
+    // Parachord-desktop installed; the hook's onclose handler keeps
+    // the UX correct and the visual presence-state false.
+    /WebSocket connection to 'ws:\/\/127\.0\.0\.1:9876.*ERR_CONNECTION_REFUSED/,
+    // Same root cause as above when chrome can't even attempt the
+    // handshake (e.g. when MV3 service-worker context blocks the
+    // WS API entirely). Emitted differently across browser builds.
+    /Failed to construct 'WebSocket'.*ws:\/\/127\.0\.0\.1:9876/,
   ];
   const onConsole = (msg: ConsoleMessage) => {
     if (msg.type() !== "error") return;
