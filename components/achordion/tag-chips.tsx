@@ -242,26 +242,26 @@ export function TagChips({
       })}
       {sessionStatus === "authenticated" && (
         addOpen ? (
-          <form onSubmit={handleAddSubmit} className="flex items-center gap-1">
-            <input
-              autoFocus
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              placeholder="new tag"
-              maxLength={80}
-              className="border-border/60 bg-background h-7 rounded-full border px-3 text-xs outline-none focus:ring-2 focus:ring-ring/30"
-            />
-            <button
-              type="button"
-              onClick={() => {
-                setAddOpen(false);
-                setDraft("");
-              }}
-              className="text-muted-foreground hover:text-foreground text-xs underline-offset-2"
-            >
-              cancel
-            </button>
-          </form>
+          <AddTagForm
+            draft={draft}
+            setDraft={setDraft}
+            onSubmit={handleAddSubmit}
+            onCancel={() => {
+              setAddOpen(false);
+              setDraft("");
+            }}
+            onPickSuggestion={(name) => {
+              setDraft(name);
+              setPendingTags((prev) =>
+                prev.some((t) => t.name === name)
+                  ? prev
+                  : [...prev, { name, count: 0 }],
+              );
+              setAddOpen(false);
+              setDraft("");
+              handleVote(name, "upvote");
+            }}
+          />
         ) : (
           <Tooltip>
             <TooltipTrigger asChild>
@@ -435,4 +435,108 @@ function TagChip({
 function mergeTags(initial: TagInput[], pending: TagInput[]): TagInput[] {
   const seen = new Set(initial.map((t) => t.name));
   return [...initial, ...pending.filter((t) => !seen.has(t.name))];
+}
+
+/**
+ * Inline new-tag input with autocomplete from MB's curated genre list.
+ *
+ * MB doesn't expose a generic tag-search endpoint, but the curated
+ * `/genre/all` set (~500 entries) covers the vast majority of what
+ * users want to type. We fetch it once when the form opens, filter
+ * client-side as the user types, and render up to 8 prefix matches
+ * as a dropdown.
+ *
+ * The input stays free-form: pressing Enter submits the literal
+ * draft, even if it isn't in the curated list. Suggestions are a
+ * convenience, not a constraint — niche subgenres / language-
+ * specific tags / personal-vocabulary tags all still go through.
+ */
+function AddTagForm({
+  draft,
+  setDraft,
+  onSubmit,
+  onCancel,
+  onPickSuggestion,
+}: {
+  draft: string;
+  setDraft: (next: string) => void;
+  onSubmit: (e: React.FormEvent) => void;
+  onCancel: () => void;
+  onPickSuggestion: (name: string) => void;
+}) {
+  const genresQuery = useQuery<string[]>({
+    queryKey: ["mb-genres"],
+    queryFn: async () => {
+      const r = await fetch("/api/musicbrainz/genres", {
+        credentials: "same-origin",
+      });
+      if (!r.ok) return [] as string[];
+      const data = (await r.json()) as { genres?: string[] };
+      return data.genres ?? [];
+    },
+    // Genre list barely changes — once loaded, cache it for the
+    // session and skip any refetch.
+    staleTime: Number.POSITIVE_INFINITY,
+    refetchOnWindowFocus: false,
+  });
+
+  const trimmed = draft.trim().toLowerCase();
+  const matches = trimmed.length > 0 && genresQuery.data
+    ? genresQuery.data
+        .filter((g) => g.includes(trimmed))
+        .sort((a, b) => {
+          // Prefix matches first, then substring.
+          const ap = a.startsWith(trimmed) ? 0 : 1;
+          const bp = b.startsWith(trimmed) ? 0 : 1;
+          if (ap !== bp) return ap - bp;
+          return a.localeCompare(b);
+        })
+        .slice(0, 8)
+    : [];
+
+  return (
+    <form onSubmit={onSubmit} className="relative flex items-center gap-1">
+      <div className="relative">
+        <input
+          autoFocus
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          placeholder="new tag"
+          maxLength={80}
+          autoComplete="off"
+          className="border-border/60 bg-background h-7 rounded-full border px-3 text-xs outline-none focus:ring-2 focus:ring-ring/30"
+        />
+        {matches.length > 0 && (
+          <ul className="border-border/60 bg-popover absolute left-0 top-full z-20 mt-1 max-h-60 min-w-full overflow-auto rounded-md border py-1 shadow-md">
+            {matches.map((m) => (
+              <li key={m}>
+                <button
+                  type="button"
+                  // `onMouseDown` so the click registers before the
+                  // input's blur fires and remounts the form into
+                  // its closed state. `preventDefault` keeps the
+                  // input focused for the brief moment between
+                  // pick + submit.
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    onPickSuggestion(m);
+                  }}
+                  className="hover:bg-muted block w-full px-3 py-1 text-left text-xs"
+                >
+                  {m}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+      <button
+        type="button"
+        onClick={onCancel}
+        className="text-muted-foreground hover:text-foreground text-xs underline-offset-2"
+      >
+        cancel
+      </button>
+    </form>
+  );
 }
