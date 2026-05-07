@@ -51,6 +51,15 @@ export async function visit(
   const baseURL = process.env.E2E_BASE_URL ?? "http://localhost:3000";
   const baseHost = new URL(baseURL).host;
 
+  // URL substrings whose 4xx/5xx responses are expected outside of
+  // Vercel deploys (i.e. the local CI stack). Vercel Analytics +
+  // Speed Insights inject `<script src="/_vercel/insights/...">` and
+  // matching speed-insights tags into every response — those paths
+  // only exist when Vercel's edge is doing the script rewrite, so
+  // `next start` against localhost 404s on each. Ignore both.
+  const RESPONSE_NOISE_ALLOWLIST = [
+    /\/_vercel\/(?:insights|speed-insights)\/script\.js/,
+  ];
   // Filter responses by origin matching baseURL — third-party noise
   // (gstatic favicons, archive.org cover-art thumbs, Vercel telemetry,
   // etc.) can 4xx/5xx for reasons we can't act on, so we ignore them.
@@ -64,6 +73,7 @@ export async function visit(
       return;
     }
     if (host !== baseHost) return;
+    if (RESPONSE_NOISE_ALLOWLIST.some((re) => re.test(resp.url()))) return;
     ownOriginFailures.push(
       `[${status}] ${resp.request().method()} ${resp.url()}`,
     );
@@ -91,6 +101,11 @@ export async function visit(
     // handshake (e.g. when MV3 service-worker context blocks the
     // WS API entirely). Emitted differently across browser builds.
     /Failed to construct 'WebSocket'.*ws:\/\/127\.0\.0\.1:9876/,
+    // Pair of the response-noise-allowlist Vercel-analytics 404s:
+    // Chrome logs the MIME mismatch (the 404 returns text/html, not
+    // application/javascript) at error level. Same root cause —
+    // Vercel script rewrite only exists on Vercel deploys.
+    /Refused to execute script from .*\/_vercel\/(?:insights|speed-insights)\/script\.js/,
   ];
   const onConsole = (msg: ConsoleMessage) => {
     if (msg.type() !== "error") return;
