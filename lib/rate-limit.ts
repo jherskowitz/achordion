@@ -36,11 +36,14 @@ function makeLimiter(prefix: string, limit: number, window: `${number} ${"s" | "
 
 const coverLimiter = makeLimiter("ip:cover", 60, "60 s");
 const imageLimiter = makeLimiter("ip:image", 60, "60 s");
-// Page-route limiter is roomier than the API ones — a real user can
-// open 4-5 tabs in quick succession and we don't want to 429 them.
-// 120/min cuts off a crawler walking the catalog at full tilt within
-// the first minute, which is the actual goal.
-const pageLimiter = makeLimiter("ip:page", 120, "60 s");
+// Page-route limiter has to be generous: a real user opening a tab
+// triggers the page request itself + N RSC prefetches for hovered
+// links + N async API XHRs (reviews, social-proof, tags, etc.), so
+// 120/min (≈ 2/sec) trips on routine multi-tab browsing or a fast
+// reload-test loop. 600/min keeps the catalog-walker cutoff intact
+// (a 1k-entity scrape still hits the wall in <2 minutes) while
+// leaving plenty of headroom for legitimate per-user activity.
+const pageLimiter = makeLimiter("ip:page", 600, "60 s");
 
 /**
  * Client-IP extraction for rate-limit keying. Hardened against

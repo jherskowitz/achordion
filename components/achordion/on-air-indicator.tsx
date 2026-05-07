@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { Radio } from "lucide-react";
 import { auth } from "@/auth";
 import { getPlayingNow } from "@/lib/clients/listenbrainz";
@@ -6,6 +5,7 @@ import { parachordListenAlong } from "@/lib/parachord";
 import { artistHref, recordingHref } from "@/lib/entity-links";
 import { cn } from "@/lib/utils";
 import { IconTooltip } from "@/components/ui/icon-tooltip";
+import { OnAirText } from "./on-air-text";
 
 interface OnAirIndicatorProps {
   username: string;
@@ -77,34 +77,33 @@ export async function OnAirIndicator({
     />
   );
 
+  // Shared text node — OnAirText is a client island that handles
+  // the marquee-on-overflow behavior. Server-rendered here without
+  // any polling; the marquee just adapts to track length on first
+  // paint and re-adapts on resize.
+  const trackText = (
+    <OnAirText
+      trackName={meta.track_name}
+      trackLink={trackLink}
+      artistName={meta.artist_name}
+      artistLink={artistLink}
+      sizeVariant={size}
+    />
+  );
+
   if (size === "default") {
     return (
       <div
         className={cn(
           // `flex max-w-full` instead of `inline-flex` so the
-          // container is bounded and the inner `truncate` actually
-          // clips long track / artist names on mobile. Mirrors the
-          // compact variant below.
+          // container is bounded and the inner OnAirText's clip
+          // container actually clips long track / artist names.
           "text-muted-foreground flex max-w-full items-center gap-2 text-xs",
           className,
         )}
       >
         {dot}
-        <span className="min-w-0 truncate">
-          <Link
-            href={trackLink}
-            className="text-foreground font-medium hover:underline"
-          >
-            {meta.track_name}
-          </Link>
-          <span className="text-muted-foreground"> — </span>
-          <Link
-            href={artistLink}
-            className="text-muted-foreground hover:text-foreground hover:underline"
-          >
-            {meta.artist_name}
-          </Link>
-        </span>
+        {trackText}
         {!isOwnUser && (
           <IconTooltip
             label={`Listen along with ${username} in Parachord`}
@@ -122,30 +121,20 @@ export async function OnAirIndicator({
     );
   }
 
-  // Compact — sized to live alongside a username in list rows.
+  // Compact — sized to live alongside a username in list rows. Was
+  // `inline-flex` before, which sized the container to its content
+  // (track+artist+button) and let the indicator overflow the row
+  // width on long titles. `flex` makes it block-level so `max-w-full`
+  // and the inner OnAirText marquee actually constrain.
   return (
     <div
       className={cn(
-        "text-muted-foreground/90 inline-flex max-w-full items-center gap-1.5 text-[11px]",
+        "text-muted-foreground/90 flex max-w-full items-center gap-1.5 text-[11px]",
         className,
       )}
     >
       {dot}
-      <span className="min-w-0 truncate">
-        <Link
-          href={trackLink}
-          className="text-foreground/90 hover:underline"
-        >
-          {meta.track_name}
-        </Link>
-        <span className="text-muted-foreground"> — </span>
-        <Link
-          href={artistLink}
-          className="text-muted-foreground hover:text-foreground hover:underline"
-        >
-          {meta.artist_name}
-        </Link>
-      </span>
+      {trackText}
       {!isOwnUser && (
         <IconTooltip label={`Listen along with ${username} in Parachord`}>
           <a
