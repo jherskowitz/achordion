@@ -326,6 +326,26 @@ The helper is per-request memoized via React `cache()` (so multiple checks on on
 
 ---
 
+## Tag-voting blocklist
+
+Tag voting + add-tag is OPEN to every signed-in user — this is community-driven classification, gating it behind allowlists defeats the purpose. But every open vote system attracts the occasional bad actor (spammy tags, downvote campaigns, slurs in custom tag names). The blocklist at `lib/tag-blocklist.ts` is the moderation lever.
+
+Storage is a Redis set at key `tag:blocked:users` containing the MB usernames (case-sensitive) of blocked users. The check is enforced in `app/api/musicbrainz/[entity]/[mbid]/tags/route.ts` before any MB call — blocked users get a vague 403 ("tag voting is unavailable for this account") so they can't probe for the reason. Their existing votes on MB stay untouched (we don't have authority to retract them upstream).
+
+Admin ops via Upstash CLI:
+```
+SADD     tag:blocked:users alice bob
+SREM     tag:blocked:users alice
+SMEMBERS tag:blocked:users
+DEL      tag:blocked:users        # clear everyone
+```
+
+Env-var fallback for local dev (when Upstash isn't configured): `TAG_BLOCKLIST=alice,bob` in `.env.local`. Comma-separated MB usernames. Lets us hit the blocked-user code path without standing up Redis.
+
+When triggering blocks, prefer the lightest touch — most "polluting" tag activity is fixed by reverting MB's tag votes manually rather than blocking the user. Reach for the blocklist when MB-side cleanup isn't keeping up.
+
+---
+
 ## Auth-gated content on edge-cached routes (client-island pattern)
 
 Public entity routes (`/release-group/:mbid`, `/artist/:mbid`, `/recording/:mbid`, `/charts/*`, `/about`, `/faq`, etc.) carry a shared `CDN-Cache-Control: public, s-maxage=3600, stale-while-revalidate=86400` header (see `PUBLIC_ENTITY_CACHE` in `next.config.ts`). The Vercel edge serves a single SSR'd response to every visitor for an hour, refreshing in the background — the entire reason these pages feel instant.

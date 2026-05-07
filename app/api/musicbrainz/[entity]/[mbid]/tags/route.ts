@@ -9,6 +9,7 @@ import {
   type TagEntity,
   type TagVote,
 } from "@/lib/clients/musicbrainz-tags";
+import { isTaggingBlocked } from "@/lib/tag-blocklist";
 
 /**
  * Per-user tag-state + vote endpoint, scoped to one MB entity.
@@ -181,6 +182,17 @@ export async function POST(
     return NextResponse.json(
       { error: "not signed in", reason: "unauthenticated" },
       { status: 401, headers: NO_STORE },
+    );
+  }
+  // Soft-block bad actors at the API boundary — keeps tagging open
+  // by default but lets us cut off spammy users without breaking
+  // sign-in or hiding existing chips. Returns 403 with a deliberately
+  // vague message so the blocked user can't probe for the exact
+  // reason they were cut off.
+  if (await isTaggingBlocked(session.user.mbUsername)) {
+    return NextResponse.json(
+      { error: "tag voting is unavailable for this account" },
+      { status: 403, headers: NO_STORE },
     );
   }
   const { accessToken } = await readJwtMbAuth(request);
