@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { YimTopGenre } from "@/lib/clients/listenbrainz";
 
 export function YearTopGenres({
@@ -30,7 +31,15 @@ export function YearTopGenres({
             </span>
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-medium capitalize">
-                {g.genre}
+                {/* Genre name jumps to the tag page so users can drill
+                    in. MB tag URLs are lowercase + encoded; the tag
+                    page itself title-cases for display. */}
+                <Link
+                  href={`/tag/${encodeURIComponent(g.genre.toLowerCase())}`}
+                  className="hover:underline underline-offset-4"
+                >
+                  {g.genre}
+                </Link>
               </p>
               <div className="bg-muted mt-1.5 h-1 w-full overflow-hidden rounded-full">
                 <div

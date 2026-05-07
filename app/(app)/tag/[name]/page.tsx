@@ -5,12 +5,53 @@ import {
   getArtistsByTag,
   getReleaseGroupsByTag,
 } from "@/lib/clients/musicbrainz";
-import { getLbRadio } from "@/lib/clients/listenbrainz";
+import { getLbRadio, type LbRadioTrack } from "@/lib/clients/listenbrainz";
 import { caaReleaseGroupUrl } from "@/lib/clients/coverart";
+import { ArtistAvatar } from "@/components/achordion/artist-avatar";
 import { CoverArt } from "@/components/achordion/cover-art";
 import { PageShell } from "@/components/achordion/page-shell";
 import { LbRadioSection } from "@/components/achordion/lb-radio-section";
 import { Skeleton } from "@/components/ui/skeleton";
+
+/**
+ * Build "what's hot recently for this genre" MBID rank maps from the
+ * tag's LB Radio output. LB Radio's algorithm leans on currently-
+ * trending listening data, so the order tracks appear in the playlist
+ * is a free recency-weighted popularity signal — no extra API calls
+ * needed. We dedupe by MBID and keep the FIRST occurrence position so
+ * the most-prominent track for each artist/album anchors its rank.
+ *
+ * Returns null on bad input so callers can fall back to MB's tag-vote
+ * ordering (the order `getArtistsByTag` / `getReleaseGroupsByTag`
+ * return naturally).
+ */
+function buildPopularityRanks(
+  tracks: LbRadioTrack[] | null,
+): { artists: Map<string, number>; releases: Map<string, number> } | null {
+  if (!tracks || tracks.length === 0) return null;
+  const artists = new Map<string, number>();
+  const releases = new Map<string, number>();
+  tracks.forEach((t, i) => {
+    if (t.artistMbid && !artists.has(t.artistMbid)) artists.set(t.artistMbid, i);
+    if (t.releaseMbid && !releases.has(t.releaseMbid)) releases.set(t.releaseMbid, i);
+  });
+  return { artists, releases };
+}
+
+/** Stable comparator that pulls items present in `rank` to the top
+ *  in rank order, then leaves the rest in their original order. */
+function rankedSort<T>(items: T[], idOf: (t: T) => string, rank: Map<string, number>): T[] {
+  const sorted = items.slice();
+  sorted.sort((a, b) => {
+    const ra = rank.get(idOf(a));
+    const rb = rank.get(idOf(b));
+    if (ra !== undefined && rb !== undefined) return ra - rb;
+    if (ra !== undefined) return -1;
+    if (rb !== undefined) return 1;
+    return 0;
+  });
+  return sorted;
+}
 
 interface PageParams {
   params: Promise<{ name: string }>;
@@ -24,32 +65,55 @@ function titleCase(s: string): string {
 }
 
 async function ArtistsForTag({ tag }: { tag: string }) {
-  const artists = await getArtistsByTag(tag, 24);
+  // Fetch MB tag-list + LB Radio in parallel. Both are cached, both
+  // are needed: MB for the canonical artist set, LB Radio for the
+  // recency-weighted popularity ordering.
+  const [artists, radio] = await Promise.all([
+    getArtistsByTag(tag, 24),
+    getLbRadio(`tag:(${tag})`, "easy").catch(() => null),
+  ]);
   if (artists.length === 0) {
     return (
       <p className="text-muted-foreground text-sm">No artists for this tag.</p>
     );
   }
+  const ranks = buildPopularityRanks(radio);
+  const sorted = ranks
+    ? rankedSort(artists, (a) => a.id, ranks.artists)
+    : artists;
   return (
     <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-      {artists.map((a) => (
+      {sorted.map((a) => (
         <li key={a.id}>
           <Link
             href={`/artist/${a.id}`}
-            className="border-border/60 hover:border-foreground/30 hover:bg-muted/30 group block min-w-0 rounded-xl border p-4 transition-colors"
+            className="border-border/60 hover:border-foreground/30 hover:bg-muted/30 group flex min-w-0 items-center gap-3 rounded-xl border p-4 transition-colors"
           >
-            <p className="truncate text-sm font-medium">{a.name}</p>
-            {a.disambiguation ? (
-              <p className="text-muted-foreground/80 mt-1 line-clamp-2 text-xs leading-5">
-                {a.disambiguation}
-              </p>
-            ) : (
-              (a.type || a.country) && (
-                <p className="text-muted-foreground/70 mt-1 text-xs">
-                  {[a.type, a.country].filter(Boolean).join(" · ")}
+            <Suspense
+              fallback={<Skeleton className="size-10 shrink-0 rounded-full" />}
+            >
+              <ArtistAvatar
+                mbid={a.id}
+                name={a.name}
+                className="size-10 shrink-0"
+                fallbackClassName="text-xs"
+                width={128}
+              />
+            </Suspense>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-medium">{a.name}</p>
+              {a.disambiguation ? (
+                <p className="text-muted-foreground/80 mt-1 line-clamp-2 text-xs leading-5">
+                  {a.disambiguation}
                 </p>
-              )
-            )}
+              ) : (
+                (a.type || a.country) && (
+                  <p className="text-muted-foreground/70 mt-1 truncate text-xs">
+                    {[a.type, a.country].filter(Boolean).join(" · ")}
+                  </p>
+                )
+              )}
+            </div>
           </Link>
         </li>
       ))}
@@ -58,15 +122,32 @@ async function ArtistsForTag({ tag }: { tag: string }) {
 }
 
 async function AlbumsForTag({ tag }: { tag: string }) {
-  const groups = await getReleaseGroupsByTag(tag, 24);
+  // LB Radio reports release MBIDs (single printings) but MB returns
+  // release-GROUP MBIDs (the abstract album), which means a direct
+  // rank lookup mostly misses. Falling back to the ARTIST popularity
+  // rank from the radio gets us "albums by recently-hot artists for
+  // this tag float to the top" — close enough to the user's "what's
+  // hot recently" intent without a per-release-group lookup chain.
+  const [groups, radio] = await Promise.all([
+    getReleaseGroupsByTag(tag, 24),
+    getLbRadio(`tag:(${tag})`, "easy").catch(() => null),
+  ]);
   if (groups.length === 0) {
     return (
       <p className="text-muted-foreground text-sm">No albums for this tag.</p>
     );
   }
+  const ranks = buildPopularityRanks(radio);
+  const sorted = ranks
+    ? rankedSort(
+        groups,
+        (rg) => rg["artist-credit"]?.[0]?.artist?.id ?? "",
+        ranks.artists,
+      )
+    : groups;
   return (
     <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
-      {groups.map((rg) => {
+      {sorted.map((rg) => {
         const artistName = rg["artist-credit"]?.[0]?.name ?? "";
         const year = rg["first-release-date"]?.slice(0, 4);
         return (
