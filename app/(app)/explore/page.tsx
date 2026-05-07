@@ -281,6 +281,14 @@ async function loadRecommendedTracks(username: string, familiarity: number) {
   // listen-count `exclude` set is kept as belt-and-braces for the
   // graduated-strictness UX.
   const filtered = recordings.filter((r) => {
+    // Drop rows whose LB metadata lookup returned nothing — they'd
+    // render as "Unknown track" placeholders, which look broken
+    // even though the recommendation itself is valid. Niche /
+    // recently-uploaded MBIDs sometimes aren't in LB's metadata
+    // index; pulling a wider candidate pool above means we still
+    // have plenty of fully-resolved rows to fill the visible 12.
+    const m = metadata.get(r.recording_mbid);
+    if (!m?.recording?.name || !m?.artist?.name) return false;
     if (familiarity === 0) return true;
     if (r.latest_listened_at !== null) return false;
     if (exclude.has(r.recording_mbid)) return false;
