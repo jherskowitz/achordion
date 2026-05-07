@@ -27,7 +27,6 @@ import { OdesliLinks } from "@/components/achordion/odesli-links";
 import { PageHeader } from "@/components/achordion/page-header";
 import { PageShell } from "@/components/achordion/page-shell";
 import { TopListenersList } from "@/components/achordion/top-listeners-list";
-import { SocialProof } from "@/components/achordion/social-proof";
 import { TagChips } from "@/components/achordion/tag-chips";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -308,12 +307,6 @@ async function RecordingBody({ mbid }: { mbid: string }) {
           )}
         </div>
         <aside className="space-y-8">
-          {heroReleaseGroup && (
-            <SocialProof
-              entity="release-group"
-              mbid={heroReleaseGroup.id}
-            />
-          )}
           <Suspense fallback={null}>
             <AlbumTopListenersStream promise={albumListenersPromise} />
           </Suspense>

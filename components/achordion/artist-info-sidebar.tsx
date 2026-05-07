@@ -7,7 +7,6 @@ import type {
 import { partitionArtistRelations } from "@/lib/clients/musicbrainz";
 import type { ArtistListeners } from "@/lib/clients/listenbrainz";
 import { ExternalLinks } from "./external-links";
-import { SocialProof } from "./social-proof";
 import { TopListenersList } from "./top-listeners-list";
 
 interface FactProps {
@@ -227,8 +226,6 @@ export function ArtistInfoSidebar({
           addSources={{ mbEntity: "artist", mbid: artist.id }}
         />
       </div>
-
-      <SocialProof entity="artist" mbid={artist.id} />
 
       {topListeners && topListeners.length > 0 && (
         <div>
