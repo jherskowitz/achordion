@@ -24,6 +24,7 @@ import {
   resolveArtistImage,
 } from "@/components/achordion/artist-avatar";
 import { fanartArtistUrl } from "@/lib/clients/fanart";
+import { TagChips } from "@/components/achordion/tag-chips";
 import {
   Tooltip,
   TooltipContent,
@@ -222,19 +223,9 @@ async function ArtistBody({
           />
         }
       />
-      {tags.length > 0 && (
-        <div className="-mt-2 flex flex-wrap gap-1.5 pb-4">
-          {tags.map((t) => (
-            <Link
-              key={t.name}
-              href={`/tag/${encodeURIComponent(t.name)}`}
-              className="bg-muted text-muted-foreground hover:bg-foreground/15 hover:text-foreground rounded-full px-2.5 py-0.5 text-xs transition-colors"
-            >
-              {t.name}
-            </Link>
-          ))}
-        </div>
-      )}
+      <div className="-mt-2 flex flex-wrap gap-1.5 pb-4">
+        <TagChips entity="artist" mbid={artist.id} initialTags={tags} />
+      </div>
 
       {/* Single grid that absorbs everything below the hero/tags so
           we can control mobile order independently from desktop
