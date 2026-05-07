@@ -74,7 +74,10 @@ async function BiographySection({
   source: ReturnType<typeof findBioSource> & object;
   socialLinks: ArtistExternalLink[];
 }) {
-  const bio = await getBiography(source);
+  // Wikipedia / WikiData hiccups (429s, 5xx) shouldn't take down
+  // the artist page — bio is enrichment. Degrade to "no bio" on
+  // any failure.
+  const bio = await getBiography(source).catch(() => null);
   const footer =
     socialLinks.length > 0 ? <ExternalLinks links={socialLinks} /> : null;
   if (!bio) return footer;
@@ -418,7 +421,12 @@ async function LbRadioBlock({
   mbid: string;
   artistName: string;
 }) {
-  const tracks = await getLbRadio(`artist:(${mbid})`, "easy");
+  // LB Radio + similar/discography below are all enrichment — wrap
+  // each so an upstream 429 / 5xx degrades the section to empty
+  // instead of taking the artist page down with a generic 429.
+  const tracks = await getLbRadio(`artist:(${mbid})`, "easy").catch(
+    () => null,
+  );
   return (
     <div className="my-6">
       <LbRadioSection seedLabel={artistName} tracks={tracks} />
@@ -430,7 +438,7 @@ async function SimilarArtistsSection({ mbid }: { mbid: string }) {
   // 8 instead of 12 — fits 4-up on lg, 2-up on mobile, and saves
   // server CPU cost. The "Fans also like" row is a discovery
   // hint, not exhaustive.
-  const similar = await getSimilarArtists(mbid, 8);
+  const similar = await getSimilarArtists(mbid, 8).catch(() => []);
   // Hide the section entirely when there's nothing to show — the
   // heading was leaving an empty card visible for artists with no LB
   // similar-artists data on file.
@@ -473,7 +481,7 @@ async function DiscographySection({
   mbid: string;
   type: DiscographyType;
 }) {
-  const groups = await getArtistReleaseGroups(mbid);
+  const groups = await getArtistReleaseGroups(mbid).catch(() => []);
   const allBuckets = bucketDiscography(groups);
   const buckets = filterBucketsByType(allBuckets, type);
   return <Discography buckets={buckets} />;

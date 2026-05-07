@@ -334,7 +334,10 @@ async function AlbumsForTag({ tag }: { tag: string }) {
 }
 
 async function TagRadioBlock({ tag }: { tag: string }) {
-  const tracks = await getLbRadio(`tag:(${tag})`, "easy");
+  // LB hiccups (429 / 5xx) shouldn't take the tag page down with
+  // a generic error — radio is enrichment, the artists/albums
+  // sections below carry the page on their own.
+  const tracks = await getLbRadio(`tag:(${tag})`, "easy").catch(() => null);
   return <LbRadioSection seedLabel={`#${tag}`} tracks={tracks} />;
 }
 
