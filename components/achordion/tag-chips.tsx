@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { signIn, useSession } from "next-auth/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -85,10 +85,29 @@ export function TagChips({
   const [pendingTags, setPendingTags] = useState<TagInput[]>([]);
   const [addOpen, setAddOpen] = useState(false);
   const [draft, setDraft] = useState("");
-  const [reAuthInFlight, startReAuthTransition] = useTransition();
+  const [needsReAuth, setNeedsReAuth] = useState(false);
+
+  const triggerReAuth = () => {
+    setNeedsReAuth(true);
+    // Direct call — wrapping in useTransition was swallowing the
+    // redirect on some browsers because next-auth/react's signIn
+    // does its window.location.assign synchronously and React was
+    // batching the call away from the actual click. We pin the
+    // re-auth UI flag first, then fire the redirect; if the redirect
+    // somehow fails, the user still has the visible "Re-sign in"
+    // button to click manually.
+    void signIn("musicbrainz", {
+      callbackUrl:
+        typeof window !== "undefined"
+          ? window.location.pathname + window.location.search
+          : "/",
+    });
+  };
 
   const merged = mergeTags(initialTags, pendingTags);
   const visible = merged.slice(0, limit);
+
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const voteMutation = useMutation({
     mutationFn: async (vars: { tag: string; vote: TagVote }) => {
@@ -116,34 +135,59 @@ export function TagChips({
       }
       return (await r.json()) as VotesResponse;
     },
-    onSuccess: (data) => {
-      queryClient.setQueryData(QUERY_KEY(entity, mbid), data);
-      // Wipe pending tags whose names match anything now in the
-      // server's canonical vote map — it'll come back from MB on
-      // the next entity-detail render. Until then keep the chip in
-      // place via a synthetic count so the user sees their addition.
+    // Optimistic update: flip the chip's vote state immediately on
+    // click, BEFORE the server roundtrip + MB read-back. MB's tag
+    // index lags vote writes by a minute or two — without the
+    // optimistic update the chip sits inert post-click and the user
+    // can't tell anything happened.
+    onMutate: async ({ tag, vote }) => {
+      setErrorMsg(null);
+      await queryClient.cancelQueries({ queryKey: QUERY_KEY(entity, mbid) });
+      const previous = queryClient.getQueryData<VotesResponse>(
+        QUERY_KEY(entity, mbid),
+      );
+      const next: VotesResponse = {
+        votes: { ...(previous?.votes ?? {}) },
+      };
+      if (vote === "withdraw") delete next.votes[tag];
+      else next.votes[tag] = vote;
+      queryClient.setQueryData(QUERY_KEY(entity, mbid), next);
+      return { previous };
     },
-    onError: (err) => {
+    onSuccess: (data) => {
+      // MB sometimes returns the post-vote state with the new entry;
+      // sometimes it lags and returns the pre-vote state. Merge: keep
+      // anything the optimistic update set, override with anything the
+      // server explicitly reports. That way the chip stays green even
+      // if MB's read hasn't caught up yet.
+      const optimistic = queryClient.getQueryData<VotesResponse>(
+        QUERY_KEY(entity, mbid),
+      );
+      const merged: VotesResponse = {
+        votes: { ...(optimistic?.votes ?? {}), ...data.votes },
+      };
+      queryClient.setQueryData(QUERY_KEY(entity, mbid), merged);
+    },
+    onError: (err, _vars, context) => {
+      // Roll back the optimistic flip on any non-auth failure so the
+      // chip doesn't lie about state.
+      if (context?.previous) {
+        queryClient.setQueryData(QUERY_KEY(entity, mbid), context.previous);
+      }
       const reason = (err as Error & { reason?: string }).reason;
-      if (reason === "unauthenticated") {
-        startReAuthTransition(() => {
-          void signIn("musicbrainz");
-        });
-      } else if (reason === "scope_required") {
-        // Re-run the OAuth flow with the widened scope. Auth.js will
-        // re-issue the JWT with the new scope on the round-trip.
-        startReAuthTransition(() => {
-          void signIn("musicbrainz");
-        });
+      if (reason === "unauthenticated" || reason === "scope_required") {
+        triggerReAuth();
+      } else {
+        setErrorMsg(
+          err instanceof Error ? err.message : "Couldn't submit vote",
+        );
       }
     },
   });
 
   function handleVote(name: string, vote: TagVote) {
     if (sessionStatus !== "authenticated") {
-      startReAuthTransition(() => {
-        void signIn("musicbrainz");
-      });
+      triggerReAuth();
       return;
     }
     voteMutation.mutate({ tag: name, vote });
@@ -177,7 +221,7 @@ export function TagChips({
             key={t.name}
             tag={t}
             userVote={userVote}
-            disabled={voteMutation.isPending || reAuthInFlight}
+            disabled={voteMutation.isPending}
             onVote={(v) => handleVote(t.name, v)}
           />
         );
@@ -217,6 +261,29 @@ export function TagChips({
       )}
       {votesQuery.isLoading && sessionStatus === "authenticated" && (
         <Skeleton className="h-5 w-12 rounded-full" />
+      )}
+      {needsReAuth && (
+        // Visible re-auth affordance. The first vote click already
+        // triggered a `signIn()` that should have redirected; this
+        // button is a fallback in case the auto-redirect was blocked
+        // (popup blockers, transition batching, etc.). Clicking it
+        // hits the same flow.
+        <button
+          type="button"
+          onClick={triggerReAuth}
+          className="border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-400 ml-1 inline-flex items-center rounded-full border px-3 py-0.5 text-xs hover:bg-amber-500/20"
+        >
+          Re-sign in to vote
+        </button>
+      )}
+      {errorMsg && !needsReAuth && (
+        <span
+          role="status"
+          aria-live="polite"
+          className="text-amber-600 dark:text-amber-400 ml-1 inline-flex items-center text-xs"
+        >
+          {errorMsg}
+        </span>
       )}
     </div>
   );
