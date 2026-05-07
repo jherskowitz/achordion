@@ -413,9 +413,10 @@ function TagChip({
             </button>
           </span>
         </TooltipTrigger>
-        <TooltipContent className="max-w-[15rem] text-center text-xs">
+        <TooltipContent className="max-w-[16rem] text-center text-xs">
           Tags are community-driven. Vote up if it fits, down if it
-          doesn&apos;t — counts roll up across MusicBrainz.
+          doesn&apos;t — counts roll up across MusicBrainz and help
+          define radio stations.
         </TooltipContent>
       </Tooltip>
     </span>
