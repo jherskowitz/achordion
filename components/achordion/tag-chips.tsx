@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { signIn, useSession } from "next-auth/react";
+import { signIn, signOut, useSession } from "next-auth/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronDown, ChevronUp, Plus } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -87,21 +87,23 @@ export function TagChips({
   const [draft, setDraft] = useState("");
   const [needsReAuth, setNeedsReAuth] = useState(false);
 
-  const triggerReAuth = () => {
+  const triggerReAuth = async () => {
     setNeedsReAuth(true);
-    // Direct call — wrapping in useTransition was swallowing the
-    // redirect on some browsers because next-auth/react's signIn
-    // does its window.location.assign synchronously and React was
-    // batching the call away from the actual click. We pin the
-    // re-auth UI flag first, then fire the redirect; if the redirect
-    // somehow fails, the user still has the visible "Re-sign in"
-    // button to click manually.
-    void signIn("musicbrainz", {
-      callbackUrl:
-        typeof window !== "undefined"
-          ? window.location.pathname + window.location.search
-          : "/",
-    });
+    const callbackUrl =
+      typeof window !== "undefined"
+        ? window.location.pathname + window.location.search
+        : "/";
+    // Two-step re-auth: sign out THEN sign in. With Auth.js v5 +
+    // an active session, calling signIn() alone doesn't always
+    // re-run the OAuth handshake — it can return the existing
+    // session token unchanged, so the JWT never picks up the new
+    // `mbAccessToken` / `mbScope` fields and tag voting keeps
+    // 401-ing in a loop. Clearing the session first guarantees a
+    // fresh OAuth round-trip with the widened scope, after which
+    // the JWT callback fires with `account` populated and we
+    // capture the access token.
+    await signOut({ redirect: false });
+    void signIn("musicbrainz", { callbackUrl });
   };
 
   const merged = mergeTags(initialTags, pendingTags);
@@ -176,7 +178,7 @@ export function TagChips({
       }
       const reason = (err as Error & { reason?: string }).reason;
       if (reason === "unauthenticated" || reason === "scope_required") {
-        triggerReAuth();
+        void triggerReAuth();
       } else {
         setErrorMsg(
           err instanceof Error ? err.message : "Couldn't submit vote",
@@ -187,7 +189,7 @@ export function TagChips({
 
   function handleVote(name: string, vote: TagVote) {
     if (sessionStatus !== "authenticated") {
-      triggerReAuth();
+      void triggerReAuth();
       return;
     }
     voteMutation.mutate({ tag: name, vote });
@@ -270,7 +272,7 @@ export function TagChips({
         // hits the same flow.
         <button
           type="button"
-          onClick={triggerReAuth}
+          onClick={() => void triggerReAuth()}
           className="border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-400 ml-1 inline-flex items-center rounded-full border px-3 py-0.5 text-xs hover:bg-amber-500/20"
         >
           Re-sign in to vote

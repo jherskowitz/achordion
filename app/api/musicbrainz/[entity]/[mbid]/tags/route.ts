@@ -72,15 +72,20 @@ function parseEntity(value: string): TagEntity | null {
     : null;
 }
 
-async function readJwtAccessToken(
+async function readJwtMbAuth(
   request: NextRequest,
-): Promise<string | null> {
+): Promise<{ accessToken: string | null; scope: string }> {
   const jwt = await getToken({
     req: request,
     secret: process.env.AUTH_SECRET,
   });
-  return typeof jwt?.mbAccessToken === "string" ? jwt.mbAccessToken : null;
+  return {
+    accessToken: typeof jwt?.mbAccessToken === "string" ? jwt.mbAccessToken : null,
+    scope: typeof jwt?.mbScope === "string" ? jwt.mbScope : "",
+  };
 }
+
+const TAG_SCOPE = "tag";
 
 /**
  * Authenticated MB GET to fetch the calling user's tag votes for
@@ -131,7 +136,7 @@ export async function GET(
   if (!session?.user?.mbUsername) {
     return NextResponse.json({ votes: {} }, { headers: NO_STORE });
   }
-  const accessToken = await readJwtAccessToken(request);
+  const { accessToken } = await readJwtMbAuth(request);
   if (!accessToken) {
     return NextResponse.json({ votes: {} }, { headers: NO_STORE });
   }
@@ -165,8 +170,37 @@ export async function POST(
   }
   const { tag, vote } = parsed.data as { tag: string; vote: TagVote };
 
+  // Auth gating happens here, with full visibility of the JWT. If the
+  // user has no token at all, they need to sign in. If the token
+  // exists but lacks the `tag` scope, they need to re-auth with the
+  // wider scope. Both surface as 401 with a `reason` so the client
+  // can route to the right re-auth flow.
+  const session = await auth();
+  if (!session?.user?.mbUsername) {
+    return NextResponse.json(
+      { error: "not signed in", reason: "unauthenticated" },
+      { status: 401, headers: NO_STORE },
+    );
+  }
+  const { accessToken, scope } = await readJwtMbAuth(request);
+  if (!accessToken) {
+    return NextResponse.json(
+      { error: "no MB access token", reason: "scope_required" },
+      { status: 401, headers: NO_STORE },
+    );
+  }
+  if (!scope.split(/\s+/).includes(TAG_SCOPE)) {
+    return NextResponse.json(
+      {
+        error: `MB session is missing the \`${TAG_SCOPE}\` scope`,
+        reason: "scope_required",
+      },
+      { status: 401, headers: NO_STORE },
+    );
+  }
+
   try {
-    await submitTagVote({ entity, mbid, tag, vote });
+    await submitTagVote({ entity, mbid, tag, vote, accessToken });
   } catch (err) {
     if (err instanceof TagAuthError) {
       return NextResponse.json(
@@ -190,11 +224,8 @@ export async function POST(
   // the optimistic update. MB usually reflects the new state on the
   // next read; if it lags, the client will see the stale value and
   // repaint on the next periodic refetch.
-  const accessToken = await readJwtAccessToken(request);
-  const votes = accessToken
-    ? await fetchUserVotes(entity, mbid, accessToken).catch(
-        () => ({}) as Record<string, "upvote" | "downvote">,
-      )
-    : {};
+  const votes = await fetchUserVotes(entity, mbid, accessToken).catch(
+    () => ({}) as Record<string, "upvote" | "downvote">,
+  );
   return NextResponse.json({ votes }, { headers: NO_STORE });
 }
