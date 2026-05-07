@@ -38,10 +38,13 @@ const CSP_REPORT_ONLY = [
   // covered by 'self'); data: covers any inlined fallback metrics.
   "font-src 'self' data:",
   // Image hosts the app actually fetches from. Mirrors next.config
-  // remotePatterns + favicons (Google s2) + Wikidata photos
-  // (upload.wikimedia.org) + DiceBear avatars + Spinbin station
-  // logos. data: + blob: cover dynamic SVG / canvas-derived URLs.
-  "img-src 'self' data: blob: https://archive.org https://*.archive.org https://coverartarchive.org https://musicbrainz.org https://gravatar.com https://api.dicebear.com https://upload.wikimedia.org https://www.google.com https://jherskowitz.github.io",
+  // remotePatterns + favicons (Google s2 / *.gstatic.com fallback)
+  // + Wikidata photos (upload.wikimedia.org) + Wikipedia images
+  // (commons.wikimedia.org — image and JSON paths share host) +
+  // DiceBear avatars + Apple Music cover art (is1-ssl.mzstatic.com,
+  // surfaced from /charts/apple-music) + Spinbin station logos.
+  // data: + blob: cover dynamic SVG / canvas-derived URLs.
+  "img-src 'self' data: blob: https://archive.org https://*.archive.org https://coverartarchive.org https://musicbrainz.org https://gravatar.com https://api.dicebear.com https://upload.wikimedia.org https://commons.wikimedia.org https://www.google.com https://*.gstatic.com https://is1-ssl.mzstatic.com https://jherskowitz.github.io",
   // Same-origin XHR / fetch / WS plus every external API the
   // server-side code reaches through the browser at any point. The
   // bulk are server-only (LB, MB, Wikidata, Odesli, RSS feeds, Earshot)
@@ -50,7 +53,13 @@ const CSP_REPORT_ONLY = [
   // avatars + s2 favicons are loaded by the browser. Keep the list
   // permissive on the API hosts so a future client-side fetch doesn't
   // get blocked.
-  "connect-src 'self' https://api.listenbrainz.org https://labs.api.listenbrainz.org https://listenbrainz.org https://musicbrainz.org https://api.musicbrainz.org https://www.wikidata.org https://en.wikipedia.org https://commons.wikimedia.org https://upload.wikimedia.org https://api.dicebear.com https://api.song.link https://archive.org https://*.archive.org https://coverartarchive.org https://rss.applemarketingtools.com https://www.earshot-online.com https://jherskowitz.github.io https://va.vercel-scripts.com https://vitals.vercel-insights.com",
+  //
+  // `ws://127.0.0.1:9876` is Parachord-desktop's localhost presence
+  // listener; `useParachordPresence` opens the WS to detect whether
+  // the app is running. Browsers treat 127.0.0.1 as a "potentially
+  // trustworthy origin" so the mixed-content (https → ws) rule
+  // doesn't apply, but CSP is separate — explicit allowance needed.
+  "connect-src 'self' ws://127.0.0.1:9876 https://api.listenbrainz.org https://labs.api.listenbrainz.org https://listenbrainz.org https://musicbrainz.org https://api.musicbrainz.org https://www.wikidata.org https://en.wikipedia.org https://commons.wikimedia.org https://upload.wikimedia.org https://api.dicebear.com https://api.song.link https://archive.org https://*.archive.org https://coverartarchive.org https://rss.applemarketingtools.com https://www.earshot-online.com https://jherskowitz.github.io https://va.vercel-scripts.com https://vitals.vercel-insights.com",
   // Iframe whitelist — empty for now since we don't embed anything,
   // but keeping `frame-src 'none'` would block any future LB review
   // embed without warning. Allow same-origin only.
