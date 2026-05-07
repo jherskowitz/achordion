@@ -47,15 +47,27 @@ jobs:
       - name: Build app
         run: npm run build
         env:
-          # Build needs at least the public site URL set; everything
-          # else has fallbacks. Smoke suite hits unauthenticated
-          # surfaces only.
           NEXT_PUBLIC_SITE_URL: http://localhost:3000
+          # Auth.js requires AUTH_SECRET to start its handlers; without
+          # it the /api/auth/* routes 500 and every page that touches
+          # SiteHeader (which calls useSession) cascades into failures.
+          # The smoke suite hits unauthenticated surfaces only — any
+          # 32-byte random string suffices for token signing in CI.
+          AUTH_SECRET: ci-smoke-secret-not-used-anywhere-real
+          # MusicBrainz OAuth client identifier. The provider list
+          # endpoint references it; a placeholder keeps the catalogue
+          # render path happy without any real OAuth flow being
+          # exercised by the smoke suite.
+          AUTH_MUSICBRAINZ_ID: ci-smoke-no-oauth-flow-tested
+          AUTH_MUSICBRAINZ_SECRET: ci-smoke-no-oauth-flow-tested
 
       - name: Run Playwright suite
         run: npm run e2e
         env:
           CI: "true"
+          AUTH_SECRET: ci-smoke-secret-not-used-anywhere-real
+          AUTH_MUSICBRAINZ_ID: ci-smoke-no-oauth-flow-tested
+          AUTH_MUSICBRAINZ_SECRET: ci-smoke-no-oauth-flow-tested
 
       - name: Upload Playwright report
         if: always()
