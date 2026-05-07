@@ -26,7 +26,6 @@ import {
 import { EmptyState } from "@/components/achordion/empty-state";
 import { AlbumReviews } from "@/components/achordion/album-reviews";
 import { Skeleton } from "@/components/ui/skeleton";
-import { isFeatureEnabledForViewer } from "@/lib/flags";
 
 interface PageParams {
   params: Promise<{ mbid: string }>;
@@ -113,16 +112,12 @@ async function AlbumBody({ mbid }: { mbid: string }) {
     ? await fetchListenCounts(release, credit.primaryArtistId)
     : new Map<string, number>();
 
-  // Either flag enables the Reviews section — `flag:reviews` shows
-  // existing reviews from CritiqueBrainz / Wikipedia, `flag:write_reviews`
-  // shows the inline write-a-review form. AlbumReviews decides what
-  // to render based on which flags are on for this viewer.
-  const [reviewsEnabled, writeReviewsEnabled] = await Promise.all([
-    isFeatureEnabledForViewer("reviews"),
-    isFeatureEnabledForViewer("write_reviews"),
-  ]);
-  const showReviews = reviewsEnabled || writeReviewsEnabled;
-
+  // Reviews are gated by per-user feature flags. We mount the
+  // <AlbumReviews> client island unconditionally — it bypasses the
+  // page-level edge cache by fetching `/api/release-group/[mbid]/reviews`
+  // post-hydration, where the auth + flag checks happen. Doing the
+  // flag check here would break the CDN cache split since the page
+  // would render different HTML for allowlisted vs anonymous viewers.
   const parachordTracks: ParachordTrack[] | undefined = release
     ? release.media
         ?.flatMap((m) => m.tracks ?? [])
@@ -186,11 +181,11 @@ async function AlbumBody({ mbid }: { mbid: string }) {
             )}
           </section>
 
-          {showReviews && (
-            <Suspense fallback={null}>
-              <AlbumReviews mbid={mbid} urls={urls} />
-            </Suspense>
-          )}
+          {/* Per-user reviews block. Renders nothing for viewers
+              without the feature flag; otherwise streams in CB/
+              Wikipedia content from the per-user API endpoint after
+              hydration. See `components/achordion/album-reviews.tsx`. */}
+          <AlbumReviews mbid={mbid} />
         </div>
 
         <aside className="space-y-8">

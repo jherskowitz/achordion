@@ -326,6 +326,29 @@ The helper is per-request memoized via React `cache()` (so multiple checks on on
 
 ---
 
+## Auth-gated content on edge-cached routes (client-island pattern)
+
+Public entity routes (`/release-group/:mbid`, `/artist/:mbid`, `/recording/:mbid`, `/charts/*`, `/about`, `/faq`, etc.) carry a shared `CDN-Cache-Control: public, s-maxage=3600, stale-while-revalidate=86400` header (see `PUBLIC_ENTITY_CACHE` in `next.config.ts`). The Vercel edge serves a single SSR'd response to every visitor for an hour, refreshing in the background — the entire reason these pages feel instant.
+
+That cache is **shared across all visitors**, so any server-rendered output that depends on the session cookie or a per-user flag would either (a) leak personalized content to anonymous viewers (if your render hit the cache as a logged-in allowlisted user) or (b) hide that content from real users (if the first render was anonymous). Both modes are bugs.
+
+**The pattern: render auth-gated sections as a client island that fetches a `private, no-store` API.**
+
+Worked example for the Reviews block (`flag:reviews` / `flag:write_reviews` on `/release-group/:mbid`):
+
+1. **Server page** (`app/(app)/release-group/[mbid]/page.tsx`) renders the public surface only and mounts `<AlbumReviews mbid={mbid} />` unconditionally — no flag check, no auth read at the page level. The page output is identical for everyone, so the edge cache stays valid.
+2. **Server-component shell** (`components/achordion/album-reviews.tsx`) is a one-liner that imports the client island. Server-only files (CB client, flags, cb-token) never get pulled into a `"use client"` graph this way.
+3. **Client island** (`components/achordion/album-reviews-client.tsx`) is `"use client"`, uses `useQuery` against `/api/release-group/[mbid]/reviews`, renders a skeleton while loading, nothing on error/empty, the actual content otherwise. SWR-style cache settings: `staleTime: Infinity`, `refetchOnWindowFocus: false` — reviews shift slowly.
+4. **Per-user API** (`app/api/release-group/[mbid]/reviews/route.ts`) does `isFeatureEnabledForViewer()`, `auth()`, and the upstream data fetches. Marked `dynamic = "force-dynamic"` and explicitly `Cache-Control: private, no-store, max-age=0, must-revalidate` — never CDN-share a per-user payload, even briefly.
+
+When adding a new auth-gated section to any cached route, copy this four-piece structure. Don't put `auth()` or `isFeatureEnabledForViewer()` in a server component on a cached route — that breaks the cache split. Don't pass the personalized state through props from the page either; the JSX shape needs to be byte-identical between viewers for the edge cache to hit.
+
+Out-of-scope cases (do NOT use this pattern):
+- Routes that aren't in `PUBLIC_ENTITY_CACHE` (`/feed`, `/u/[name]`, `/user/[name]/*`) — those are already per-user, regular server components are fine.
+- Auth state that's just *displayed* in the header / nav — that's already client-side via `useSession()`.
+
+---
+
 ## API route caching pattern
 
 For routes that resolve identifiers via expensive external calls (`/api/track-cover`, `/api/artist-image`), the cache stack is layered:

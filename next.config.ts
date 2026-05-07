@@ -201,15 +201,19 @@ const nextConfig: NextConfig = {
         source: "/artist/:mbid",
         headers: [PUBLIC_ENTITY_CACHE],
       },
-      // NOTE: /release-group/:mbid intentionally does NOT get
-      // PUBLIC_ENTITY_CACHE. The Reviews section (AlbumReviews)
-      // gates on `isFeatureEnabledForViewer("reviews" | "write_reviews")`,
-      // which reads the session cookie — server-rendered auth-
-      // dependent content. A shared edge cache would either hide
-      // reviews from allowlisted users (anonymous-cached miss) or
-      // leak them to everyone (allowlisted-cached miss). Re-enable
-      // only if AlbumReviews moves to a client island that does its
-      // own per-user fetch.
+      {
+        // /release-group/:mbid stays edge-cacheable because the auth-
+        // dependent Reviews section is rendered as a CLIENT ISLAND
+        // (`<AlbumReviewsClient>` → `/api/release-group/:mbid/reviews`).
+        // The page HTML itself is identical across visitors; per-user
+        // review content streams in post-hydration from a `private,
+        // no-store` API route. See `app/api/release-group/[mbid]/reviews/`
+        // and `components/achordion/album-reviews-client.tsx` for the
+        // pattern; replicate when adding any other auth-gated section
+        // to a CDN-cached route.
+        source: "/release-group/:mbid",
+        headers: [PUBLIC_ENTITY_CACHE],
+      },
       {
         source: "/release/:mbid",
         headers: [PUBLIC_ENTITY_CACHE],
