@@ -267,22 +267,13 @@ The Recommended Artists / Recommended Tracks rails on `/explore` (and the dedica
 
 ---
 
-## Content-Security-Policy: report-only → enforcing rollout
+## Content-Security-Policy
 
-`next.config.ts` ships **two** CSP headers:
+`next.config.ts` ships an **enforcing** Content-Security-Policy via the `CSP` constant — full directive set (default-src / script-src / style-src / connect-src / img-src / font-src / frame-src / frame-ancestors / object-src / base-uri / form-action / upgrade-insecure-requests). The allowlist is inventoried from the codebase: every external host the app intentionally talks to (LB, MB, Wikidata, Wikipedia, CAA, archive.org family, DiceBear, Odesli, RSS / Earshot / Spinbin, Apple Music CDN, Google s2 favicons, Vercel telemetry, the localhost Parachord WS) is named.
 
-- `Content-Security-Policy: frame-ancestors 'self'` — enforcing, the existing clickjacking defense. Nothing else is enforced yet.
-- `Content-Security-Policy-Report-Only: …` — full directive set (script-src / style-src / connect-src / img-src / font-src / base-uri / form-action / object-src / upgrade-insecure-requests). Browsers log violations against this header to the console but **don't block** the requests, which is the right posture for the iterative tuning the issue calls for.
+**When adding a new external API / image source / favicon CDN, extend the right CSP directive in `next.config.ts`** — otherwise the request gets blocked outright (no more report-only safety net) and the page silently misses content / functionality.
 
-The allowlist is inventoried from the codebase — every external host the app intentionally talks to (LB, MB, Wikidata, Wikipedia, CAA, archive.org, DiceBear, Odesli, RSS / Earshot / Spinbin, Vercel telemetry, etc.) lives in the directives. **When adding a new external API / image source / favicon CDN, extend the right CSP directive in `next.config.ts` too** — otherwise the eventual flip to enforcing will silently drop those requests.
-
-### Promoting Report-Only to enforcing
-
-1. After a deploy, walk the major surfaces in DevTools (`/`, `/explore`, `/charts`, `/radio`, `/artist/{mbid}`, `/release-group/{mbid}`, `/user/{name}`, `/search`, `/settings`, `/login`, `/faq`, `/about`, `/donate`).
-2. Watch for `[Report Only] Refused to …` console messages. Each names the directive (`script-src`, `connect-src`, etc.) and the URL.
-3. Add the host to the matching directive in `CSP_REPORT_ONLY` and re-deploy.
-4. When a clean console-walk says zero violations, promote: change `Content-Security-Policy: frame-ancestors 'self'` to `Content-Security-Policy: <CSP_REPORT_ONLY contents>`, drop the report-only header, ship.
-5. Keep the smoke suite at `tests/e2e/` running across the rollout so a CSP misstep that lands in enforcing mode regresses visibly (it'd show up as console errors the helper allowlist doesn't cover).
+The smoke suite at `tests/e2e/` catches the gross-regression case (own-origin failures + console errors), so a missed allowlist that breaks rendering surfaces as a red CI run on the PR that introduced it. For a soft rollout when adding a particularly risky new directive, swap `key: "Content-Security-Policy"` to `key: "Content-Security-Policy-Report-Only"` for one deploy, walk the routes again, then re-flip.
 
 ## API route caching pattern
 

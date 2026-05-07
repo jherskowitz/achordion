@@ -1,31 +1,29 @@
 import type { NextConfig } from "next";
 
 /**
- * Full Content-Security-Policy allowlist (`#4`). Two headers:
- *   1. Enforcing CSP carries only `frame-ancestors 'self'` — the
- *      modern clickjacking defense already in place. Everything
- *      else stays in report-only mode for now.
- *   2. Report-Only CSP carries the full directive set below
- *      (script-src / style-src / connect-src / img-src / font-src /
- *      base-uri / form-action / object-src / upgrade-insecure-
- *      requests). Browsers log violations to the console but
- *      don't block, which is the right posture for the "deploy,
- *      walk every major route, tighten" iteration loop the issue
- *      describes.
+ * Full Content-Security-Policy allowlist (`#4`).
  *
- * Once a Vercel preview round-trip shows the report-only header
- * clean across the major surfaces (/, /explore, /charts, /radio,
- * /artist/{mbid}, /release-group/{mbid}, /user/{name}, /search,
- * /settings, /login, /faq, /about, /donate), promote the directive
- * set to the enforcing header and remove the report-only one.
+ * Now in **enforcing mode** after a clean report-only walk against
+ * production turned up zero violations across the major surfaces
+ * (`/`, `/about`, `/faq`, `/donate`, `/apps`, `/explore`, `/charts`
+ * + sub-tabs, `/radio`, `/search`, `/login`, `/user/{name}`,
+ * `/artist/{mbid}`, `/release-group/{mbid}`, `/recording/{mbid}`).
+ * The earlier intermediate state shipped a separate
+ * `Content-Security-Policy-Report-Only` header alongside a narrow
+ * enforcing `frame-ancestors 'self'`; with the directive set proven
+ * safe, both have collapsed into one enforcing header below.
  *
  * Allowlist contents are inventoried from the codebase: every
  * external host the app intentionally talks to lives below. When
- * adding a new third-party API / image source / favicon CDN,
- * extend the right directive here too — otherwise the eventual
- * enforcing flip will silently drop those requests.
+ * adding a new third-party API / image source / favicon CDN, extend
+ * the right directive here too — otherwise the request gets blocked
+ * outright now (no more "report-only" safety net).
+ *
+ * If a regression ever needs a quick rollback, comment out the
+ * directives below and replace with `frame-ancestors 'self'` to
+ * revert to the pre-#4 posture.
  */
-const CSP_REPORT_ONLY = [
+const CSP = [
   "default-src 'self'",
   // 'unsafe-inline' covers Next 16 inline boot scripts; 'unsafe-eval'
   // covers Turbopack/webpack dev runtimes (no-op effect in prod since
@@ -78,14 +76,11 @@ const CSP_REPORT_ONLY = [
 ].join("; ");
 
 const SECURITY_HEADERS = [
-  // Modern clickjacking defense. CSP `frame-ancestors` supersedes XFO
-  // but XFO is still honored by some embedded webviews.
-  { key: "Content-Security-Policy", value: "frame-ancestors 'self'" },
-  // Report-Only CSP — browsers log violations against this header
-  // without blocking. Once preview-walk shows the console clean,
-  // promote `value` to the enforcing `Content-Security-Policy` and
-  // drop the report-only header in the same change.
-  { key: "Content-Security-Policy-Report-Only", value: CSP_REPORT_ONLY },
+  // Enforcing CSP — full directive set documented above. CSP
+  // `frame-ancestors 'self'` (already inside the policy) supersedes
+  // X-Frame-Options for clickjacking defense, but XFO stays for
+  // older embedded webviews.
+  { key: "Content-Security-Policy", value: CSP },
   { key: "X-Frame-Options", value: "SAMEORIGIN" },
   // Disable MIME-type sniffing so a CSS / image response can't be
   // re-interpreted as JS by a permissive browser.
