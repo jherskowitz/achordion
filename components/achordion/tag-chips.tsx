@@ -220,7 +220,11 @@ export function TagChips({
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-1.5">
+    // `min-h-7` reserves the height of the (taller) inline edit form
+    // so the row doesn't shift down when the user clicks "+ tag" and
+    // the input replaces the button. Same vertical baseline whether
+    // the form is open or closed.
+    <div className="flex min-h-7 flex-wrap items-center gap-1.5">
       {visible.map((t) => {
         const userVote = votesQuery.data?.votes[t.name] ?? null;
         // Bump the displayed count by the user's own vote so the
