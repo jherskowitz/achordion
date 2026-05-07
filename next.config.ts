@@ -127,11 +127,6 @@ const STATIC_ASSET_CACHE = {
   value: "public, max-age=86400, must-revalidate",
 };
 
-const IMMUTABLE_ASSET_CACHE = {
-  key: "Cache-Control",
-  value: "public, max-age=31536000, immutable",
-};
-
 /**
  * Edge-cache directives for public entity-detail routes (artist,
  * release-group, release, recording, tag) and charts/static pages.
@@ -180,21 +175,16 @@ const nextConfig: NextConfig = {
         source: "/:path*",
         headers: SECURITY_HEADERS,
       },
-      {
-        // Next-fingerprinted bundles (JS / CSS / chunks) — the
-        // filename includes a content hash, so a 1-year immutable
-        // cache is safe. Without this every reload re-fetches the
-        // bundle even though its URL hasn't changed.
-        source: "/_next/static/:path*",
-        headers: [IMMUTABLE_ASSET_CACHE],
-      },
-      {
-        // Next image optimizer output. The output URL embeds the
-        // source path + width + quality, so any change produces a
-        // new URL. Cache aggressively.
-        source: "/_next/image",
-        headers: [IMMUTABLE_ASSET_CACHE],
-      },
+      // NOTE: We intentionally do NOT set Cache-Control on
+      // `/_next/static/:path*` or `/_next/image`. Vercel already
+      // serves both with `public, max-age=31536000, immutable` by
+      // default (Next-fingerprinted bundles + the image optimizer's
+      // URL-embedded params + quality make a 1-year immutable cache
+      // safe), and a custom override here triggers the deploy-time
+      // warning "Custom Cache-Control headers detected for the
+      // following routes: /_next/static/:path*, /_next/image". For
+      // local `next start` runs without Vercel's edge in front, the
+      // browser still gets sane caching from Next's own defaults.
       {
         // Top-level public PNG / JPEG / SVG / favicon / OG image.
         // Filenames are stable across deploys but content can
