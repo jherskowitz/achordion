@@ -279,6 +279,7 @@ const HOST_LABEL_RULES: [string, string][] = [
   ["allmusic.com", "AllMusic"],
   ["rateyourmusic.com", "Rate Your Music"],
   ["setlist.fm", "setlist.fm"],
+  ["fanart.tv", "fanart.tv"],
   ["imdb.com", "IMDb"],
   ["pinterest.", "Pinterest"],
   ["patreon.com", "Patreon"],

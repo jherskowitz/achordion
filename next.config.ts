@@ -42,7 +42,7 @@ const CSP = [
   // DiceBear avatars + Apple Music cover art (is1-ssl.mzstatic.com,
   // surfaced from /charts/apple-music) + Spinbin station logos.
   // data: + blob: cover dynamic SVG / canvas-derived URLs.
-  "img-src 'self' data: blob: https://archive.org https://*.archive.org https://coverartarchive.org https://musicbrainz.org https://gravatar.com https://api.dicebear.com https://upload.wikimedia.org https://commons.wikimedia.org https://www.google.com https://*.gstatic.com https://is1-ssl.mzstatic.com https://jherskowitz.github.io",
+  "img-src 'self' data: blob: https://archive.org https://*.archive.org https://coverartarchive.org https://musicbrainz.org https://gravatar.com https://api.dicebear.com https://upload.wikimedia.org https://commons.wikimedia.org https://www.google.com https://*.gstatic.com https://is1-ssl.mzstatic.com https://jherskowitz.github.io https://assets.fanart.tv",
   // Same-origin XHR / fetch / WS plus every external API the
   // server-side code reaches through the browser at any point. The
   // bulk are server-only (LB, MB, Wikidata, Odesli, RSS feeds, Earshot)
@@ -57,7 +57,7 @@ const CSP = [
   // the app is running. Browsers treat 127.0.0.1 as a "potentially
   // trustworthy origin" so the mixed-content (https → ws) rule
   // doesn't apply, but CSP is separate — explicit allowance needed.
-  "connect-src 'self' ws://127.0.0.1:9876 https://api.listenbrainz.org https://labs.api.listenbrainz.org https://listenbrainz.org https://musicbrainz.org https://api.musicbrainz.org https://www.wikidata.org https://en.wikipedia.org https://commons.wikimedia.org https://upload.wikimedia.org https://api.dicebear.com https://api.song.link https://archive.org https://*.archive.org https://coverartarchive.org https://rss.applemarketingtools.com https://www.earshot-online.com https://jherskowitz.github.io https://va.vercel-scripts.com https://vitals.vercel-insights.com",
+  "connect-src 'self' ws://127.0.0.1:9876 https://api.listenbrainz.org https://labs.api.listenbrainz.org https://listenbrainz.org https://musicbrainz.org https://api.musicbrainz.org https://www.wikidata.org https://en.wikipedia.org https://commons.wikimedia.org https://upload.wikimedia.org https://api.dicebear.com https://api.song.link https://archive.org https://*.archive.org https://coverartarchive.org https://rss.applemarketingtools.com https://www.earshot-online.com https://jherskowitz.github.io https://va.vercel-scripts.com https://vitals.vercel-insights.com https://webservice.fanart.tv",
   // Iframe whitelist — empty for now since we don't embed anything,
   // but keeping `frame-src 'none'` would block any future LB review
   // embed without warning. Allow same-origin only.

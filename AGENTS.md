@@ -487,6 +487,7 @@ If they aren't yet:
 - `lib/clients/earshot.ts` — Canada NCRA chart scraper (with cover-art resolver)
 - `lib/clients/apple-charts.ts` — Apple Music RSS chart feeds
 - `lib/clients/wikidata.ts` — artist photo P18 → upload.wikimedia.org
+- `lib/clients/fanart.ts` — fanart.tv `artistthumb` fallback for artists without a usable Wikidata photo. Requires `FANART_API_KEY`; no key → returns null silently. ToS requires attribution: artist page surfaces a `Photo by fanart.tv` tooltip + link-back on the hero avatar AND adds a `fanart.tv` entry to the sidebar's Other Links whenever fanart supplied the image.
 - `lib/clients/critical-darlings.ts` — editorial RSS feed parser
 
 ### Helpers

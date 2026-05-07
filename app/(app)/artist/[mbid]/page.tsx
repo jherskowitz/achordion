@@ -18,7 +18,16 @@ import {
 import { findBioSource, getBiography } from "@/lib/clients/wikipedia";
 import { PageShell } from "@/components/achordion/page-shell";
 import { PageHeader } from "@/components/achordion/page-header";
-import { ArtistAvatar } from "@/components/achordion/artist-avatar";
+import {
+  ArtistAvatar,
+  resolveArtistImage,
+} from "@/components/achordion/artist-avatar";
+import { fanartArtistUrl } from "@/lib/clients/fanart";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { ArtistInfoSidebar } from "@/components/achordion/artist-info-sidebar";
 import { Biography } from "@/components/achordion/biography";
 import { Discography } from "@/components/achordion/discography";
@@ -98,6 +107,24 @@ async function ArtistBody({
   //   social    → favicon row inside the bio block
   //   other     → wiki/discogs/lyrics/etc. in the sidebar
   const { streaming, social, other } = categoriseLinks(urls);
+
+  // Resolve the artist hero image once at the page level so we can
+  // (a) feed the chosen URL into <ArtistAvatar> via Next's fetch
+  // dedupe (one upstream call shared with the avatar render), and
+  // (b) credit fanart.tv in the sidebar when their image won the
+  // resolution race. Per fanart.tv ToS we must link back to them
+  // whenever we display their imagery.
+  const heroImage = await resolveArtistImage(mbid, artist, 256);
+  const otherWithCredits: ArtistExternalLink[] =
+    heroImage.source === "fanart"
+      ? [
+          ...other,
+          {
+            type: "fanart.tv",
+            url: fanartArtistUrl(artist.id),
+          },
+        ]
+      : other;
   // Always include MusicBrainz itself in the bio block's social /
   // official sites row so users can jump to the MB entity page from
   // any artist regardless of which other reference links MB editors
@@ -120,13 +147,46 @@ async function ArtistBody({
     <>
       <PageHeader
         leading={
-          <ArtistAvatar
-            mbid={artist.id}
-            name={artist.name}
-            artist={artist}
-            className="size-20 sm:size-24"
-            fallbackClassName="text-2xl"
-          />
+          heroImage.source === "fanart" ? (
+            // fanart.tv ToS requires crediting their imagery with a
+            // link back. We surface it three ways for redundancy:
+            //   1. The hero avatar itself becomes a click-through to
+            //      the fanart artist page (one obvious affordance).
+            //   2. A hover tooltip names the source ("Photo by
+            //      fanart.tv") so users know who provided the image
+            //      without having to click.
+            //   3. An "fanart.tv" entry lands in the sidebar's Other
+            //      Links list, matching how every other reference
+            //      source is credited.
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <a
+                  href={fanartArtistUrl(artist.id)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={`${artist.name} photo on fanart.tv`}
+                  className="rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+                >
+                  <ArtistAvatar
+                    mbid={artist.id}
+                    name={artist.name}
+                    artist={artist}
+                    className="size-20 sm:size-24"
+                    fallbackClassName="text-2xl"
+                  />
+                </a>
+              </TooltipTrigger>
+              <TooltipContent>Photo by fanart.tv</TooltipContent>
+            </Tooltip>
+          ) : (
+            <ArtistAvatar
+              mbid={artist.id}
+              name={artist.name}
+              artist={artist}
+              className="size-20 sm:size-24"
+              fallbackClassName="text-2xl"
+            />
+          )
         }
         eyebrow={artist.type ?? "Artist"}
         title={artist.name}
@@ -255,7 +315,7 @@ async function ArtistBody({
             fallback={
               <ArtistInfoSidebar
                 artist={artist}
-                linksOverride={other}
+                linksOverride={otherWithCredits}
                 // No topListeners during the initial paint — the section
                 // gets hidden, fills in below when listeners resolves.
               />
@@ -263,7 +323,7 @@ async function ArtistBody({
           >
             <SidebarWithListeners
               artist={artist}
-              other={other}
+              other={otherWithCredits}
               promise={listenersPromise}
             />
           </Suspense>

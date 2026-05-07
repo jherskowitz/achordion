@@ -5,6 +5,7 @@ import {
   type ArtistDetail,
 } from "@/lib/clients/musicbrainz";
 import { getArtistImageFromWikidata } from "@/lib/clients/wikidata";
+import { getArtistImageFromFanart } from "@/lib/clients/fanart";
 import { dicebearShapesUrl } from "@/lib/dicebear-shapes";
 
 interface ArtistAvatarProps {
@@ -26,23 +27,55 @@ interface ArtistAvatarProps {
   width?: number;
 }
 
-async function resolveImageUrl(
+/** Where the resolved image URL came from. Surfaces to the artist
+ *  page so it can attribute fanart.tv per their ToS. */
+export type ArtistImageSource = "wikidata" | "fanart" | null;
+
+export interface ResolvedArtistImage {
+  url: string | null;
+  source: ArtistImageSource;
+}
+
+/**
+ * Resolve an MB artist MBID to an image URL with provenance. Tries
+ * Wikidata `P18` → fanart.tv `artistthumb` in that order. Wikidata
+ * has the better "uses Wikipedia photo" coverage; fanart.tv covers
+ * pop / contemporary / electronic where Wikidata is sparse.
+ *
+ * Returns `{ url, source }` so callers that need to credit fanart.tv
+ * (per their ToS) know whether the displayed image came from there.
+ *
+ * Exported separately because the artist page calls this directly to
+ * decide whether to add the fanart.tv attribution link. The avatar
+ * component below uses the same helper.
+ */
+export async function resolveArtistImage(
   mbid: string,
   artist: ArtistDetail | null | undefined,
   width: number,
-): Promise<string | null> {
+): Promise<ResolvedArtistImage> {
   let detail = artist;
   if (!detail) {
     try {
       detail = await getArtist(mbid);
     } catch {
-      return null;
+      // MB unreachable — fall through to the fanart attempt below
+      // since fanart accepts the raw MBID without the MB roundtrip.
     }
   }
-  const { urls } = partitionArtistRelations(detail);
-  const wikidataUrl = urls.find((u) => /wikidata\.org/i.test(u.url))?.url;
-  if (!wikidataUrl) return null;
-  return getArtistImageFromWikidata(wikidataUrl, width);
+  if (detail) {
+    const { urls } = partitionArtistRelations(detail);
+    const wikidataUrl = urls.find((u) => /wikidata\.org/i.test(u.url))?.url;
+    if (wikidataUrl) {
+      const wd = await getArtistImageFromWikidata(wikidataUrl, width).catch(
+        () => null,
+      );
+      if (wd) return { url: wd, source: "wikidata" };
+    }
+  }
+  const fa = await getArtistImageFromFanart(mbid).catch(() => null);
+  if (fa) return { url: fa, source: "fanart" };
+  return { url: null, source: null };
 }
 
 /**
@@ -73,8 +106,8 @@ export async function ArtistAvatar({
   // a bigger size (none today) can override via the `width` prop.
   width = 256,
 }: ArtistAvatarProps) {
-  const imageUrl = await resolveImageUrl(mbid, artist, width);
-  const src = imageUrl ?? dicebearShapesUrl(mbid);
+  const { url } = await resolveArtistImage(mbid, artist, width);
+  const src = url ?? dicebearShapesUrl(mbid);
   const initial = name.slice(0, 1).toUpperCase();
   return (
     <Avatar className={className}>
