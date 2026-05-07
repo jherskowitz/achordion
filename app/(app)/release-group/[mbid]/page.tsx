@@ -18,6 +18,7 @@ import { PageShell } from "@/components/achordion/page-shell";
 import { AlbumHeader } from "@/components/achordion/album-header";
 import { Breadcrumbs } from "@/components/achordion/breadcrumbs";
 import { TrackList } from "@/components/achordion/track-list";
+import { SocialProof } from "@/components/achordion/social-proof";
 import { TopListenersList } from "@/components/achordion/top-listeners-list";
 import {
   ExternalLinks,
@@ -196,6 +197,7 @@ async function AlbumBody({ mbid }: { mbid: string }) {
         </div>
 
         <aside className="space-y-8">
+          <SocialProof entity="release-group" mbid={mbid} />
           <Suspense fallback={null}>
             <TopListenersStream promise={listenersPromise} />
           </Suspense>
