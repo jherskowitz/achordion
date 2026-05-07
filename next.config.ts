@@ -201,10 +201,15 @@ const nextConfig: NextConfig = {
         source: "/artist/:mbid",
         headers: [PUBLIC_ENTITY_CACHE],
       },
-      {
-        source: "/release-group/:mbid",
-        headers: [PUBLIC_ENTITY_CACHE],
-      },
+      // NOTE: /release-group/:mbid intentionally does NOT get
+      // PUBLIC_ENTITY_CACHE. The Reviews section (AlbumReviews)
+      // gates on `isFeatureEnabledForViewer("reviews" | "write_reviews")`,
+      // which reads the session cookie — server-rendered auth-
+      // dependent content. A shared edge cache would either hide
+      // reviews from allowlisted users (anonymous-cached miss) or
+      // leak them to everyone (allowlisted-cached miss). Re-enable
+      // only if AlbumReviews moves to a client island that does its
+      // own per-user fetch.
       {
         source: "/release/:mbid",
         headers: [PUBLIC_ENTITY_CACHE],
