@@ -253,16 +253,22 @@ async function loadRecommendedTracks(username: string, familiarity: number) {
   // and we want to surface those. Pull a wider raw set when the
   // slider asks for more discoveries so the visible 12 stays full.
   const rawCount = threshold === null ? 25 : 100;
+  // Catch on every upstream so a 429 from MB / LB doesn't take the
+  // entire /explore page down with a generic 429 response. Empty
+  // metadata or an empty exclude set degrades the row gracefully —
+  // no recommendations, but the rest of the page still renders.
   const [recordings, exclude] = await Promise.all([
     getRecommendedRecordings(username, rawCount, "raw").catch(() => []),
-    buildExcludedRecordingSet(username, threshold),
+    buildExcludedRecordingSet(username, threshold).catch(
+      () => new Set<string>(),
+    ),
   ]);
   if (recordings.length === 0) {
     return { top: [], metadata: new Map(), parachordTracks: [] };
   }
   const metadata = await getRecordingMetadata(
     recordings.map((r) => r.recording_mbid),
-  );
+  ).catch(() => new Map<string, never>());
   // Hide anything LB knows the user has heard, at any non-zero
   // slider value. `latest_listened_at` is the only reliable signal
   // for "I've heard this exact recommendation" — MBID-based filters
@@ -350,7 +356,9 @@ async function RecommendedArtistsSection({
   // who the user nonetheless plays regularly.
   const [recordings, exclude] = await Promise.all([
     getRecommendedRecordings(username, 100, "raw").catch(() => []),
-    buildExcludedArtistSet(username, threshold),
+    buildExcludedArtistSet(username, threshold).catch(
+      () => new Set<string>(),
+    ),
   ]);
   if (recordings.length === 0) {
     return (
@@ -362,7 +370,7 @@ async function RecommendedArtistsSection({
   }
   const metadata = await getRecordingMetadata(
     recordings.map((r) => r.recording_mbid),
-  );
+  ).catch(() => new Map<string, never>());
   return (
     <RecommendedArtistsList
       recordings={recordings}

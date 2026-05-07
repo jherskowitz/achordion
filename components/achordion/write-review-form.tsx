@@ -97,7 +97,7 @@ export function WriteReviewForm({ mbid, connected }: WriteReviewFormProps) {
           }
         >
           {tooShort
-            ? `${CB_REVIEW_MIN_CHARS - chars} more to publish`
+            ? `${CB_REVIEW_MIN_CHARS - chars} more characters to publish`
             : `${chars} / ${CB_REVIEW_MAX_CHARS}`}
         </span>
       </div>
