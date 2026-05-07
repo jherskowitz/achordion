@@ -23,9 +23,15 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         if (typeof account.access_token === "string") {
           token.mbAccessToken = account.access_token;
         }
-        if (typeof account.scope === "string") {
-          token.mbScope = account.scope;
-        }
+        // MB's token endpoint doesn't echo back the granted scope in
+        // its JSON response, so `account.scope` is undefined for our
+        // provider. Fall back to the scope we REQUESTED at sign-in
+        // time — that's what the user just consented to in the OAuth
+        // bounce. If MB silently downgrades (rare), the bearer will
+        // 401 on the protected endpoint and the client surfaces a
+        // generic vote-failed message.
+        token.mbScope =
+          typeof account.scope === "string" ? account.scope : "profile tag";
       }
       return token;
     },

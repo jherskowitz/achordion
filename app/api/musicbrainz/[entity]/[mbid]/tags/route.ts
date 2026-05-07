@@ -85,7 +85,6 @@ async function readJwtMbAuth(
   };
 }
 
-const TAG_SCOPE = "tag";
 
 /**
  * Authenticated MB GET to fetch the calling user's tag votes for
@@ -170,11 +169,13 @@ export async function POST(
   }
   const { tag, vote } = parsed.data as { tag: string; vote: TagVote };
 
-  // Auth gating happens here, with full visibility of the JWT. If the
-  // user has no token at all, they need to sign in. If the token
-  // exists but lacks the `tag` scope, they need to re-auth with the
-  // wider scope. Both surface as 401 with a `reason` so the client
-  // can route to the right re-auth flow.
+  // Auth gating: only check that we have a session + access token.
+  // We deliberately DON'T pre-flight the `tag` scope here because
+  // MB's token endpoint doesn't echo back granted scopes in its
+  // JSON response, so we'd false-negative every signed-in user
+  // whose JWT lacks the (uncapturable) field. If the token actually
+  // lacks the scope, MB itself returns 401 from /ws/2/tag and we
+  // surface that as a re-auth prompt below.
   const session = await auth();
   if (!session?.user?.mbUsername) {
     return NextResponse.json(
@@ -182,19 +183,10 @@ export async function POST(
       { status: 401, headers: NO_STORE },
     );
   }
-  const { accessToken, scope } = await readJwtMbAuth(request);
+  const { accessToken } = await readJwtMbAuth(request);
   if (!accessToken) {
     return NextResponse.json(
       { error: "no MB access token", reason: "scope_required" },
-      { status: 401, headers: NO_STORE },
-    );
-  }
-  if (!scope.split(/\s+/).includes(TAG_SCOPE)) {
-    return NextResponse.json(
-      {
-        error: `MB session is missing the \`${TAG_SCOPE}\` scope`,
-        reason: "scope_required",
-      },
       { status: 401, headers: NO_STORE },
     );
   }
