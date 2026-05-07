@@ -218,10 +218,17 @@ export function TagChips({
     <div className="flex flex-wrap items-center gap-1.5">
       {visible.map((t) => {
         const userVote = votesQuery.data?.votes[t.name] ?? null;
+        // Bump the displayed count by the user's own vote so the
+        // number changes the moment they click. MB's read API will
+        // catch up to the new tally on the next page render —
+        // until then the local delta keeps the UI honest about
+        // what the user just did.
+        const displayCount = t.count + voteDelta(userVote);
         return (
           <TagChip
             key={t.name}
             tag={t}
+            displayCount={displayCount}
             userVote={userVote}
             disabled={voteMutation.isPending}
             onVote={(v) => handleVote(t.name, v)}
@@ -293,13 +300,27 @@ export function TagChips({
 
 type TagVote = "upvote" | "downvote" | "withdraw";
 
+/**
+ * Map a user's current vote to a count delta vs the server-rendered
+ * tally. The server count we receive doesn't include this viewer's
+ * vote (it's the public tally), so we add or subtract one to match
+ * what MB's server sees post-vote.
+ */
+function voteDelta(userVote: "upvote" | "downvote" | null): number {
+  if (userVote === "upvote") return 1;
+  if (userVote === "downvote") return -1;
+  return 0;
+}
+
 function TagChip({
   tag,
+  displayCount,
   userVote,
   disabled,
   onVote,
 }: {
   tag: TagInput;
+  displayCount: number;
   userVote: "upvote" | "downvote" | null;
   disabled: boolean;
   onVote: (vote: TagVote) => void;
@@ -318,8 +339,10 @@ function TagChip({
       >
         {tag.name}
       </Link>
-      {tag.count > 0 && (
-        <span className="text-muted-foreground tabular-nums">{tag.count}</span>
+      {displayCount > 0 && (
+        <span className="text-muted-foreground tabular-nums">
+          {displayCount}
+        </span>
       )}
       <button
         type="button"
