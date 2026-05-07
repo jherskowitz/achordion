@@ -53,6 +53,10 @@ interface TagChipsProps {
 
 interface VotesResponse {
   votes: Record<string, "upvote" | "downvote">;
+  /** Server-side blocklist gate. When true, the client suppresses
+   *  vote affordances + add-tag affordances entirely so the user
+   *  doesn't see controls they'd just 403 against. */
+  blocked?: boolean;
 }
 
 const QUERY_KEY = (entity: string, mbid: string) =>
@@ -113,6 +117,11 @@ export function TagChips({
 
   const merged = mergeTags(initialTags, pendingTags);
   const visible = merged.slice(0, limit);
+  // Blocked users see read-only chips: no vote controls, no add-tag
+  // button. Mirrors how MB itself treats spammed accounts — they can
+  // see the data, just can't modify it.
+  const blocked = !!votesQuery.data?.blocked;
+  const canInteract = sessionStatus === "authenticated" && !blocked;
 
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -239,12 +248,13 @@ export function TagChips({
             tag={t}
             displayCount={displayCount}
             userVote={userVote}
+            interactive={canInteract}
             disabled={voteMutation.isPending}
             onVote={(v) => handleVote(t.name, v)}
           />
         );
       })}
-      {sessionStatus === "authenticated" && (
+      {canInteract && (
         addOpen ? (
           <AddTagForm
             draft={draft}
@@ -334,15 +344,39 @@ function TagChip({
   tag,
   displayCount,
   userVote,
+  interactive,
   disabled,
   onVote,
 }: {
   tag: TagInput;
   displayCount: number;
   userVote: "upvote" | "downvote" | null;
+  /** When false, the chip is read-only — no vote controls, no
+   *  hover flyout. Used for signed-out viewers and for users on
+   *  the tag-blocklist. */
+  interactive: boolean;
   disabled: boolean;
   onVote: (vote: TagVote) => void;
 }) {
+  // Read-only chip: just a link to the tag page, count alongside
+  // for context. No flyout, no controls.
+  if (!interactive) {
+    return (
+      <span className="border-border/60 bg-muted/40 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs">
+        <Link
+          href={`/tag/${encodeURIComponent(tag.name)}`}
+          className="text-foreground/90 hover:underline"
+        >
+          {tag.name}
+        </Link>
+        {displayCount > 0 && (
+          <span className="text-muted-foreground tabular-nums">
+            {displayCount}
+          </span>
+        )}
+      </span>
+    );
+  }
   const upActive = userVote === "upvote";
   const downActive = userVote === "downvote";
   // Two-zone pill: left half is always a link to the tag page; right

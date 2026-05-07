@@ -134,16 +134,28 @@ export async function GET(
   }
   const session = await auth();
   if (!session?.user?.mbUsername) {
-    return NextResponse.json({ votes: {} }, { headers: NO_STORE });
+    return NextResponse.json(
+      { votes: {}, blocked: false },
+      { headers: NO_STORE },
+    );
   }
+  // Surface the blocklist state to the client so it can hide the
+  // vote / add-tag affordances entirely instead of rendering them
+  // and then 403'ing on click. Existing votes still come back so
+  // chips that the user previously voted on stay rendered as plain
+  // names (no controls).
+  const blocked = await isTaggingBlocked(session.user.mbUsername);
   const { accessToken } = await readJwtMbAuth(request);
   if (!accessToken) {
-    return NextResponse.json({ votes: {} }, { headers: NO_STORE });
+    return NextResponse.json(
+      { votes: {}, blocked },
+      { headers: NO_STORE },
+    );
   }
   const votes = await fetchUserVotes(entity, mbid, accessToken).catch(
     () => ({}) as Record<string, "upvote" | "downvote">,
   );
-  return NextResponse.json({ votes }, { headers: NO_STORE });
+  return NextResponse.json({ votes, blocked }, { headers: NO_STORE });
 }
 
 export async function POST(
