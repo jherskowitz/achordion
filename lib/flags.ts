@@ -31,8 +31,18 @@ import { auth } from "@/auth";
  */
 
 const redis = (() => {
-  const url = process.env.UPSTASH_REDIS_REST_URL;
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+  // Accept either set of env-var names. The same Upstash Redis
+  // backend is exposed via two Vercel integrations with different
+  // conventions: the standalone "Upstash" Marketplace integration
+  // sets `UPSTASH_REDIS_REST_URL` / `_TOKEN`; the "Vercel KV /
+  // Storage" integration (which is also Upstash under the hood)
+  // sets `KV_REST_API_URL` / `KV_REST_API_TOKEN`. Reading both
+  // means whichever integration the project was wired up with,
+  // flags resolve from Redis without a manual rename.
+  const url =
+    process.env.UPSTASH_REDIS_REST_URL ?? process.env.KV_REST_API_URL;
+  const token =
+    process.env.UPSTASH_REDIS_REST_TOKEN ?? process.env.KV_REST_API_TOKEN;
   if (!url || !token) return null;
   return new Redis({ url, token });
 })();
