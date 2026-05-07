@@ -19,6 +19,35 @@ import { LbRadioSection } from "@/components/achordion/lb-radio-section";
 import { Skeleton } from "@/components/ui/skeleton";
 
 /**
+ * Recency-decay scoring. Half-life of 10 years means an album from 10
+ * years ago is worth half as much per-listen as a release from this
+ * year, an album from 20 years ago is worth a quarter, etc. Tuned so
+ * "what's popular AND not from the boomer era" surfaces — without it,
+ * tag pages for post-1990 movements like indie rock kept showing
+ * decades-old MB-tag-noise (e.g. The Beatles tagged as "indie rock").
+ *
+ * `currentYear` is computed once at module load — fine for our use
+ * since the page is edge-cached for 1h and the year only ticks once
+ * a year. We don't need January-1st-precision freshness here.
+ */
+const RECENCY_HALFLIFE_YEARS = 10;
+const CURRENT_YEAR = new Date().getUTCFullYear();
+
+function recencyDecay(year: number | null | undefined): number {
+  if (!year || !Number.isFinite(year)) return 0.05; // unknown date → mostly suppressed
+  const age = Math.max(0, CURRENT_YEAR - year);
+  return Math.pow(0.5, age / RECENCY_HALFLIFE_YEARS);
+}
+
+function parseYear(value: string | null | undefined): number | null {
+  if (!value) return null;
+  const m = value.match(/^(\d{4})/);
+  if (!m) return null;
+  const y = Number.parseInt(m[1], 10);
+  return Number.isFinite(y) ? y : null;
+}
+
+/**
  * Build "what's hot recently for this genre" MBID rank maps from the
  * tag's LB Radio output. LB Radio's algorithm leans on currently-
  * trending listening data, so the order tracks appear in the playlist
@@ -80,10 +109,18 @@ async function ArtistsForTag({ tag }: { tag: string }) {
   // (recency tiebreak — currently-trending artists bubble up within
   // their popularity bracket); tertiary = MB's natural order.
   const ranks = buildPopularityRanks(radio);
+  // Score = listen_count * recency_decay(career-start year). Surfaces
+  // popular artists who started recently enough to plausibly fit the
+  // tag — deflates The Beatles in a hypothetical "indie rock" tag
+  // search (career start 1957 → ~0.009× multiplier even with 50M
+  // listens). Tie-break on LB Radio rank so two equally-decayed
+  // popular artists fall in radio order.
   const sorted = artistsAll.slice().sort((a, b) => {
-    const pa = popularity.get(a.id) ?? 0;
-    const pb = popularity.get(b.id) ?? 0;
-    if (pa !== pb) return pb - pa;
+    const aBegin = parseYear(a["life-span"]?.begin);
+    const bBegin = parseYear(b["life-span"]?.begin);
+    const sa = (popularity.get(a.id) ?? 0) * recencyDecay(aBegin);
+    const sb = (popularity.get(b.id) ?? 0) * recencyDecay(bBegin);
+    if (sa !== sb) return sb - sa;
     const ra = ranks?.artists.get(a.id) ?? Infinity;
     const rb = ranks?.artists.get(b.id) ?? Infinity;
     return ra - rb;
@@ -150,10 +187,17 @@ async function AlbumsForTag({ tag }: { tag: string }) {
     groupsAll.map((g) => g.id),
   ).catch(() => new Map<string, number>());
   const ranks = buildPopularityRanks(radio);
+  // Score = listen_count * recency_decay(first-release year). Same
+  // halflife as artists so an album by an old band that happens to
+  // be wrongly tagged for the genre falls way below recent records
+  // in the same listen-count tier. Tie-break on the artist's LB
+  // Radio position for the recency signal.
   const sortedAll = groupsAll.slice().sort((a, b) => {
-    const pa = popularity.get(a.id) ?? 0;
-    const pb = popularity.get(b.id) ?? 0;
-    if (pa !== pb) return pb - pa;
+    const ay = parseYear(a["first-release-date"]);
+    const by = parseYear(b["first-release-date"]);
+    const sa = (popularity.get(a.id) ?? 0) * recencyDecay(ay);
+    const sb = (popularity.get(b.id) ?? 0) * recencyDecay(by);
+    if (sa !== sb) return sb - sa;
     const aArtist = a["artist-credit"]?.[0]?.artist?.id ?? "";
     const bArtist = b["artist-credit"]?.[0]?.artist?.id ?? "";
     const ra = ranks?.artists.get(aArtist) ?? Infinity;
