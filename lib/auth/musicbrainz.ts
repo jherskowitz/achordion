@@ -22,7 +22,14 @@ export default function MusicBrainz<P extends MusicBrainzProfile>(
     type: "oauth",
     authorization: {
       url: "https://musicbrainz.org/oauth2/authorize",
-      params: { scope: "profile" },
+      // `profile` for sign-in (sub = MB username). `tag` for posting
+      // user tag votes via /ws/2/tag — used by the per-entity tag-
+      // voting UI (artist / release-group / recording pages). Adding
+      // a scope to an existing app forces all currently-authenticated
+      // users to re-auth before they can vote; reads keep working
+      // with the old token. New sign-ins go through both scopes
+      // automatically.
+      params: { scope: "profile tag" },
     },
     token: "https://musicbrainz.org/oauth2/token",
     userinfo: "https://musicbrainz.org/oauth2/userinfo",
