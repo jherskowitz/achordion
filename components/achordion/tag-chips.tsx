@@ -6,6 +6,11 @@ import { signIn, signOut, useSession } from "next-auth/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronDown, ChevronUp, Plus } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 /**
  * Per-entity tag chips with upvote / downvote / withdraw + add new
@@ -346,53 +351,73 @@ function TagChip({
       >
         {tag.name}
       </Link>
+      {/*
+       * Voting half: max-width + opacity transition for a smooth
+       * slide-out reveal on hover. We can't transition `display`
+       * (hidden ↔ inline-flex), so the half is always inline-flex
+       * but collapsed to zero width with hidden overflow when not
+       * active. Touch devices keep it open via `pointer-coarse:`.
+       *
+       * Divider matches the same fade so it doesn't appear as a
+       * standalone hairline before the controls slide in.
+       */}
       <span
         aria-hidden="true"
         className={
-          (voteVisible ? "inline-block " : "hidden group-hover:inline-block pointer-coarse:inline-block ") +
-          "border-border/60 self-stretch border-l"
+          "border-border/60 self-stretch border-l opacity-0 transition-opacity duration-200 ease-out group-hover:opacity-100 pointer-coarse:opacity-100" +
+          (voteVisible ? " opacity-100" : "")
         }
       />
-      <span
-        className={
-          (voteVisible ? "inline-flex " : "hidden group-hover:inline-flex pointer-coarse:inline-flex ") +
-          "hover:bg-muted items-center gap-1 px-1.5 py-0.5 transition-colors"
-        }
-      >
-        <button
-          type="button"
-          onClick={() => onVote(upActive ? "withdraw" : "upvote")}
-          disabled={disabled}
-          aria-label={upActive ? `Withdraw upvote on ${tag.name}` : `Upvote ${tag.name}`}
-          className={
-            (upActive
-              ? "text-emerald-600 dark:text-emerald-400"
-              : "text-muted-foreground hover:text-foreground") +
-            " inline-flex size-4 items-center justify-center rounded-full disabled:opacity-50"
-          }
-        >
-          <ChevronUp className="size-3.5" />
-        </button>
-        {displayCount > 0 && (
-          <span className="text-muted-foreground tabular-nums">
-            {displayCount}
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span
+            className={
+              "inline-flex max-w-0 items-center gap-1 overflow-hidden whitespace-nowrap py-0.5 opacity-0 transition-[max-width,opacity,padding] duration-200 ease-out group-hover:max-w-[10rem] group-hover:px-1.5 group-hover:opacity-100 hover:bg-muted pointer-coarse:max-w-[10rem] pointer-coarse:px-1.5 pointer-coarse:opacity-100" +
+              (voteVisible
+                ? " max-w-[10rem] px-1.5 opacity-100"
+                : "")
+            }
+          >
+            <button
+              type="button"
+              onClick={() => onVote(upActive ? "withdraw" : "upvote")}
+              disabled={disabled}
+              aria-label={upActive ? `Withdraw upvote on ${tag.name}` : `Upvote ${tag.name}`}
+              className={
+                (upActive
+                  ? "text-emerald-600 dark:text-emerald-400"
+                  : "text-muted-foreground hover:text-foreground") +
+                " inline-flex size-4 items-center justify-center rounded-full disabled:opacity-50"
+              }
+            >
+              <ChevronUp className="size-3.5" />
+            </button>
+            {displayCount > 0 && (
+              <span className="text-muted-foreground tabular-nums">
+                {displayCount}
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={() => onVote(downActive ? "withdraw" : "downvote")}
+              disabled={disabled}
+              aria-label={downActive ? `Withdraw downvote on ${tag.name}` : `Downvote ${tag.name}`}
+              className={
+                (downActive
+                  ? "text-rose-600 dark:text-rose-400"
+                  : "text-muted-foreground hover:text-foreground") +
+                " inline-flex size-4 items-center justify-center rounded-full disabled:opacity-50"
+              }
+            >
+              <ChevronDown className="size-3.5" />
+            </button>
           </span>
-        )}
-        <button
-          type="button"
-          onClick={() => onVote(downActive ? "withdraw" : "downvote")}
-          disabled={disabled}
-          aria-label={downActive ? `Withdraw downvote on ${tag.name}` : `Downvote ${tag.name}`}
-          className={
-            (downActive
-              ? "text-rose-600 dark:text-rose-400"
-              : "text-muted-foreground hover:text-foreground") +
-            " inline-flex size-4 items-center justify-center rounded-full disabled:opacity-50"
-          }
-        >
-          <ChevronDown className="size-3.5" />
-        </button>
-      </span>
+        </TooltipTrigger>
+        <TooltipContent className="max-w-[15rem] text-center text-xs">
+          Tags are community-driven. Vote up if it fits, down if it
+          doesn&apos;t — counts roll up across MusicBrainz.
+        </TooltipContent>
+      </Tooltip>
     </span>
   );
 }
