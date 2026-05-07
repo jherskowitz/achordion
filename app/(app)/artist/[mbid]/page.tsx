@@ -18,6 +18,7 @@ import {
 import { findBioSource, getBiography } from "@/lib/clients/wikipedia";
 import { PageShell } from "@/components/achordion/page-shell";
 import { PageHeader } from "@/components/achordion/page-header";
+import { track } from "@vercel/analytics/server";
 import {
   ArtistAvatar,
   resolveArtistImage,
@@ -115,6 +116,16 @@ async function ArtistBody({
   // resolution race. Per fanart.tv ToS we must link back to them
   // whenever we display their imagery.
   const heroImage = await resolveArtistImage(mbid, artist, 256);
+  // Fire a lightweight analytics event so we can see, in the Vercel
+  // Analytics dashboard, what fraction of artist pages get their hero
+  // image from each source. `null` source = fell back to the DiceBear
+  // shape placeholder. Only emitted from the artist detail page (one
+  // event per page view), not from every avatar in lists/search —
+  // the detail page is enough signal to compare coverage rates and
+  // decide whether to add another fallback source later.
+  void track("artist-image-resolved", {
+    source: heroImage.source ?? "dicebear",
+  }).catch(() => {});
   const otherWithCredits: ArtistExternalLink[] =
     heroImage.source === "fanart"
       ? [

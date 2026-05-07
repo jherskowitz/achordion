@@ -65,10 +65,20 @@ export async function getArtistImageFromFanart(
   if (!mbid) return null;
   try {
     const url = `${ENDPOINT}/${encodeURIComponent(mbid)}?api_key=${encodeURIComponent(apiKey)}`;
+    // 6-hour cache TTL is a compromise between two opposing forces:
+    //   - approved images on fanart almost never change, so a longer
+    //     cache would cost nothing for the steady-state hit path.
+    //   - new editor approvals lag both fanart's API (non-VIP keys
+    //     run ~2 days behind) AND any cached null we stored before
+    //     the image was approved. A long TTL means a freshly-added
+    //     thumb might not show up in our app for a week.
+    // 6 hours puts the worst-case "approved but not yet visible" gap
+    // at half a workday. Cache-tag-based revalidation could cut that
+    // further if we ever want a manual refresh path.
     const res = await fetch(url, {
       headers: { Accept: "application/json" },
       next: {
-        revalidate: 60 * 60 * 24 * 7,
+        revalidate: 60 * 60 * 6,
         tags: [`fanart-artist:${mbid}`],
       },
     });
