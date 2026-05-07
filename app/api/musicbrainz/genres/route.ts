@@ -18,14 +18,14 @@ import { z } from "zod";
  * grows by a handful of entries per year.
  */
 
-// `revalidate` alone is enough — combining it with
-// `dynamic = "force-static"` is rejected by Next 16 with
-// "Invalid segment configuration export detected" since the
-// underlying fetch needs to occasionally hit MB. The fetch itself
-// already carries `next: { revalidate }` so the cached response
-// gets refreshed in the background; route-level revalidate keeps
-// the response shape cacheable too.
-export const revalidate = 60 * 60 * 24; // 24h server cache
+// No segment-level config exports — Next 16's segment validator
+// rejects them on this route ("Invalid segment configuration
+// export detected") even though the values are nominally valid.
+// Caching is handled at two correct layers regardless:
+//   1. The inner `fetch(...)` carries `next: { revalidate }`, so
+//      the upstream MB call is server-cached for a week.
+//   2. The response sets explicit `Cache-Control` + `s-maxage` so
+//      Vercel's edge + browsers cache the JSON body for a day.
 
 const GenreListSchema = z.object({
   genres: z
