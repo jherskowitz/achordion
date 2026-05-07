@@ -5,7 +5,7 @@ import {
   type SimilarUser,
 } from "@/lib/clients/listenbrainz";
 import { PageShell } from "@/components/achordion/page-shell";
-import { ComingSoon } from "@/components/achordion/coming-soon";
+import { EmptyState } from "@/components/achordion/empty-state";
 import { Button } from "@/components/ui/button";
 import { TopArtistsList } from "@/components/achordion/top-artists-list";
 import { TopTracksList } from "@/components/achordion/top-tracks-list";
@@ -55,7 +55,7 @@ export default async function ExploreYearInMusicPage({ searchParams }: PageParam
   if (!username) {
     return (
       <PageShell className="pt-8">
-        <ComingSoon
+        <EmptyState
           title="Sign in for your Year in Music"
           description="ListenBrainz computes a yearly recap from your listen history — top artists, tracks, albums, listening calendar, and more."
           hint={
@@ -77,7 +77,7 @@ export default async function ExploreYearInMusicPage({ searchParams }: PageParam
           <h2 className="text-xl font-semibold tracking-tight">Year in Music</h2>
           <YearPicker current={year} years={years} />
         </div>
-        <ComingSoon
+        <EmptyState
           title={`No Year in Music for ${year}`}
           description="ListenBrainz hasn't generated a recap for this year yet, or you didn't have enough listens. Try another year."
         />

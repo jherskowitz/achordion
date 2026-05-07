@@ -4,7 +4,7 @@ import { auth } from "@/auth";
 import { getUserFeed } from "@/lib/clients/listenbrainz";
 import { getLbTokenForRequest } from "@/lib/lb-token";
 import { PageShell } from "@/components/achordion/page-shell";
-import { ComingSoon } from "@/components/achordion/coming-soon";
+import { EmptyState } from "@/components/achordion/empty-state";
 import { FeedEventList } from "@/components/achordion/feed-event-list";
 import { FilterPills } from "@/components/achordion/filter-pills";
 import { TrackListActionsMenu } from "@/components/achordion/track-list-actions-menu";
@@ -26,7 +26,7 @@ async function FeedBody({
   const token = await getLbTokenForRequest();
   if (!token) {
     return (
-      <ComingSoon
+      <EmptyState
         title="Feed needs your ListenBrainz token"
         description="Add your LB token in Settings → Connections to load your feed. The feed endpoint is private — only you can see your own."
         hint={
@@ -44,7 +44,7 @@ async function FeedBody({
   const events = await getUserFeed(name, token, { count: 50 });
   if (events === null) {
     return (
-      <ComingSoon
+      <EmptyState
         title="Couldn't load feed"
         description="ListenBrainz didn't return your feed. Your token may have been revoked, or LB might be having a moment."
       />
@@ -144,7 +144,7 @@ export default async function FeedPage({ searchParams }: FeedPageProps) {
   if (!viewer) {
     return (
       <PageShell className="pt-8">
-        <ComingSoon
+        <EmptyState
           title="Sign in to view your feed"
           description="Feeds are private — only you can see your own follows, pins, and notifications."
           hint={

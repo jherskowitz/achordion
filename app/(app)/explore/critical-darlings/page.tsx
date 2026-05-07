@@ -1,6 +1,6 @@
 import { getCriticalDarlings } from "@/lib/clients/critical-darlings";
 import { PageShell } from "@/components/achordion/page-shell";
-import { ComingSoon } from "@/components/achordion/coming-soon";
+import { EmptyState } from "@/components/achordion/empty-state";
 import { CriticalDarlingCard } from "@/components/achordion/critical-darling-card";
 
 export const metadata = { title: "Critical Darlings" };
@@ -18,7 +18,7 @@ export default async function CriticalDarlingsPage() {
   if (albums.length === 0) {
     return (
       <PageShell className="pt-8">
-        <ComingSoon
+        <EmptyState
           title="No critics' picks right now"
           description="The Critical Darlings feed didn't load — try refreshing in a few minutes."
         />

@@ -4,7 +4,7 @@ import { ScrobbleList } from "@/components/achordion/scrobble-list";
 import { TrackListActionsMenu } from "@/components/achordion/track-list-actions-menu";
 import { OpenInParachordButton } from "@/components/achordion/open-in-parachord-button";
 import { PageShell } from "@/components/achordion/page-shell";
-import { ComingSoon } from "@/components/achordion/coming-soon";
+import { EmptyState } from "@/components/achordion/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { listensToParachordTracks } from "@/lib/parachord-listens";
 
@@ -28,7 +28,7 @@ async function ListensSection({
     return <ScrobbleList listens={listens} />;
   } catch (err) {
     return (
-      <ComingSoon
+      <EmptyState
         title="Couldn't load listens"
         description={err instanceof Error ? err.message : "Try again in a moment."}
       />

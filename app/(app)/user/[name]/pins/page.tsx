@@ -3,7 +3,7 @@ import { auth } from "@/auth";
 import { getUserPins } from "@/lib/clients/listenbrainz";
 import { PinnedTrackCard } from "@/components/achordion/pinned-track-card";
 import { PageShell } from "@/components/achordion/page-shell";
-import { ComingSoon } from "@/components/achordion/coming-soon";
+import { EmptyState } from "@/components/achordion/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface PageParams {
@@ -22,7 +22,7 @@ async function PinsHistory({
     pins = await getUserPins(name, 50);
   } catch (err) {
     return (
-      <ComingSoon
+      <EmptyState
         title="Couldn't load pins"
         description={err instanceof Error ? err.message : ""}
       />
@@ -31,7 +31,7 @@ async function PinsHistory({
 
   if (pins.length === 0) {
     return (
-      <ComingSoon
+      <EmptyState
         title="No pins yet"
         description={`${name} hasn't pinned a recording.`}
       />

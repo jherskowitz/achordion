@@ -1,5 +1,5 @@
 import { PageShell } from "@/components/achordion/page-shell";
-import { ComingSoon } from "@/components/achordion/coming-soon";
+import { EmptyState } from "@/components/achordion/empty-state";
 
 export default async function YearInMusicPage({
   params,
@@ -9,7 +9,7 @@ export default async function YearInMusicPage({
   const { name, year } = await params;
   return (
     <PageShell className="pt-8">
-      <ComingSoon
+      <EmptyState
         title={`Year in Music ${year}`}
         description={`${name}'s ${year} listening recap — top artists, top albums, and the moments that defined the year.`}
       />

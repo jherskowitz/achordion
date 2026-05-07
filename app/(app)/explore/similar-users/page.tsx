@@ -4,7 +4,7 @@ import { auth } from "@/auth";
 import { getSimilarUsers } from "@/lib/clients/listenbrainz";
 import { PageShell } from "@/components/achordion/page-shell";
 import { SimilarUsersList } from "@/components/achordion/similar-users-list";
-import { ComingSoon } from "@/components/achordion/coming-soon";
+import { EmptyState } from "@/components/achordion/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 
@@ -37,7 +37,7 @@ export default async function SimilarUsersExplorePage() {
   if (!username) {
     return (
       <PageShell className="pt-8">
-        <ComingSoon
+        <EmptyState
           title="Sign in to see similar listeners"
           description="ListenBrainz computes similarity from your listen history."
           hint={

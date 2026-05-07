@@ -11,7 +11,7 @@ import { listensToParachordTracks } from "@/lib/parachord-listens";
 import { auth } from "@/auth";
 import { PinnedTrackCard } from "@/components/achordion/pinned-track-card";
 import { PageShell } from "@/components/achordion/page-shell";
-import { ComingSoon } from "@/components/achordion/coming-soon";
+import { EmptyState } from "@/components/achordion/empty-state";
 import {
   WeeklyStatsSidebar,
   WeeklyStatsSidebarSkeleton,
@@ -65,7 +65,7 @@ async function RecentListensSection({ name }: { name: string }) {
     );
   } catch (err) {
     return (
-      <ComingSoon
+      <EmptyState
         title="Couldn't reach ListenBrainz"
         description={err instanceof Error ? err.message : "Try again in a moment."}
       />

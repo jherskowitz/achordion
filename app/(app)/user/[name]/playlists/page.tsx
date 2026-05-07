@@ -10,7 +10,7 @@ import { auth } from "@/auth";
 import { getLbTokenForRequest } from "@/lib/lb-token";
 import { PageShell } from "@/components/achordion/page-shell";
 import { PlaylistCard } from "@/components/achordion/playlist-card";
-import { ComingSoon } from "@/components/achordion/coming-soon";
+import { EmptyState } from "@/components/achordion/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface PageParams {
@@ -73,7 +73,7 @@ async function PlaylistsList({ name }: { name: string }) {
     page = await getUserPlaylists(name, 50, 0, token ?? undefined);
   } catch (err) {
     return (
-      <ComingSoon
+      <EmptyState
         title="Couldn't load playlists"
         description={err instanceof Error ? err.message : ""}
       />
@@ -82,7 +82,7 @@ async function PlaylistsList({ name }: { name: string }) {
 
   if (page.playlists.length === 0) {
     return (
-      <ComingSoon
+      <EmptyState
         title="No playlists yet"
         description={`${name} hasn't created any playlists.`}
       />

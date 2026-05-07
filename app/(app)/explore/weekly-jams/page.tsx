@@ -10,7 +10,7 @@ import {
 } from "@/lib/clients/listenbrainz";
 import { PageShell } from "@/components/achordion/page-shell";
 import { PlaylistCard } from "@/components/achordion/playlist-card";
-import { ComingSoon } from "@/components/achordion/coming-soon";
+import { EmptyState } from "@/components/achordion/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 
@@ -60,7 +60,7 @@ async function Body({
   const page = await getCreatedForPlaylists(username, 100).catch(() => null);
   if (!page) {
     return (
-      <ComingSoon
+      <EmptyState
         title="Couldn't load playlists"
         description="ListenBrainz didn't respond. Try again in a moment."
       />
@@ -75,7 +75,7 @@ async function Body({
     .sort((a, b) => dateOf(b) - dateOf(a));
 
   if (matches.length === 0) {
-    return <ComingSoon title="No playlists yet" description={emptyMessage} />;
+    return <EmptyState title="No playlists yet" description={emptyMessage} />;
   }
 
   return (
@@ -97,7 +97,7 @@ export default async function WeeklyJamsPage() {
   if (!username) {
     return (
       <PageShell className="pt-8">
-        <ComingSoon
+        <EmptyState
           title="Sign in for Weekly Jams"
           description="ListenBrainz generates a fresh Weekly Jams playlist for you each Monday."
           hint={

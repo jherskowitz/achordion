@@ -2,19 +2,32 @@ import type { ReactNode } from "react";
 import { Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-interface ComingSoonProps {
+/**
+ * Standard empty / placeholder card used wherever a section has no
+ * data to render — "you haven't pinned anything yet", "no top tracks
+ * for this range", "this feature is on the way", etc. Originally
+ * called `<EmptyState>`; renamed because the visual was being reused
+ * for any-empty-state and the old name kept nudging contributors to
+ * roll their own markup for the non-coming-soon cases.
+ *
+ * Visual contract is unchanged: dashed-border card, centered icon
+ * chip, title, description, optional hint footer. Default copy + the
+ * Sparkles icon match the original "Coming soon" framing so existing
+ * call sites that relied on the defaults keep rendering identically.
+ */
+interface EmptyStateProps {
   title?: string;
   description?: ReactNode;
   hint?: ReactNode;
   className?: string;
 }
 
-export function ComingSoon({
+export function EmptyState({
   title = "Coming soon",
   description = "This page is part of the Phase 1 route skeleton — it will get real ListenBrainz data in a later phase.",
   hint,
   className,
-}: ComingSoonProps) {
+}: EmptyStateProps) {
   return (
     <div
       className={cn(

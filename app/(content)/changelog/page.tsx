@@ -1,6 +1,6 @@
 import { PageShell } from "@/components/achordion/page-shell";
 import { PageHeader } from "@/components/achordion/page-header";
-import { ComingSoon } from "@/components/achordion/coming-soon";
+import { EmptyState } from "@/components/achordion/empty-state";
 
 export const metadata = { title: "Changelog" };
 // See app/(content)/layout.tsx for the static-rendering rationale.
@@ -14,7 +14,7 @@ export default function ChangelogPage() {
         title="What's new"
         description="Release notes and notable improvements."
       />
-      <ComingSoon
+      <EmptyState
         title="Changelog"
         description="Phase 0 (clickable shell) shipped today. Phase 1 (full route skeleton) is what you're looking at."
       />

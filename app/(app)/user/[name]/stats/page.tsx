@@ -9,7 +9,7 @@ import {
   type StatRange,
 } from "@/lib/clients/listenbrainz";
 import { PageShell } from "@/components/achordion/page-shell";
-import { ComingSoon } from "@/components/achordion/coming-soon";
+import { EmptyState } from "@/components/achordion/empty-state";
 import { StatRangePicker } from "@/components/achordion/stat-range-picker";
 import { TopArtistsList } from "@/components/achordion/top-artists-list";
 import { TopAlbumsGrid } from "@/components/achordion/top-albums-grid";
@@ -44,7 +44,7 @@ async function ArtistsSection({
     return <TopArtistsList artists={artists} />;
   } catch (err) {
     return (
-      <ComingSoon
+      <EmptyState
         title="Couldn't load top artists"
         description={err instanceof Error ? err.message : ""}
       />
@@ -64,7 +64,7 @@ async function AlbumsSection({
     return <TopAlbumsGrid albums={albums} />;
   } catch (err) {
     return (
-      <ComingSoon
+      <EmptyState
         title="Couldn't load top albums"
         description={err instanceof Error ? err.message : ""}
       />
@@ -84,7 +84,7 @@ async function TracksSection({
     return <TopTracksList tracks={tracks} />;
   } catch (err) {
     return (
-      <ComingSoon
+      <EmptyState
         title="Couldn't load top tracks"
         description={err instanceof Error ? err.message : ""}
       />

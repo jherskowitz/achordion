@@ -23,7 +23,7 @@ import {
   ExternalLinks,
   categoriseLinks,
 } from "@/components/achordion/external-links";
-import { ComingSoon } from "@/components/achordion/coming-soon";
+import { EmptyState } from "@/components/achordion/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface PageParams {
@@ -167,7 +167,7 @@ async function AlbumBody({ mbid }: { mbid: string }) {
             {release ? (
               <TrackList release={release} listenCounts={listenCounts} />
             ) : (
-              <ComingSoon
+              <EmptyState
                 title="No track listing"
                 description="MusicBrainz doesn't have a release on file we can show tracks from."
               />

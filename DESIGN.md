@@ -339,7 +339,7 @@ Below `md`, the screenshot hides — the column collapses to single-column copy 
 
 ### Empty state
 
-`<ComingSoon>` is the canonical empty-state placeholder. Title + body + optional icon. Don't roll your own "no data" markup.
+`<EmptyState>` is the canonical empty-state placeholder. Title + body + optional icon. Don't roll your own "no data" markup.
 
 ---
 
@@ -399,7 +399,7 @@ Things this doc points at that aren't fully baked yet:
 1. ✅ **Brand colors lifted into CSS variables** (`--parachord-accent`, `--achordion-brand`). Done.
 2. ✅ **Sidebar palette as CSS variables** (`--palette-violet`, `--palette-pink`, etc.). Done.
 3. ✅ **`<ContentSection>` extracted** to `components/achordion/content-section.tsx`. Done.
-4. **`<EmptyState>`** — `<ComingSoon>` is the de-facto empty state but has a name that ties it to one specific use. Rename + extract for general use. Tracked in [Issue #10](https://github.com/jherskowitz/achordion/issues/10).
+4. **`<EmptyState>`** — `<EmptyState>` is the de-facto empty state but has a name that ties it to one specific use. Rename + extract for general use. Tracked in [Issue #10](https://github.com/jherskowitz/achordion/issues/10).
 5. **Heading hierarchy audit.** Lighthouse caught `<h1> → <h3>` skips on the home (fixed). Worth a sweep across every page once: `h1` only at page top, `h2` for section headings, `h3` only where the structure actually demands it. Tracked in [Issue #11](https://github.com/jherskowitz/achordion/issues/11).
 
 If you spot a pattern that's recurring without a name, **add it here first**, then refactor the codebase to match. The doc is the contract.

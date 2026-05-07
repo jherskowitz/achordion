@@ -15,7 +15,7 @@ import { auth } from "@/auth";
 import type { ParachordTrack } from "@/lib/parachord";
 import { PageShell } from "@/components/achordion/page-shell";
 import { PlaylistCard } from "@/components/achordion/playlist-card";
-import { ComingSoon } from "@/components/achordion/coming-soon";
+import { EmptyState } from "@/components/achordion/empty-state";
 import { ExploreTrackList } from "@/components/achordion/explore-track-list";
 import { FamiliaritySlider } from "@/components/achordion/familiarity-slider";
 import { thresholdFromFamiliarity } from "@/lib/familiarity";
@@ -410,7 +410,7 @@ export default async function ExploreOverviewPage({
   if (!username) {
     return (
       <PageShell className="pt-8">
-        <ComingSoon
+        <EmptyState
           title="Sign in to explore"
           description="Personalized weekly playlists, recommendations, and similar listeners need a ListenBrainz identity. Sign in with MusicBrainz to see them."
           hint={

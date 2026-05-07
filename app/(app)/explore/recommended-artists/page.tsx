@@ -10,7 +10,7 @@ import { thresholdFromFamiliarity } from "@/lib/familiarity";
 import { FamiliaritySlider } from "@/components/achordion/familiarity-slider";
 import { PageShell } from "@/components/achordion/page-shell";
 import { RecommendedArtistsList } from "@/components/achordion/recommended-artists-list";
-import { ComingSoon } from "@/components/achordion/coming-soon";
+import { EmptyState } from "@/components/achordion/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 
@@ -41,7 +41,7 @@ async function Body({
   ]);
   if (recordings.length === 0) {
     return (
-      <ComingSoon
+      <EmptyState
         title="No recommendations yet"
         description="ListenBrainz starts surfacing recommendations after a few weeks of listens."
       />
@@ -87,7 +87,7 @@ export default async function RecommendedArtistsPage({
   if (!username) {
     return (
       <PageShell className="pt-8">
-        <ComingSoon
+        <EmptyState
           title="Sign in for recommended artists"
           description="LB's collaborative-filter model lifts artists out of your top track recommendations."
           hint={

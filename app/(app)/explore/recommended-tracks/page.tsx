@@ -13,7 +13,7 @@ import { FamiliaritySlider } from "@/components/achordion/familiarity-slider";
 import { OpenInParachordButton } from "@/components/achordion/open-in-parachord-button";
 import { TrackListActionsMenu } from "@/components/achordion/track-list-actions-menu";
 import { PageShell } from "@/components/achordion/page-shell";
-import { ComingSoon } from "@/components/achordion/coming-soon";
+import { EmptyState } from "@/components/achordion/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 
@@ -82,7 +82,7 @@ async function Body({
   const { top, metadata } = await loadFilteredTracks(username, familiarity);
   if (top.length === 0) {
     return (
-      <ComingSoon
+      <EmptyState
         title="No recommendations yet"
         description="Listen for a few weeks and ListenBrainz will surface picks here."
       />
@@ -148,7 +148,7 @@ export default async function RecommendedTracksPage({
   if (!username) {
     return (
       <PageShell className="pt-8">
-        <ComingSoon
+        <EmptyState
           title="Sign in for recommended tracks"
           description="LB's collaborative-filter model picks tracks based on listeners with overlapping taste."
           hint={

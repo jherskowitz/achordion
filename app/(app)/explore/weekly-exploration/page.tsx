@@ -10,7 +10,7 @@ import {
 } from "@/lib/clients/listenbrainz";
 import { PageShell } from "@/components/achordion/page-shell";
 import { PlaylistCard } from "@/components/achordion/playlist-card";
-import { ComingSoon } from "@/components/achordion/coming-soon";
+import { EmptyState } from "@/components/achordion/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 
@@ -52,7 +52,7 @@ async function Body({ username }: { username: string }) {
   const page = await getCreatedForPlaylists(username, 100).catch(() => null);
   if (!page) {
     return (
-      <ComingSoon
+      <EmptyState
         title="Couldn't load playlists"
         description="ListenBrainz didn't respond. Try again in a moment."
       />
@@ -68,7 +68,7 @@ async function Body({ username }: { username: string }) {
 
   if (matches.length === 0) {
     return (
-      <ComingSoon
+      <EmptyState
         title="No explorations yet"
         description="Weekly Explorations push you toward stuff outside your usual orbit. Your first one shows up after a couple weeks of listening."
       />
@@ -94,7 +94,7 @@ export default async function WeeklyExplorationPage() {
   if (!username) {
     return (
       <PageShell className="pt-8">
-        <ComingSoon
+        <EmptyState
           title="Sign in for Weekly Explorations"
           description="A fresh exploration playlist arrives every week — adjacent to your taste but not too close."
           hint={

@@ -8,7 +8,7 @@ import {
 } from "@/lib/clients/listenbrainz";
 import { caaReleaseUrl } from "@/lib/clients/coverart";
 import { parachordPlayTrack } from "@/lib/parachord";
-import { ComingSoon } from "@/components/achordion/coming-soon";
+import { EmptyState } from "@/components/achordion/empty-state";
 import { CoverArt } from "@/components/achordion/cover-art";
 import { PageShell } from "@/components/achordion/page-shell";
 import type { ParachordTrack } from "@/lib/parachord";
@@ -146,7 +146,7 @@ async function LovesBody({ name }: { name: string }) {
   const { feedback, tracks } = await loadLoves(name);
   if (feedback.length === 0) {
     return (
-      <ComingSoon
+      <EmptyState
         title={`${name} hasn't loved any tracks yet`}
         description="Loves on ListenBrainz appear here — anything they've ❤️'d on a track shows up in this list."
       />
