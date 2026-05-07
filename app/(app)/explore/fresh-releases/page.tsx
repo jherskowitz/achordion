@@ -132,7 +132,12 @@ export default async function FreshReleasesPage({ searchParams }: PageProps) {
 
   return (
     <PageShell className="pt-8">
-      <div className="mb-8 flex flex-wrap items-center gap-3">
+      {/* Mobile: each filter group lives on its own row, full-width
+          so the longer "Albums + EPs / Albums / EPs / Singles / All"
+          set doesn't share a line with another group and overflow.
+          sm+ goes back to the inline layout with the time-range
+          pill right-justified. */}
+      <div className="mb-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
         {username && (
           <FilterPills
             param="source"
@@ -155,7 +160,7 @@ export default async function FreshReleasesPage({ searchParams }: PageProps) {
           options={DAYS_OPTIONS}
           defaultValue="14"
           ariaLabel="Time range"
-          className="ml-auto"
+          className="sm:ml-auto"
         />
       </div>
 

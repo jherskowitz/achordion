@@ -142,8 +142,14 @@ export function SearchTypeahead({ initialQuery }: { initialQuery: string }) {
           className="border-border/60 bg-background placeholder:text-muted-foreground/70 focus:ring-ring/30 h-10 w-full rounded-lg border px-3 pl-9 text-sm outline-none focus:ring-2"
         />
         {loading && (
+          // `type="search"` inputs render a native clear-X button at
+          // the right edge that the browser owns (no portable way to
+          // restyle); `right-3` would put the spinner directly on top
+          // of it. Sit the spinner at `right-9` so it lands cleanly to
+          // the left of the X regardless of which browser renders the
+          // clear control.
           <Loader2
-            className="text-muted-foreground/70 absolute right-3 size-4 animate-spin"
+            className="text-muted-foreground/70 absolute right-9 size-4 animate-spin"
             aria-label="Searching"
           />
         )}
