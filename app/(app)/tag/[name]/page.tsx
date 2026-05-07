@@ -5,7 +5,12 @@ import {
   getArtistsByTag,
   getReleaseGroupsByTag,
 } from "@/lib/clients/musicbrainz";
-import { getLbRadio, type LbRadioTrack } from "@/lib/clients/listenbrainz";
+import {
+  getArtistPopularityBatch,
+  getLbRadio,
+  getReleaseGroupPopularityBatch,
+  type LbRadioTrack,
+} from "@/lib/clients/listenbrainz";
 import { caaReleaseGroupUrl } from "@/lib/clients/coverart";
 import { ArtistAvatar } from "@/components/achordion/artist-avatar";
 import { CoverArt } from "@/components/achordion/cover-art";
@@ -38,20 +43,6 @@ function buildPopularityRanks(
   return { artists, releases };
 }
 
-/** Stable comparator that pulls items present in `rank` to the top
- *  in rank order, then leaves the rest in their original order. */
-function rankedSort<T>(items: T[], idOf: (t: T) => string, rank: Map<string, number>): T[] {
-  const sorted = items.slice();
-  sorted.sort((a, b) => {
-    const ra = rank.get(idOf(a));
-    const rb = rank.get(idOf(b));
-    if (ra !== undefined && rb !== undefined) return ra - rb;
-    if (ra !== undefined) return -1;
-    if (rb !== undefined) return 1;
-    return 0;
-  });
-  return sorted;
-}
 
 interface PageParams {
   params: Promise<{ name: string }>;
@@ -65,25 +56,42 @@ function titleCase(s: string): string {
 }
 
 async function ArtistsForTag({ tag }: { tag: string }) {
-  // Fetch MB tag-list + LB Radio in parallel. Both are cached, both
-  // are needed: MB for the canonical artist set, LB Radio for the
-  // recency-weighted popularity ordering.
-  const [artists, radio] = await Promise.all([
-    getArtistsByTag(tag, 24),
+  // Pull a WIDE candidate pool from MB (100 instead of 24). MB's
+  // tag-vote ordering surfaces editor-curated obscurities by default
+  // — we want the broader set so we can re-rank by real listen
+  // activity and slice the head. After re-rank, only the top 24
+  // render.
+  const [artistsAll, radio] = await Promise.all([
+    getArtistsByTag(tag, 100),
     getLbRadio(`tag:(${tag})`, "easy").catch(() => null),
   ]);
-  if (artists.length === 0) {
+  if (artistsAll.length === 0) {
     return (
       <p className="text-muted-foreground text-sm">No artists for this tag.</p>
     );
   }
+  // Batch one LB call to get total_listen_count for every candidate
+  // (single POST, not 100 GETs). Missing entries imply zero listens.
+  const popularity = await getArtistPopularityBatch(
+    artistsAll.map((a) => a.id),
+  ).catch(() => new Map<string, number>());
+  // Sort: primary = LB total_listen_count desc (the user's "I'd
+  // expect more popular artists" signal); secondary = LB Radio rank
+  // (recency tiebreak — currently-trending artists bubble up within
+  // their popularity bracket); tertiary = MB's natural order.
   const ranks = buildPopularityRanks(radio);
-  const sorted = ranks
-    ? rankedSort(artists, (a) => a.id, ranks.artists)
-    : artists;
+  const sorted = artistsAll.slice().sort((a, b) => {
+    const pa = popularity.get(a.id) ?? 0;
+    const pb = popularity.get(b.id) ?? 0;
+    if (pa !== pb) return pb - pa;
+    const ra = ranks?.artists.get(a.id) ?? Infinity;
+    const rb = ranks?.artists.get(b.id) ?? Infinity;
+    return ra - rb;
+  });
+  const artists = sorted.slice(0, 24);
   return (
     <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-      {sorted.map((a) => (
+      {artists.map((a) => (
         <li key={a.id}>
           <Link
             href={`/artist/${a.id}`}
@@ -122,29 +130,37 @@ async function ArtistsForTag({ tag }: { tag: string }) {
 }
 
 async function AlbumsForTag({ tag }: { tag: string }) {
-  // LB Radio reports release MBIDs (single printings) but MB returns
-  // release-GROUP MBIDs (the abstract album), which means a direct
-  // rank lookup mostly misses. Falling back to the ARTIST popularity
-  // rank from the radio gets us "albums by recently-hot artists for
-  // this tag float to the top" — close enough to the user's "what's
-  // hot recently" intent without a per-release-group lookup chain.
-  const [groups, radio] = await Promise.all([
-    getReleaseGroupsByTag(tag, 24),
+  // Same widen-and-rerank pattern as ArtistsForTag: pull 100 MB
+  // candidates, batch-query LB for release-group listen counts, sort
+  // by all-time popularity (so the household-name records actually
+  // appear), tie-break by the artist's LB Radio rank for the recency
+  // signal. LB Radio reports release (not release-group) MBIDs so we
+  // fall back to artist-rank for the recency tiebreak — close enough
+  // to "what's hot in this genre" without a per-release-group join.
+  const [groupsAll, radio] = await Promise.all([
+    getReleaseGroupsByTag(tag, 100),
     getLbRadio(`tag:(${tag})`, "easy").catch(() => null),
   ]);
-  if (groups.length === 0) {
+  if (groupsAll.length === 0) {
     return (
       <p className="text-muted-foreground text-sm">No albums for this tag.</p>
     );
   }
+  const popularity = await getReleaseGroupPopularityBatch(
+    groupsAll.map((g) => g.id),
+  ).catch(() => new Map<string, number>());
   const ranks = buildPopularityRanks(radio);
-  const sorted = ranks
-    ? rankedSort(
-        groups,
-        (rg) => rg["artist-credit"]?.[0]?.artist?.id ?? "",
-        ranks.artists,
-      )
-    : groups;
+  const sortedAll = groupsAll.slice().sort((a, b) => {
+    const pa = popularity.get(a.id) ?? 0;
+    const pb = popularity.get(b.id) ?? 0;
+    if (pa !== pb) return pb - pa;
+    const aArtist = a["artist-credit"]?.[0]?.artist?.id ?? "";
+    const bArtist = b["artist-credit"]?.[0]?.artist?.id ?? "";
+    const ra = ranks?.artists.get(aArtist) ?? Infinity;
+    const rb = ranks?.artists.get(bArtist) ?? Infinity;
+    return ra - rb;
+  });
+  const sorted = sortedAll.slice(0, 24);
   return (
     <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
       {sorted.map((rg) => {
