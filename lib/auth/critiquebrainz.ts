@@ -12,8 +12,8 @@ import { z } from "zod";
  * CritiqueBrainz" flow whose access token lands in an encrypted
  * `cb-token` cookie via the routes under `app/api/critiquebrainz/`.
  *
- * Register an app at https://critiquebrainz.org/oauth/client/list and
- * set:
+ * Register an app at https://critiquebrainz.org/profile/applications/
+ * and set:
  *   AUTH_CRITIQUEBRAINZ_ID
  *   AUTH_CRITIQUEBRAINZ_SECRET
  *
