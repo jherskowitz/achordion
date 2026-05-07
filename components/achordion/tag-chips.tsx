@@ -263,14 +263,23 @@ export function TagChips({
             </button>
           </form>
         ) : (
-          <button
-            type="button"
-            onClick={() => setAddOpen(true)}
-            className="border-border/60 hover:border-foreground/50 hover:bg-muted/30 inline-flex items-center gap-1 rounded-full border px-3 py-0.5 text-xs text-muted-foreground"
-          >
-            <Plus className="size-3" />
-            tag
-          </button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={() => setAddOpen(true)}
+                aria-label="Add a tag"
+                className="border-border/60 hover:border-foreground/50 hover:bg-muted/30 inline-flex items-center gap-1 rounded-full border px-3 py-0.5 text-xs text-muted-foreground"
+              >
+                <Plus className="size-3" />
+                tag
+              </button>
+            </TooltipTrigger>
+            <TooltipContent className="max-w-[16rem] text-center text-xs">
+              Add a community-driven tag — counts roll up across
+              MusicBrainz and help define radio stations.
+            </TooltipContent>
+          </Tooltip>
         )
       )}
       {votesQuery.isLoading && sessionStatus === "authenticated" && (
