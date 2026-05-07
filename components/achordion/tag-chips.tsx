@@ -438,6 +438,165 @@ function mergeTags(initial: TagInput[], pending: TagInput[]): TagInput[] {
 }
 
 /**
+ * Bundled fallback genre list — the ~120 most common genres / styles
+ * users want to type, sourced from MB's curated genre vocabulary
+ * (and trimmed to a maintainable subset). Used as the initialData for
+ * the autocomplete query so the dropdown works on first open before
+ * the API resolves, AND as the fallback when the API returns empty
+ * (network issues, schema drift, etc.). Lower-cased to match how MB
+ * stores them.
+ */
+const STATIC_GENRES: string[] = [
+  "acid house",
+  "acid jazz",
+  "acid rock",
+  "acoustic",
+  "afrobeat",
+  "afro-house",
+  "alternative",
+  "alternative country",
+  "alternative dance",
+  "alternative folk",
+  "alternative hip hop",
+  "alternative metal",
+  "alternative pop",
+  "alternative rock",
+  "ambient",
+  "americana",
+  "art pop",
+  "art punk",
+  "art rock",
+  "avant-garde",
+  "baroque",
+  "bass",
+  "bebop",
+  "big band",
+  "black metal",
+  "blues",
+  "blues rock",
+  "bluegrass",
+  "boom bap",
+  "bossa nova",
+  "breakbeat",
+  "britpop",
+  "celtic",
+  "chamber pop",
+  "chillwave",
+  "chiptune",
+  "christmas",
+  "classical",
+  "classic rock",
+  "country",
+  "country rock",
+  "dance",
+  "dance-pop",
+  "dancehall",
+  "death metal",
+  "deep house",
+  "disco",
+  "doom metal",
+  "downtempo",
+  "drone",
+  "drum and bass",
+  "dub",
+  "dubstep",
+  "edm",
+  "electro",
+  "electronic",
+  "electronica",
+  "emo",
+  "experimental",
+  "folk",
+  "folk rock",
+  "funk",
+  "fusion",
+  "garage",
+  "garage rock",
+  "glam rock",
+  "gospel",
+  "gothic",
+  "gothic rock",
+  "grime",
+  "grindcore",
+  "grunge",
+  "hardcore",
+  "hardcore punk",
+  "hard rock",
+  "heavy metal",
+  "hip hop",
+  "house",
+  "indie",
+  "indie folk",
+  "indie pop",
+  "indie rock",
+  "industrial",
+  "instrumental",
+  "j-pop",
+  "jazz",
+  "jazz fusion",
+  "k-pop",
+  "krautrock",
+  "latin",
+  "lo-fi",
+  "math rock",
+  "metal",
+  "metalcore",
+  "minimal",
+  "neo-soul",
+  "new age",
+  "new wave",
+  "noise",
+  "nu metal",
+  "opera",
+  "orchestral",
+  "pop",
+  "pop punk",
+  "pop rock",
+  "post-hardcore",
+  "post-metal",
+  "post-punk",
+  "post-rock",
+  "power pop",
+  "progressive metal",
+  "progressive rock",
+  "psychedelic",
+  "psychedelic rock",
+  "punk",
+  "punk rock",
+  "r&b",
+  "rap",
+  "reggae",
+  "reggaeton",
+  "rock",
+  "rock and roll",
+  "rockabilly",
+  "shoegaze",
+  "singer-songwriter",
+  "ska",
+  "ska punk",
+  "sludge metal",
+  "soft rock",
+  "soul",
+  "soundtrack",
+  "southern rock",
+  "space rock",
+  "spoken word",
+  "stoner rock",
+  "surf rock",
+  "swing",
+  "symphonic",
+  "synth-pop",
+  "synthwave",
+  "techno",
+  "thrash metal",
+  "trance",
+  "trap",
+  "trip hop",
+  "vaporwave",
+  "world",
+];
+
+/**
  * Inline new-tag input with autocomplete from MB's curated genre list.
  *
  * MB doesn't expose a generic tag-search endpoint, but the curated
@@ -464,25 +623,37 @@ function AddTagForm({
   onCancel: () => void;
   onPickSuggestion: (name: string) => void;
 }) {
+  // Try the API first (MB curated genres ~500 entries); fall back to
+  // a small static list bundled in the client when the API call
+  // fails or returns nothing. The static list covers the most common
+  // genres so autocomplete still works in dev, behind firewalls, or
+  // when MB's endpoint changes shape.
   const genresQuery = useQuery<string[]>({
     queryKey: ["mb-genres"],
     queryFn: async () => {
-      const r = await fetch("/api/musicbrainz/genres", {
-        credentials: "same-origin",
-      });
-      if (!r.ok) return [] as string[];
-      const data = (await r.json()) as { genres?: string[] };
-      return data.genres ?? [];
+      try {
+        const r = await fetch("/api/musicbrainz/genres", {
+          credentials: "same-origin",
+        });
+        if (!r.ok) return STATIC_GENRES;
+        const data = (await r.json()) as { genres?: string[] };
+        const list = data.genres ?? [];
+        return list.length > 0 ? list : STATIC_GENRES;
+      } catch {
+        return STATIC_GENRES;
+      }
     },
-    // Genre list barely changes — once loaded, cache it for the
-    // session and skip any refetch.
     staleTime: Number.POSITIVE_INFINITY,
     refetchOnWindowFocus: false,
+    // Render with the static list immediately while the API call
+    // resolves — no "no suggestions" gap on first open.
+    initialData: STATIC_GENRES,
   });
 
   const trimmed = draft.trim().toLowerCase();
-  const matches = trimmed.length > 0 && genresQuery.data
-    ? genresQuery.data
+  const pool = genresQuery.data ?? STATIC_GENRES;
+  const matches = trimmed.length > 0
+    ? pool
         .filter((g) => g.includes(trimmed))
         .sort((a, b) => {
           // Prefix matches first, then substring.
@@ -495,7 +666,13 @@ function AddTagForm({
     : [];
 
   return (
-    <form onSubmit={onSubmit} className="relative flex items-center gap-1">
+    <form
+      onSubmit={onSubmit}
+      // Mount-in animation so the form swaps in smoothly when the
+      // user clicks "+ tag" — the button collapses, the input fades
+      // and slides in from the left over 150ms.
+      className="relative flex animate-in fade-in slide-in-from-left-2 items-center gap-1 duration-150 ease-out"
+    >
       <div className="relative">
         <input
           autoFocus
