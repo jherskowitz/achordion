@@ -3,6 +3,8 @@ import { PageHeader } from "@/components/achordion/page-header";
 import { ComingSoon } from "@/components/achordion/coming-soon";
 
 export const metadata = { title: "Changelog" };
+// See app/(content)/layout.tsx for the static-rendering rationale.
+export const revalidate = 86400;
 
 export default function ChangelogPage() {
   return (

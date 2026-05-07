@@ -3,6 +3,8 @@ import { PageShell } from "@/components/achordion/page-shell";
 import { PageHeader } from "@/components/achordion/page-header";
 
 export const metadata = { title: "Donate" };
+// See app/(content)/layout.tsx for the static-rendering rationale.
+export const revalidate = 86400;
 
 // Shared inline-link colour with the about page — sky-500/-400 reads
 // well on the page background in both light and dark modes.

@@ -5,6 +5,10 @@ import { PageHeader } from "@/components/achordion/page-header";
 import { ContentSection } from "@/components/achordion/content-section";
 
 export const metadata = { title: "About" };
+// Static markup; rebuild at most once per day if traffic comes in.
+// Combined with PUBLIC_ENTITY_CACHE in next.config.ts, the page
+// renders once per 24h per Vercel edge, then serves from cache.
+export const revalidate = 86400;
 
 // Light-blue editorial link styling shared by every inline link on
 // the footer-linked content pages (about / donate). Sky-500 reads

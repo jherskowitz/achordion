@@ -4,6 +4,8 @@ import { PageHeader } from "@/components/achordion/page-header";
 import { ContentSection } from "@/components/achordion/content-section";
 
 export const metadata = { title: "FAQ" };
+// See app/(content)/layout.tsx for the static-rendering rationale.
+export const revalidate = 86400;
 
 // Same light-blue editorial link style used on /about and /donate.
 const LINK_CLASS =

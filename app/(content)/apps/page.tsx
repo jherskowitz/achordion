@@ -3,6 +3,8 @@ import { PageHeader } from "@/components/achordion/page-header";
 import { LbClientMarketplace } from "@/components/achordion/lb-client-marketplace";
 
 export const metadata = { title: "App Marketplace" };
+// See app/(content)/layout.tsx for the static-rendering rationale.
+export const revalidate = 86400;
 
 export default function AppsPage() {
   return (
