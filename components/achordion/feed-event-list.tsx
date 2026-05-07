@@ -9,6 +9,7 @@ import {
   Music,
   MessageSquareQuote,
   HandHeart,
+  Heart,
   Star,
 } from "lucide-react";
 import { CoverArt } from "./cover-art";
@@ -263,6 +264,40 @@ function ListenEvent({ event }: { event: FeedEvent }) {
           <span className="text-muted-foreground/70">
             {" · "}
             {relativeTime(when)}
+          </span>
+        </>
+      }
+    >
+      <TrackEventBody trackMeta={m?.track_metadata} />
+    </EventShell>
+  );
+}
+
+// ─── loved_recording (synthetic — see getLovedRecordingEvents) ──────
+
+interface LoveMeta {
+  track_metadata?: TrackMetaShape;
+  recording_mbid?: string | null;
+}
+
+function LovedRecordingEvent({ event }: { event: FeedEvent }) {
+  const m = event.metadata as LoveMeta | undefined;
+  return (
+    <EventShell
+      // Filled heart in the same emerald accent the rest of the
+      // app uses for "loved" state (track-actions menu, listen rows).
+      icon={
+        <Heart
+          className="size-4 fill-emerald-500/80 text-emerald-500/80"
+          aria-hidden="true"
+        />
+      }
+      header={
+        <>
+          <UserLink name={event.user_name} /> loved a track
+          <span className="text-muted-foreground/70">
+            {" · "}
+            {relativeTime(event.created)}
           </span>
         </>
       }
@@ -680,6 +715,8 @@ export async function FeedEventList({
             return <PinEvent event={e} viewer={viewer} key={key} />;
           case "listen":
             return <ListenEvent event={e} key={key} />;
+          case "loved_recording":
+            return <LovedRecordingEvent event={e} key={key} />;
           case "recording_recommendation":
             return (
               <RecordingRecommendationEvent

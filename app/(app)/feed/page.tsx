@@ -1,7 +1,12 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import { auth } from "@/auth";
-import { getUserFeed } from "@/lib/clients/listenbrainz";
+import {
+  getFollowing,
+  getLovedRecordingEvents,
+  getUserFeed,
+  type FeedEvent,
+} from "@/lib/clients/listenbrainz";
 import { getLbTokenForRequest } from "@/lib/lb-token";
 import { PageShell } from "@/components/achordion/page-shell";
 import { EmptyState } from "@/components/achordion/empty-state";
@@ -41,7 +46,19 @@ async function FeedBody({
       />
     );
   }
-  const events = await getUserFeed(name, token, { count: 50 });
+  // Fetch native feed + the love-events fan-out in parallel. LB's
+  // feed endpoint doesn't emit loves natively, so we splice them in
+  // by walking the viewer's following list and pulling each user's
+  // recent feedback. Cached at the LB-client layer; steady-state
+  // cost is mostly cache hits.
+  const [events, lovedEvents] = await Promise.all([
+    getUserFeed(name, token, { count: 50 }),
+    getFollowing(name)
+      .catch(() => [] as string[])
+      .then((following) =>
+        getLovedRecordingEvents(following).catch(() => [] as FeedEvent[]),
+      ),
+  ]);
   if (events === null) {
     return (
       <EmptyState
@@ -50,9 +67,17 @@ async function FeedBody({
       />
     );
   }
+  // Merge native feed + synthetic loves, sort by `created` desc, and
+  // re-cap at the same 50 the page started with so adding loves
+  // doesn't unbounded-grow the list. Self-loves are filtered with
+  // the same excludeSelf logic the rest of the feed uses.
+  const merged = [...events, ...lovedEvents].sort(
+    (a, b) => b.created - a.created,
+  );
+  const sliced = merged.slice(0, 50);
   const filtered = excludeSelf
-    ? events.filter((e) => (e.user_name ?? "") !== name)
-    : events;
+    ? sliced.filter((e) => (e.user_name ?? "") !== name)
+    : sliced;
   // viewer = current user's mbUsername — lets FeedEventList hide the
   // Thanks button on the viewer's own pins / recs (LB 403s in that
   // case) while still rendering it for everyone else's.

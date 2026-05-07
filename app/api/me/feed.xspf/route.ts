@@ -1,6 +1,11 @@
 import { auth } from "@/auth";
 import { getLbTokenForRequest } from "@/lib/lb-token";
-import { getUserFeed, type FeedEvent } from "@/lib/clients/listenbrainz";
+import {
+  getFollowing,
+  getLovedRecordingEvents,
+  getUserFeed,
+  type FeedEvent,
+} from "@/lib/clients/listenbrainz";
 import {
   tracksToXspf,
   xspfDownloadResponse,
@@ -23,14 +28,28 @@ export async function GET(request: Request) {
   const excludeSelf = url.searchParams.get("exclude_self") === "1";
   const count = clampCount(url.searchParams.get("count"), 100, 1, 1000);
 
-  const events = await getUserFeed(viewer, token, { count });
+  // Mirror the page's feed-merge logic: native feed + synthetic
+  // loved_recording events from the viewer's follow graph, sorted by
+  // timestamp. Keeps the XSPF export aligned with what the user sees
+  // on /feed.
+  const [events, lovedEvents] = await Promise.all([
+    getUserFeed(viewer, token, { count }),
+    getFollowing(viewer)
+      .catch(() => [] as string[])
+      .then((following) =>
+        getLovedRecordingEvents(following).catch(() => [] as FeedEvent[]),
+      ),
+  ]);
   if (events === null) {
     return new Response("Couldn't load feed", { status: 502 });
   }
-
+  const merged = [...events, ...lovedEvents].sort(
+    (a, b) => b.created - a.created,
+  );
+  const sliced = merged.slice(0, count);
   const filtered = excludeSelf
-    ? events.filter((e) => (e.user_name ?? "") !== viewer)
-    : events;
+    ? sliced.filter((e) => (e.user_name ?? "") !== viewer)
+    : sliced;
   const tracks = feedEventsToXspfTracks(filtered);
 
   const identifier = `https://${url.host}/feed${excludeSelf ? "?exclude_self=1" : ""}`;

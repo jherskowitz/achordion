@@ -2329,6 +2329,59 @@ export type FeedEvent = z.infer<typeof FeedEventSchema>;
 export type FeedTrackMetadata = z.infer<typeof FeedTrackMetadataSchema>;
 
 /**
+ * Synthetic event_type we emit for "user X loved track Y" rows
+ * stitched into the feed from each followed user's `/feedback`
+ * history. LB's native feed endpoint doesn't include loves, so we
+ * mint these client-side and let the FeedEventList renderer
+ * pattern-match on the type. Keeps the merge straightforward
+ * (same FeedEvent shape) without a parallel data path.
+ */
+export const LOVED_RECORDING_EVENT_TYPE = "loved_recording";
+
+/**
+ * Fetch recent loves from each user in a `following` list and emit
+ * them as synthetic FeedEvent entries. Used to splice loved-track
+ * activity into the personal feed (LB's feed endpoint omits loves).
+ *
+ * Per-user fetch is cached at the LB-client layer (5 min revalidate),
+ * so steady-state cost is a cache hit per friend. Cold cache fans
+ * out N parallel calls; we cap at `maxUsers` (default 50) to bound
+ * the per-render cost for users with very large follow lists.
+ *
+ * Each user's `lovesPerUser` (default 5) is the recent-love window
+ * we pull. With 50 users × 5 loves = 250 candidate events, plenty
+ * of room for the feed merge to cherry-pick the freshest ones.
+ */
+export async function getLovedRecordingEvents(
+  following: string[],
+  opts: { lovesPerUser?: number; maxUsers?: number } = {},
+): Promise<FeedEvent[]> {
+  const lovesPerUser = opts.lovesPerUser ?? 5;
+  const maxUsers = opts.maxUsers ?? 50;
+  if (following.length === 0) return [];
+  const targets = following.slice(0, maxUsers);
+  const fanOut = await Promise.all(
+    targets.map(async (user) => {
+      const items = await getUserFeedback(user, {
+        score: 1,
+        count: lovesPerUser,
+      }).catch(() => [] as FeedbackItem[]);
+      return items.map<FeedEvent>((item) => ({
+        id: null,
+        created: item.created,
+        event_type: LOVED_RECORDING_EVENT_TYPE,
+        user_name: user,
+        metadata: {
+          track_metadata: item.track_metadata ?? null,
+          recording_mbid: item.recording_mbid ?? null,
+        },
+      }));
+    }),
+  );
+  return fanOut.flat();
+}
+
+/**
  * Fetch the personal feed for a LB user. Requires that user's own
  * authentication token — LB only returns the feed for the token owner,
  * never for arbitrary users. Caller is responsible for ensuring the
