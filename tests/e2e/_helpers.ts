@@ -112,6 +112,14 @@ export async function visit(
     // (cover-art-archive thumb 500s, archive.org 404s, gstatic
     // favicons, ListenBrainz hiccups, etc.). Cover 4xx + 5xx.
     /Failed to load resource: the server responded with a status of [45]\d\d/i,
+    // net::ERR_* — Chromium emits these for transport-level failures
+    // (TLS handshake, DNS, connection reset). The CI server runs
+    // plain HTTP on localhost, so any net::ERR_SSL_*, net::ERR_CERT_*,
+    // or net::ERR_NAME_NOT_RESOLVED is necessarily a cross-origin
+    // upstream (cover-art-archive, archive.org, etc.) and outside
+    // our control. Same root-cause-bucket as the 4xx/5xx allowlist
+    // above.
+    /Failed to load resource: net::ERR_/i,
     // useParachordPresence opens ws://127.0.0.1:9876 to detect the
     // desktop app. In CI (or any non-developer environment) the WS
     // refuses, Chromium logs it at error level, and we'd flag a
