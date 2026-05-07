@@ -434,10 +434,14 @@ function TagChip({
                 (upActive
                   ? "text-emerald-600 dark:text-emerald-400"
                   : "text-muted-foreground hover:text-foreground") +
-                " inline-flex size-4 items-center justify-center rounded-full disabled:opacity-50"
+                // Tap-target bump on coarse pointers (touch). Mouse
+                // users get the compact 16px caret we want for chip
+                // density; touch devices get a finger-sized 36px hit
+                // area so voting on phone is actually feasible.
+                " inline-flex size-4 items-center justify-center rounded-full disabled:opacity-50 pointer-coarse:size-9"
               }
             >
-              <ChevronUp className="size-3.5" />
+              <ChevronUp className="size-3.5 pointer-coarse:size-5" />
             </button>
             {displayCount > 0 && (
               <span className="text-muted-foreground tabular-nums">
@@ -453,10 +457,10 @@ function TagChip({
                 (downActive
                   ? "text-rose-600 dark:text-rose-400"
                   : "text-muted-foreground hover:text-foreground") +
-                " inline-flex size-4 items-center justify-center rounded-full disabled:opacity-50"
+                " inline-flex size-4 items-center justify-center rounded-full disabled:opacity-50 pointer-coarse:size-9"
               }
             >
-              <ChevronDown className="size-3.5" />
+              <ChevronDown className="size-3.5 pointer-coarse:size-5" />
             </button>
           </span>
         </TooltipTrigger>
