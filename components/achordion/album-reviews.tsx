@@ -11,6 +11,9 @@ import {
 import type { ArtistExternalLink } from "@/lib/clients/musicbrainz";
 import { stripHtml } from "@/lib/strip-html";
 import { safeHttpUrl } from "./external-links";
+import { isFeatureEnabledForViewer } from "@/lib/flags";
+import { hasCbConnection } from "@/lib/cb-token";
+import { WriteReviewForm } from "./write-review-form";
 
 const SNIPPET_CHARS = 480;
 
@@ -31,15 +34,28 @@ interface AlbumReviewsProps {
  * has anything — sparse coverage is the norm.
  */
 export async function AlbumReviews({ mbid, urls }: AlbumReviewsProps) {
+  const [canRead, canWrite] = await Promise.all([
+    isFeatureEnabledForViewer("reviews"),
+    isFeatureEnabledForViewer("write_reviews"),
+  ]);
+  if (!canRead && !canWrite) return null;
+
   const wikipediaUrl = findAlbumWikipediaUrl(urls);
-  const [cbReviews, reception] = await Promise.all([
-    getReleaseGroupReviews(mbid).catch(() => [] as CritiqueBrainzReview[]),
-    wikipediaUrl
+  const [cbReviews, reception, cbConnected] = await Promise.all([
+    canRead
+      ? getReleaseGroupReviews(mbid).catch(() => [] as CritiqueBrainzReview[])
+      : Promise.resolve([] as CritiqueBrainzReview[]),
+    canRead && wikipediaUrl
       ? getCriticalReception(wikipediaUrl).catch(() => null)
       : Promise.resolve(null),
+    canWrite ? hasCbConnection() : Promise.resolve(false),
   ]);
 
-  if (cbReviews.length === 0 && !reception) return null;
+  // Render the section when there's anything to show: existing
+  // reviews, the Wikipedia fallback, OR the write-review affordance
+  // for users who have it enabled (so an album with zero reviews
+  // still surfaces the "write the first one" entry point).
+  if (cbReviews.length === 0 && !reception && !canWrite) return null;
 
   return (
     <section>
@@ -51,6 +67,7 @@ export async function AlbumReviews({ mbid, urls }: AlbumReviewsProps) {
       ) : (
         reception && <WikipediaReception reception={reception} />
       )}
+      {canWrite && <WriteReviewForm mbid={mbid} connected={cbConnected} />}
     </section>
   );
 }

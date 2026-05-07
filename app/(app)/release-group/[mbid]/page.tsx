@@ -113,7 +113,15 @@ async function AlbumBody({ mbid }: { mbid: string }) {
     ? await fetchListenCounts(release, credit.primaryArtistId)
     : new Map<string, number>();
 
-  const reviewsEnabled = await isFeatureEnabledForViewer("reviews");
+  // Either flag enables the Reviews section — `flag:reviews` shows
+  // existing reviews from CritiqueBrainz / Wikipedia, `flag:write_reviews`
+  // shows the inline write-a-review form. AlbumReviews decides what
+  // to render based on which flags are on for this viewer.
+  const [reviewsEnabled, writeReviewsEnabled] = await Promise.all([
+    isFeatureEnabledForViewer("reviews"),
+    isFeatureEnabledForViewer("write_reviews"),
+  ]);
+  const showReviews = reviewsEnabled || writeReviewsEnabled;
 
   const parachordTracks: ParachordTrack[] | undefined = release
     ? release.media
@@ -178,7 +186,7 @@ async function AlbumBody({ mbid }: { mbid: string }) {
             )}
           </section>
 
-          {reviewsEnabled && (
+          {showReviews && (
             <Suspense fallback={null}>
               <AlbumReviews mbid={mbid} urls={urls} />
             </Suspense>

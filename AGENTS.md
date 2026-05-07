@@ -317,6 +317,13 @@ The helper is per-request memoized via React `cache()` (so multiple checks on on
 
 **When to add a flag:** any user-facing surface that you want to dogfood for a few days before opening up, any feature that depends on an external API whose stability is unproven (so you can kill the surface fast without a deploy), and anything you'd want to A/B test later. **When not to:** internal refactors, bugfixes, or changes you'd never want to dark-launch — those should ship unconditionally.
 
+**Active flags:**
+
+| Flag | What it gates |
+|---|---|
+| `reviews` | The Reviews section on `/release-group/<mbid>` (CritiqueBrainz reviews + Wikipedia "Critical reception" fallback). |
+| `write_reviews` | The inline write-a-review form on the same album page; posts to CritiqueBrainz via the OAuth flow under `app/api/critiquebrainz/`. Requires `AUTH_CRITIQUEBRAINZ_ID` / `_SECRET` to be configured. The server action also re-checks this flag, so flipping the flag off mid-session blocks new submissions even from clients that already had the form rendered. |
+
 ---
 
 ## API route caching pattern

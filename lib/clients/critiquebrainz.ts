@@ -47,6 +47,18 @@ export interface CritiqueBrainzReview {
   url: string;
 }
 
+/** CritiqueBrainz reviews must be ≥ 25 characters and ≤ 5000 to
+ *  publish. We surface these as UI hints and re-validate server-
+ *  side; the API will also reject out-of-bounds submissions with
+ *  a 400. */
+export const CB_REVIEW_MIN_CHARS = 25;
+export const CB_REVIEW_MAX_CHARS = 5000;
+
+/** Default Creative Commons license — CritiqueBrainz requires every
+ *  review to declare one, and CC BY-SA 3.0 is the default the CB UI
+ *  itself defaults to. */
+export const CB_DEFAULT_LICENSE = "CC BY-SA 3.0";
+
 /**
  * Fetch published reviews for a release-group MBID. Sorted by
  * popularity (CB's default) so the strongest signal lands first.
@@ -87,5 +99,134 @@ export async function getReleaseGroupReviews(
       }));
   } catch {
     return [];
+  }
+}
+
+const CreateReviewResponseSchema = z
+  .object({
+    id: z.string(),
+  })
+  .passthrough();
+
+export type SubmitReviewError =
+  | { kind: "unauthorized" }
+  | { kind: "duplicate" }
+  | { kind: "validation"; message: string }
+  | { kind: "server"; status: number; message: string };
+
+export interface SubmitReviewSuccess {
+  id: string;
+  url: string;
+}
+
+/**
+ * POST a new review to CritiqueBrainz for a release-group. The
+ * caller is responsible for supplying a valid OAuth access token
+ * obtained via `lib/auth/critiquebrainz.ts`'s `exchangeCode`.
+ *
+ * Returns a discriminated union so callers can distinguish the
+ * "you need to reconnect" case from a "your review's too short"
+ * validation error and surface different UX accordingly.
+ */
+export async function submitReleaseGroupReview(opts: {
+  accessToken: string;
+  mbid: string;
+  text: string;
+  rating?: number | null;
+  language?: string;
+  licenseChoice?: string;
+}): Promise<{ ok: true; data: SubmitReviewSuccess } | { ok: false; error: SubmitReviewError }> {
+  const body = {
+    entity_id: opts.mbid,
+    entity_type: "release_group" as const,
+    text: opts.text,
+    rating: opts.rating ?? null,
+    language: opts.language ?? "en",
+    license_choice: opts.licenseChoice ?? CB_DEFAULT_LICENSE,
+  };
+
+  let res: Response;
+  try {
+    res = await fetch(`${CB_BASE}/review/`, {
+      method: "POST",
+      headers: {
+        "User-Agent": USER_AGENT,
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${opts.accessToken}`,
+      },
+      body: JSON.stringify(body),
+      cache: "no-store",
+    });
+  } catch (err) {
+    return {
+      ok: false,
+      error: {
+        kind: "server",
+        status: 0,
+        message: err instanceof Error ? err.message : "Network error",
+      },
+    };
+  }
+
+  if (res.status === 401 || res.status === 403) {
+    return { ok: false, error: { kind: "unauthorized" } };
+  }
+  if (res.status === 409) {
+    return { ok: false, error: { kind: "duplicate" } };
+  }
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    if (res.status === 400) {
+      return {
+        ok: false,
+        error: {
+          kind: "validation",
+          message: extractErrorMessage(text) ?? "CritiqueBrainz rejected the review.",
+        },
+      };
+    }
+    return {
+      ok: false,
+      error: {
+        kind: "server",
+        status: res.status,
+        message: extractErrorMessage(text) ?? `CritiqueBrainz returned ${res.status}.`,
+      },
+    };
+  }
+
+  try {
+    const data = CreateReviewResponseSchema.parse(await res.json());
+    return {
+      ok: true,
+      data: {
+        id: data.id,
+        url: `https://critiquebrainz.org/review/${data.id}`,
+      },
+    };
+  } catch {
+    return {
+      ok: false,
+      error: {
+        kind: "server",
+        status: res.status,
+        message: "Couldn't parse CritiqueBrainz response.",
+      },
+    };
+  }
+}
+
+function extractErrorMessage(body: string): string | null {
+  if (!body) return null;
+  try {
+    const parsed = JSON.parse(body) as {
+      message?: string;
+      description?: string;
+      error?: string;
+    };
+    return parsed.message ?? parsed.description ?? parsed.error ?? null;
+  } catch {
+    return null;
   }
 }
