@@ -534,9 +534,12 @@ function FeaturedCard({ client }: { client: LbClient }) {
           className="border-border/40 mb-5 block w-full rounded-xl border"
         />
       )}
-      <h4 className="text-foreground text-lg font-semibold tracking-tight">
+      {/* h2 (FeaturedCard): top-level page section under the
+          /apps PageHeader's h1, sibling of the per-category h2s
+          below in the marketplace grid. (#10) */}
+      <h2 className="text-foreground text-lg font-semibold tracking-tight">
         {client.name}
-      </h4>
+      </h2>
       <div className="mt-2">
         <PlatformPills platforms={client.platforms} />
       </div>
@@ -585,11 +588,8 @@ function ClientTile({ client }: { client: LbClient }) {
         />
       )}
       <div className="flex items-baseline justify-between gap-3">
-        <h4
-          className={cnTitle(client.featured)}
-        >
-          {client.name}
-        </h4>
+        {/* h3 (ClientTile): nested under each category's h2. (#10) */}
+        <h3 className={cnTitle(client.featured)}>{client.name}</h3>
         <ExternalLink className="text-muted-foreground/60 group-hover:text-muted-foreground size-3 shrink-0" />
       </div>
       <div className="mt-2">
@@ -636,9 +636,11 @@ export function LbClientMarketplace() {
       {CATEGORIES.map((category) => (
         <div key={category.title} className="space-y-3">
           <header>
-            <h3 className="text-foreground text-base font-semibold tracking-tight">
+            {/* h2 per category — sibling of the FeaturedCard h2 above.
+                ClientTile names below render at h3. (#10) */}
+            <h2 className="text-foreground text-base font-semibold tracking-tight">
               {category.title}
-            </h3>
+            </h2>
             {category.blurb && (
               <p className="text-muted-foreground/80 mt-1 text-xs leading-5">
                 {category.blurb}

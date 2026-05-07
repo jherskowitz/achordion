@@ -182,9 +182,11 @@ async function AlbumBody({ mbid }: { mbid: string }) {
           </Suspense>
           {otherUrls.length > 0 && (
             <div>
-              <h3 className="mb-3 text-xs tracking-wide uppercase text-muted-foreground">
+              {/* h2 (sidebar): sibling of the main column's "Tracks"
+                  h2, not nested under it. (#10) */}
+              <h2 className="mb-3 text-xs tracking-wide uppercase text-muted-foreground">
                 Other Links
-              </h3>
+              </h2>
               <ExternalLinks links={otherUrls} />
             </div>
           )}
@@ -242,9 +244,10 @@ async function TopListenersStream({
   if (!listeners?.listeners || listeners.listeners.length === 0) return null;
   return (
     <div>
-      <h3 className="mb-3 text-xs tracking-wide uppercase text-muted-foreground">
+      {/* h2 (sidebar): sibling of the main column's "Tracks" h2. */}
+      <h2 className="mb-3 text-xs tracking-wide uppercase text-muted-foreground">
         Top listeners
-      </h3>
+      </h2>
       <TopListenersList listeners={listeners.listeners} />
     </div>
   );

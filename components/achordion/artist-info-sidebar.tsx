@@ -186,9 +186,9 @@ export function ArtistInfoSidebar({
 
       {members.length > 0 && (
         <div>
-          <h3 className="mb-2 text-xs tracking-wide uppercase text-muted-foreground">
+          <h2 className="mb-2 text-xs tracking-wide uppercase text-muted-foreground">
             Members
-          </h3>
+          </h2>
           <ul className="space-y-1">
             {/* Plain mbid is unique now — collapseMembers() merges
                 multiple stints for the same person into one row. */}
@@ -201,9 +201,9 @@ export function ArtistInfoSidebar({
 
       {memberOf.length > 0 && (
         <div>
-          <h3 className="mb-2 text-xs tracking-wide uppercase text-muted-foreground">
+          <h2 className="mb-2 text-xs tracking-wide uppercase text-muted-foreground">
             Member of
-          </h3>
+          </h2>
           <ul className="space-y-1">
             {memberOf.slice(0, 12).map((m) => (
               <MemberRow key={m.artist.id} entry={m} />
@@ -218,9 +218,9 @@ export function ArtistInfoSidebar({
           standalone "Edit on MusicBrainz" footer that used to live
           below the sidebar. */}
       <div>
-        <h3 className="mb-2 text-xs tracking-wide uppercase text-muted-foreground">
+        <h2 className="mb-2 text-xs tracking-wide uppercase text-muted-foreground">
           Other Links
-        </h3>
+        </h2>
         <ExternalLinks
           links={urls}
           addSources={{ mbEntity: "artist", mbid: artist.id }}
@@ -229,9 +229,9 @@ export function ArtistInfoSidebar({
 
       {topListeners && topListeners.length > 0 && (
         <div>
-          <h3 className="mb-3 text-xs tracking-wide uppercase text-muted-foreground">
+          <h2 className="mb-3 text-xs tracking-wide uppercase text-muted-foreground">
             Top listeners
-          </h3>
+          </h2>
           <TopListenersList listeners={topListeners} />
         </div>
       )}

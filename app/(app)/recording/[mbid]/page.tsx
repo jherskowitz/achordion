@@ -321,9 +321,11 @@ async function RecordingBody({ mbid }: { mbid: string }) {
           </Suspense>
           {otherUrls.length > 0 && (
             <div>
-              <h3 className="mb-3 text-xs tracking-wide uppercase text-muted-foreground">
+              {/* h2 (not h3): sibling of the main column's content
+                  h2s, not nested under any of them. (#10) */}
+              <h2 className="mb-3 text-xs tracking-wide uppercase text-muted-foreground">
                 Other Links
-              </h3>
+              </h2>
               <ExternalLinks links={otherUrls} />
             </div>
           )}
@@ -387,9 +389,10 @@ async function AlbumTopListenersStream({
   if (!listeners?.listeners || listeners.listeners.length === 0) return null;
   return (
     <div>
-      <h3 className="mb-3 text-xs tracking-wide uppercase text-muted-foreground">
+      {/* h2 (sidebar): sibling of the main column's content h2s. */}
+      <h2 className="mb-3 text-xs tracking-wide uppercase text-muted-foreground">
         Top listeners
-      </h3>
+      </h2>
       <TopListenersList listeners={listeners.listeners} />
     </div>
   );

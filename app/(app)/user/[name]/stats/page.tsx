@@ -236,9 +236,12 @@ export default async function StatsPage({ params, searchParams }: PageParams) {
 
         <aside className="space-y-8">
           <section>
-            <h3 className="mb-3 text-xs tracking-wide uppercase text-muted-foreground">
+            {/* h2, not h3: sibling of the main column's "Top items"
+                h2, not nested under it. Same logical level even
+                though visual size is smaller. (#10) */}
+            <h2 className="mb-3 text-xs tracking-wide uppercase text-muted-foreground">
               Listening over time
-            </h3>
+            </h2>
             <Suspense
               key={`activity-${range}`}
               fallback={<Skeleton className="h-56 w-full rounded-xl" />}
@@ -248,9 +251,9 @@ export default async function StatsPage({ params, searchParams }: PageParams) {
           </section>
 
           <section>
-            <h3 className="mb-3 text-xs tracking-wide uppercase text-muted-foreground">
+            <h2 className="mb-3 text-xs tracking-wide uppercase text-muted-foreground">
               Daily heatmap
-            </h3>
+            </h2>
             <Suspense
               key={`heatmap-${range}`}
               fallback={<Skeleton className="h-40 w-full rounded-xl" />}
