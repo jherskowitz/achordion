@@ -11,7 +11,7 @@ import {
   CB_DEFAULT_LICENSE,
   CB_REVIEW_MAX_CHARS,
   CB_REVIEW_MIN_CHARS,
-} from "@/lib/clients/critiquebrainz";
+} from "@/lib/clients/critiquebrainz-constants";
 
 const initial: SubmitReviewState = { status: "idle" };
 
@@ -57,14 +57,19 @@ export function WriteReviewForm({ mbid, connected }: WriteReviewFormProps) {
   }
 
   if (!open) {
+    // Right-aligned trigger that sits flush with the cards' right
+    // edge above. Wrapped in a flex row so the button hugs the right
+    // gutter of the same bounding box as the review tiles.
     return (
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="text-muted-foreground hover:text-foreground mt-4 text-xs underline-offset-4 hover:underline"
-      >
-        Write a review
-      </button>
+      <div className="mt-3 flex justify-end">
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="text-muted-foreground hover:text-foreground text-xs underline-offset-4 hover:underline"
+        >
+          + Write a review
+        </button>
+      </div>
     );
   }
 
@@ -92,7 +97,7 @@ export function WriteReviewForm({ mbid, connected }: WriteReviewFormProps) {
           }
         >
           {tooShort
-            ? `${chars} / ${CB_REVIEW_MIN_CHARS} chars`
+            ? `${CB_REVIEW_MIN_CHARS - chars} more to publish`
             : `${chars} / ${CB_REVIEW_MAX_CHARS}`}
         </span>
       </div>

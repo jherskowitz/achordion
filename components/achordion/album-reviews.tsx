@@ -8,6 +8,7 @@ import {
   getCriticalReception,
   type WikipediaCriticalReception,
 } from "@/lib/clients/wikipedia";
+import { getWikidataEnWikipediaUrl } from "@/lib/clients/wikidata";
 import type { ArtistExternalLink } from "@/lib/clients/musicbrainz";
 import { stripHtml } from "@/lib/strip-html";
 import { safeHttpUrl } from "./external-links";
@@ -40,16 +41,33 @@ export async function AlbumReviews({ mbid, urls }: AlbumReviewsProps) {
   ]);
   if (!canRead && !canWrite) return null;
 
-  const wikipediaUrl = findAlbumWikipediaUrl(urls);
-  const [cbReviews, reception, cbConnected] = await Promise.all([
+  // Many MB release groups link to Wikidata (`Q...`) rather than a
+  // direct Wikipedia rel — Radiohead's "In Rainbows" is a typical
+  // example. Fall back to resolving the wikidata Q-id to its `enwiki`
+  // sitelink so the Wikipedia "Critical reception" preview still
+  // surfaces in those cases.
+  const directWikiUrl = findAlbumWikipediaUrl(urls);
+  const wikidataUrl =
+    !directWikiUrl
+      ? urls.find((l) => /\/\/www\.wikidata\.org\/wiki\/Q\d+/i.test(l.url))
+          ?.url ?? null
+      : null;
+  const wikipediaUrlPromise: Promise<string | null> = directWikiUrl
+    ? Promise.resolve(directWikiUrl)
+    : wikidataUrl
+      ? getWikidataEnWikipediaUrl(wikidataUrl).catch(() => null)
+      : Promise.resolve(null);
+
+  const [cbReviews, wikipediaUrl, cbConnected] = await Promise.all([
     canRead
       ? getReleaseGroupReviews(mbid).catch(() => [] as CritiqueBrainzReview[])
       : Promise.resolve([] as CritiqueBrainzReview[]),
-    canRead && wikipediaUrl
-      ? getCriticalReception(wikipediaUrl).catch(() => null)
-      : Promise.resolve(null),
+    canRead ? wikipediaUrlPromise : Promise.resolve(null),
     canWrite ? hasCbConnection() : Promise.resolve(false),
   ]);
+  const reception = wikipediaUrl
+    ? await getCriticalReception(wikipediaUrl).catch(() => null)
+    : null;
 
   // Render the section when there's anything to show: existing
   // reviews, the Wikipedia fallback, OR the write-review affordance
@@ -62,10 +80,16 @@ export async function AlbumReviews({ mbid, urls }: AlbumReviewsProps) {
       <h2 className="mb-4 text-sm font-semibold tracking-wide uppercase">
         Reviews
       </h2>
-      {cbReviews.length > 0 ? (
-        <CritiqueBrainzReviews reviews={cbReviews} />
-      ) : (
-        reception && <WikipediaReception reception={reception} />
+      {/* Wikipedia "Critical reception" first — it's an editorial
+          critic-consensus summary that frames the album, so it makes
+          sense as the lead. CB user reviews follow as the live peer-
+          rating signal. Both render when available; either alone is
+          fine too. */}
+      {reception && <WikipediaReception reception={reception} />}
+      {cbReviews.length > 0 && (
+        <div className={reception ? "mt-3" : undefined}>
+          <CritiqueBrainzReviews reviews={cbReviews} />
+        </div>
       )}
       {canWrite && <WriteReviewForm mbid={mbid} connected={cbConnected} />}
     </section>
@@ -122,9 +146,19 @@ function WikipediaReception({
       <div className="text-muted-foreground mb-2 text-xs tracking-wide uppercase">
         Critical reception
       </div>
-      <p className="text-foreground max-w-3xl text-sm leading-7">
-        {reception.text}
-      </p>
+      {/*
+       * `reception.html` is sanitized server-side in
+       * `sanitizeReceptionHtml` — only `<a>` (with vetted absolute
+       * Wikipedia/external href + noopener), `<p>`, `<br>`, and a
+       * narrow set of inline emphasis tags survive. No script/style
+       * tags reach this point. `prose-a` styling preserves the
+       * Wikipedia inline links from being invisible against the
+       * surrounding text.
+       */}
+      <div
+        className="text-foreground max-w-3xl text-sm leading-7 [&_a]:text-foreground [&_a]:underline [&_a]:underline-offset-2 [&_a:hover]:opacity-80 [&_p]:mb-3 [&_p:last-child]:mb-0"
+        dangerouslySetInnerHTML={{ __html: reception.html }}
+      />
       {safeUrl && (
         <a
           href={safeUrl}

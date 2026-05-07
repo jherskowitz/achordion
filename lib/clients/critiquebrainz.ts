@@ -47,17 +47,16 @@ export interface CritiqueBrainzReview {
   url: string;
 }
 
-/** CritiqueBrainz reviews must be ≥ 25 characters and ≤ 5000 to
- *  publish. We surface these as UI hints and re-validate server-
- *  side; the API will also reject out-of-bounds submissions with
- *  a 400. */
-export const CB_REVIEW_MIN_CHARS = 25;
-export const CB_REVIEW_MAX_CHARS = 5000;
-
-/** Default Creative Commons license — CritiqueBrainz requires every
- *  review to declare one, and CC BY-SA 3.0 is the default the CB UI
- *  itself defaults to. */
-export const CB_DEFAULT_LICENSE = "CC BY-SA 3.0";
+// Review length + license constants live in a separate file so client
+// components can import them without pulling in this server-only
+// module. Re-exported here so existing server-side imports keep
+// working without churn.
+export {
+  CB_REVIEW_MIN_CHARS,
+  CB_REVIEW_MAX_CHARS,
+  CB_DEFAULT_LICENSE,
+} from "./critiquebrainz-constants";
+import { CB_DEFAULT_LICENSE } from "./critiquebrainz-constants";
 
 /**
  * Fetch published reviews for a release-group MBID. Sorted by
