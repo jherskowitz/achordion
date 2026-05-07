@@ -19,25 +19,44 @@ import { LbRadioSection } from "@/components/achordion/lb-radio-section";
 import { Skeleton } from "@/components/ui/skeleton";
 
 /**
- * Recency-decay scoring. Half-life of 10 years means an album from 10
- * years ago is worth half as much per-listen as a release from this
- * year, an album from 20 years ago is worth a quarter, etc. Tuned so
- * "what's popular AND not from the boomer era" surfaces — without it,
- * tag pages for post-1990 movements like indie rock kept showing
- * decades-old MB-tag-noise (e.g. The Beatles tagged as "indie rock").
+ * Recency-decay scoring — used as a TIEBREAKER below the LB Radio
+ * primary sort. Tag pages are tuned for "hot right now" rather than
+ * "all-time canonical": the LB Radio for the tag is the strongest
+ * "currently being listened to" signal, so it leads. Recency decay
+ * + listen count breaks ties among items not in the radio (or among
+ * items at the same radio position).
  *
- * `currentYear` is computed once at module load — fine for our use
- * since the page is edge-cached for 1h and the year only ticks once
- * a year. We don't need January-1st-precision freshness here.
+ * - Albums: 3y halflife. A 2024 album is worth ~10× a 2014 album of
+ *   the same listen count, ~80× a 2004 album. Aggressive on purpose
+ *   — we don't want canonical 2005-era records hogging the slots
+ *   when newer-and-popular alternatives exist.
+ *
+ * - Artists: 5y halflife. `life-span.begin` is the band's formation
+ *   year, which is fuzzier than an album's release date — gentler
+ *   curve gives currently-active old(er) bands a chance.
  */
-const RECENCY_HALFLIFE_YEARS = 10;
+const ARTIST_HALFLIFE_YEARS = 5;
+const ALBUM_HALFLIFE_YEARS = 3;
 const CURRENT_YEAR = new Date().getUTCFullYear();
 
-function recencyDecay(year: number | null | undefined): number {
+function recencyDecay(
+  year: number | null | undefined,
+  halflifeYears: number,
+): number {
   if (!year || !Number.isFinite(year)) return 0.05; // unknown date → mostly suppressed
   const age = Math.max(0, CURRENT_YEAR - year);
-  return Math.pow(0.5, age / RECENCY_HALFLIFE_YEARS);
+  return Math.pow(0.5, age / halflifeYears);
 }
+
+/**
+ * Minimum listen count for inclusion in the ranked pool. Items below
+ * this threshold are dropped before sorting — typical case is the
+ * long tail of niche records MB editors tagged but no one actually
+ * listens to. Keeping them lets recency decay tie-break a sea of
+ * zeros, which is how mid-90s no-name records were leaking into the
+ * top-24 even after the recency fix.
+ */
+const MIN_LISTENS = 1000;
 
 function parseYear(value: string | null | undefined): number | null {
   if (!value) return null;
@@ -109,22 +128,46 @@ async function ArtistsForTag({ tag }: { tag: string }) {
   // (recency tiebreak — currently-trending artists bubble up within
   // their popularity bracket); tertiary = MB's natural order.
   const ranks = buildPopularityRanks(radio);
-  // Score = listen_count * recency_decay(career-start year). Surfaces
-  // popular artists who started recently enough to plausibly fit the
-  // tag — deflates The Beatles in a hypothetical "indie rock" tag
-  // search (career start 1957 → ~0.009× multiplier even with 50M
-  // listens). Tie-break on LB Radio rank so two equally-decayed
-  // popular artists fall in radio order.
-  const sorted = artistsAll.slice().sort((a, b) => {
-    const aBegin = parseYear(a["life-span"]?.begin);
-    const bBegin = parseYear(b["life-span"]?.begin);
-    const sa = (popularity.get(a.id) ?? 0) * recencyDecay(aBegin);
-    const sb = (popularity.get(b.id) ?? 0) * recencyDecay(bBegin);
-    if (sa !== sb) return sb - sa;
+  // Drop pool entries with no LB activity at all — those are MB-tag
+  // editor noise that has no current listenership to justify
+  // surfacing.
+  const candidatePool = artistsAll.filter(
+    (a) => (popularity.get(a.id) ?? 0) >= MIN_LISTENS,
+  );
+  // Sort key, in order of importance:
+  //   1. LB Radio rank — items currently being played for this tag
+  //      come first, in radio order. The "hot" signal.
+  //   2. listen_count * recency_decay(life-span.begin) — for items
+  //      tied or both absent from the radio, prefer popular and
+  //      recent. Deflates The Beatles tagged as "indie rock"
+  //      (career start 1957 → effectively zero) below currently-
+  //      active bands.
+  const sorted = candidatePool.slice().sort((a, b) => {
     const ra = ranks?.artists.get(a.id) ?? Infinity;
     const rb = ranks?.artists.get(b.id) ?? Infinity;
-    return ra - rb;
+    if (ra !== rb) return ra - rb;
+    const aBegin = parseYear(a["life-span"]?.begin);
+    const bBegin = parseYear(b["life-span"]?.begin);
+    const sa =
+      (popularity.get(a.id) ?? 0) * recencyDecay(aBegin, ARTIST_HALFLIFE_YEARS);
+    const sb =
+      (popularity.get(b.id) ?? 0) * recencyDecay(bBegin, ARTIST_HALFLIFE_YEARS);
+    return sb - sa;
   });
+  // Backfill in case the popularity floor knocked us under 24 — fall
+  // back to the original pool sorted by raw popularity for the
+  // shortfall so the page never looks half-empty.
+  const fallback = artistsAll
+    .slice()
+    .sort((a, b) => (popularity.get(b.id) ?? 0) - (popularity.get(a.id) ?? 0));
+  const seen = new Set(sorted.map((a) => a.id));
+  for (const a of fallback) {
+    if (sorted.length >= 24) break;
+    if (!seen.has(a.id)) {
+      sorted.push(a);
+      seen.add(a.id);
+    }
+  }
   const artists = sorted.slice(0, 24);
   return (
     <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
@@ -187,24 +230,44 @@ async function AlbumsForTag({ tag }: { tag: string }) {
     groupsAll.map((g) => g.id),
   ).catch(() => new Map<string, number>());
   const ranks = buildPopularityRanks(radio);
-  // Score = listen_count * recency_decay(first-release year). Same
-  // halflife as artists so an album by an old band that happens to
-  // be wrongly tagged for the genre falls way below recent records
-  // in the same listen-count tier. Tie-break on the artist's LB
-  // Radio position for the recency signal.
-  const sortedAll = groupsAll.slice().sort((a, b) => {
-    const ay = parseYear(a["first-release-date"]);
-    const by = parseYear(b["first-release-date"]);
-    const sa = (popularity.get(a.id) ?? 0) * recencyDecay(ay);
-    const sb = (popularity.get(b.id) ?? 0) * recencyDecay(by);
-    if (sa !== sb) return sb - sa;
+  // Drop pool entries with no LB activity — same noise filter as the
+  // artist list. Long-tail unrecognizable records get cut.
+  const candidatePool = groupsAll.filter(
+    (g) => (popularity.get(g.id) ?? 0) >= MIN_LISTENS,
+  );
+  // Sort priority:
+  //   1. LB Radio rank by ARTIST mbid (radio reports release MBIDs
+  //      not release-groups, so we use the artist position as a proxy
+  //      — albums by currently-playing artists float up).
+  //   2. listen_count * 3y-halflife decay on first-release-date.
+  const sortedRanked = candidatePool.slice().sort((a, b) => {
     const aArtist = a["artist-credit"]?.[0]?.artist?.id ?? "";
     const bArtist = b["artist-credit"]?.[0]?.artist?.id ?? "";
     const ra = ranks?.artists.get(aArtist) ?? Infinity;
     const rb = ranks?.artists.get(bArtist) ?? Infinity;
-    return ra - rb;
+    if (ra !== rb) return ra - rb;
+    const ay = parseYear(a["first-release-date"]);
+    const by = parseYear(b["first-release-date"]);
+    const sa =
+      (popularity.get(a.id) ?? 0) * recencyDecay(ay, ALBUM_HALFLIFE_YEARS);
+    const sb =
+      (popularity.get(b.id) ?? 0) * recencyDecay(by, ALBUM_HALFLIFE_YEARS);
+    return sb - sa;
   });
-  const sorted = sortedAll.slice(0, 24);
+  // Backfill from the full pool (sorted by raw popularity) to top up
+  // when the floor knocked too many candidates out.
+  const fallback = groupsAll
+    .slice()
+    .sort((a, b) => (popularity.get(b.id) ?? 0) - (popularity.get(a.id) ?? 0));
+  const seen = new Set(sortedRanked.map((g) => g.id));
+  for (const g of fallback) {
+    if (sortedRanked.length >= 24) break;
+    if (!seen.has(g.id)) {
+      sortedRanked.push(g);
+      seen.add(g.id);
+    }
+  }
+  const sorted = sortedRanked.slice(0, 24);
   return (
     <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
       {sorted.map((rg) => {
