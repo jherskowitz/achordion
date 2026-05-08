@@ -46,14 +46,14 @@ export function TopListenersList({ listeners }: { listeners: ListenerEntry[] }) 
               </div>
             </Link>
             <Suspense fallback={null}>
-              {/* Indent past the rank (w-4) + first gap (gap-2) +
-                  avatar (size-6) + second gap (gap-2) = 3.5rem so
-                  the now-playing line aligns with the username
-                  start, not the row edge. ml-12 (3rem) was off by
-                  the second gap. */}
+              {/* Indent past the rank (w-4) + first gap (gap-2) so
+                  the now-playing line aligns under the avatar's
+                  left edge — feels visually anchored to the
+                  person, not floating mid-row under the username
+                  text. */}
               <OnAirIndicator
                 username={l.user_name}
-                className="mt-1 ml-14"
+                className="mt-1 ml-6"
               />
             </Suspense>
           </li>
