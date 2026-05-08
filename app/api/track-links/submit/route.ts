@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import {
   setCachedTrackLinks,
@@ -145,6 +146,18 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     ...(artistName ? { artistName } : {}),
     ...(albumName ? { albumName } : {}),
   });
+
+  // Bust the edge cache for the recording's user-facing pages so the
+  // freshly-submitted links appear without waiting out the 1h
+  // s-maxage. `revalidatePath` is best-effort — failures here just
+  // mean users see the new links once the edge entry naturally
+  // refreshes (well within stale-while-revalidate).
+  try {
+    revalidatePath(`/recording/${mbid}`);
+    revalidatePath(`/embed/track/${mbid}`);
+  } catch {
+    // ignore — write to Redis already succeeded.
+  }
 
   return NextResponse.json(
     { ok: true, accepted: normalised.length },

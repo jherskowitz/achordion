@@ -1,5 +1,6 @@
 import type { ArtistExternalLink } from "@/lib/clients/musicbrainz";
 import { getOdesliLinks } from "@/lib/clients/odesli";
+import { resolveTrackLinks } from "@/lib/track-links-resolver";
 import { IconTooltip } from "@/components/ui/icon-tooltip";
 import { AddSourcesButton } from "./add-sources-button";
 import { normalizeStreamingUrl, tooltipLabel } from "./external-links";
@@ -79,38 +80,53 @@ export async function OdesliLinks({
   mbStreamingLinks = [],
   recordingMbid,
 }: OdesliLinksProps) {
-  const data = seedUrl ? await getOdesliLinks(seedUrl) : null;
-
-  // Build the row of platform icons from Odesli, in preferred order.
-  const items: { url: string; label: string; host: string }[] = [];
-  if (data) {
-    for (const p of PLATFORM_ORDER) {
-      const link = data.linksByPlatform[p.key];
-      if (link?.url) items.push({ url: link.url, label: p.label, host: p.host });
-    }
-  }
-
-  // Append MB-only services Odesli didn't cover (Bandcamp, Qobuz, niche
-  // services). Dedupe by checking whether the MB link's hostname already
-  // contains any host string from the items already added — that catches
-  // open.spotify.com vs spotify.com, music.apple.com vs apple.com, etc.
-  for (const mb of mbStreamingLinks) {
-    const normalised = normalizeStreamingUrl(mb.url);
-    if (!normalised) continue;
-    let hostname: string;
-    try {
-      hostname = new URL(normalised).hostname.toLowerCase();
-    } catch {
-      continue;
-    }
-    const dup = items.some((it) => hostname.includes(it.host));
-    if (dup) continue;
-    // Use the same friendly-label rules ExternalLinks would for tooltips.
-    items.push({
-      url: normalised,
-      label: tooltipLabel(mb),
-      host: hostname.replace(/^(www|m|open|music|web|en)\./, ""),
+  // When we have an MBID, route through the cache-first resolver so
+  // we surface anything Parachord has actively-confirmed (its
+  // submissions outrank Odesli + MB on tie-breaks) and skip redundant
+  // Odesli calls on cache hits. Without an MBID (currently no
+  // callers — recording pages always have one — but kept for
+  // safety) fall back to the direct Odesli path.
+  let items: { url: string; label: string; host: string }[] = [];
+  let songLinkPageUrl: string | null = null;
+  if (recordingMbid) {
+    items = await resolveTrackLinks({
+      mbid: recordingMbid,
+      seedUrl,
+      prefetched: {
+        streamingUrls: mbStreamingLinks.map((m) => ({
+          url: m.url,
+          type: m.type,
+        })),
+      },
     });
+  } else {
+    const data = seedUrl ? await getOdesliLinks(seedUrl) : null;
+    if (data) {
+      for (const p of PLATFORM_ORDER) {
+        const link = data.linksByPlatform[p.key];
+        if (link?.url)
+          items.push({ url: link.url, label: p.label, host: p.host });
+      }
+      songLinkPageUrl = data.pageUrl ?? null;
+    }
+    // Mirror the legacy MB-merge step for non-MBID callers.
+    for (const mb of mbStreamingLinks) {
+      const normalised = normalizeStreamingUrl(mb.url);
+      if (!normalised) continue;
+      let hostname: string;
+      try {
+        hostname = new URL(normalised).hostname.toLowerCase();
+      } catch {
+        continue;
+      }
+      const dup = items.some((it) => hostname.includes(it.host));
+      if (dup) continue;
+      items.push({
+        url: normalised,
+        label: tooltipLabel(mb),
+        host: hostname.replace(/^(www|m|open|music|web|en)\./, ""),
+      });
+    }
   }
 
   // Render nothing if we have no items AND no MBID for the "Add sources"
@@ -127,9 +143,9 @@ export async function OdesliLinks({
           host={it.host}
         />
       ))}
-      {data?.pageUrl && (
+      {songLinkPageUrl && (
         <FaviconLink
-          url={data.pageUrl}
+          url={songLinkPageUrl}
           label="All services (song.link)"
           host="song.link"
         />
