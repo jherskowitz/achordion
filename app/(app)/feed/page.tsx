@@ -78,12 +78,17 @@ async function FeedBody({
   // re-cap at the same 50 the page started with so adding loves
   // doesn't unbounded-grow the list. Self-loves are filtered with
   // the same excludeSelf logic the rest of the feed uses.
+  // Comparison is case-insensitive: LB occasionally returns usernames
+  // with different casing than `session.user.mbUsername` (we've seen
+  // it in follow-list dedup elsewhere). Without this normalisation,
+  // a viewer's own loves can leak past the "Hide my own" filter.
+  const nameLc = name.toLowerCase();
   const merged = [...events, ...lovedEvents].sort(
     (a, b) => b.created - a.created,
   );
   const sliced = merged.slice(0, 50);
   const filtered = excludeSelf
-    ? sliced.filter((e) => (e.user_name ?? "") !== name)
+    ? sliced.filter((e) => (e.user_name ?? "").toLowerCase() !== nameLc)
     : sliced;
   // viewer = current user's mbUsername — lets FeedEventList hide the
   // Thanks button on the viewer's own pins / recs (LB 403s in that

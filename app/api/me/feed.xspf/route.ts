@@ -50,8 +50,13 @@ export async function GET(request: Request) {
     (a, b) => b.created - a.created,
   );
   const sliced = merged.slice(0, count);
+  // Case-insensitive on user_name — LB sometimes returns usernames
+  // with different casing than what's stored in the session, and a
+  // strict `!==` lets the viewer's own loves leak past the
+  // "Hide my own" filter.
+  const viewerLc = viewer.toLowerCase();
   const filtered = excludeSelf
-    ? sliced.filter((e) => (e.user_name ?? "") !== viewer)
+    ? sliced.filter((e) => (e.user_name ?? "").toLowerCase() !== viewerLc)
     : sliced;
   const tracks = feedEventsToXspfTracks(filtered);
 
