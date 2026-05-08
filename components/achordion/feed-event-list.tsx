@@ -284,11 +284,13 @@ function LovedRecordingEvent({ event }: { event: FeedEvent }) {
   const m = event.metadata as LoveMeta | undefined;
   return (
     <EventShell
-      // Filled heart in the same emerald accent the rest of the
-      // app uses for "loved" state (track-actions menu, listen rows).
+      // Red filled heart — universal "loved" affordance. (Other
+      // app surfaces use emerald for loved state to match the
+      // play / on-air color palette, but on a feed card the
+      // expected mental model is red = love.)
       icon={
         <Heart
-          className="size-4 fill-emerald-500/80 text-emerald-500/80"
+          className="size-4 fill-rose-500/90 text-rose-500/90"
           aria-hidden="true"
         />
       }

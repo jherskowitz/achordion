@@ -2366,19 +2366,69 @@ export async function getLovedRecordingEvents(
         score: 1,
         count: lovesPerUser,
       }).catch(() => [] as FeedbackItem[]);
-      return items.map<FeedEvent>((item) => ({
-        id: null,
-        created: item.created,
-        event_type: LOVED_RECORDING_EVENT_TYPE,
-        user_name: user,
-        metadata: {
-          track_metadata: item.track_metadata ?? null,
-          recording_mbid: item.recording_mbid ?? null,
-        },
-      }));
+      return items.map((item) => ({ user, item }));
     }),
   );
-  return fanOut.flat();
+  const flat = fanOut.flat();
+  // LB's /feedback endpoint frequently omits track_metadata on
+  // older loves. Enrich any item missing it (but with a
+  // recording_mbid) via /metadata/recording so the feed renders
+  // real track names instead of "Unknown track" placeholders.
+  const needsMeta = flat.filter(
+    ({ item }) => !item.track_metadata && item.recording_mbid,
+  );
+  const enriched = needsMeta.length
+    ? await getRecordingMetadata(
+        needsMeta.map(({ item }) => item.recording_mbid as string),
+      ).catch(() => new Map<string, RecordingMetadata>())
+    : new Map<string, RecordingMetadata>();
+
+  const events: FeedEvent[] = [];
+  for (const { user, item } of flat) {
+    let trackMeta = item.track_metadata ?? null;
+    if (!trackMeta && item.recording_mbid) {
+      const m = enriched.get(item.recording_mbid);
+      if (m?.recording?.name && m?.artist?.name) {
+        trackMeta = {
+          track_name: m.recording.name,
+          artist_name: m.artist.name,
+          release_name: m.release?.name ?? null,
+          additional_info: {
+            recording_mbid: item.recording_mbid,
+            ...(m.release?.mbid ? { release_mbid: m.release.mbid } : {}),
+          },
+          ...(m.release?.caa_id || m.release?.caa_release_mbid
+            ? {
+                mbid_mapping: {
+                  recording_mbid: item.recording_mbid,
+                  ...(m.release?.mbid
+                    ? { release_mbid: m.release.mbid }
+                    : {}),
+                  ...(m.release?.caa_id
+                    ? { caa_id: m.release.caa_id }
+                    : {}),
+                  ...(m.release?.caa_release_mbid
+                    ? { caa_release_mbid: m.release.caa_release_mbid }
+                    : {}),
+                },
+              }
+            : {}),
+        };
+      }
+    }
+    if (!trackMeta) continue; // drop unresolvable loves
+    events.push({
+      id: null,
+      created: item.created,
+      event_type: LOVED_RECORDING_EVENT_TYPE,
+      user_name: user,
+      metadata: {
+        track_metadata: trackMeta,
+        recording_mbid: item.recording_mbid ?? null,
+      },
+    });
+  }
+  return events;
 }
 
 /**

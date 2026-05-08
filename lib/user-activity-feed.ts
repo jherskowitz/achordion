@@ -1,6 +1,7 @@
 import "server-only";
 
 import {
+  getRecordingMetadata,
   getUserFeedback,
   getUserPins,
   LOVED_RECORDING_EVENT_TYPE,
@@ -53,6 +54,22 @@ export async function getUserActivityFeed(
     ),
   ]);
 
+  // LB's /feedback endpoint frequently returns loves with `track_metadata`
+  // unpopulated — older loves predate the MBID-mapping work, plus
+  // the feedback row format itself doesn't always echo the recording's
+  // metadata. Without enrichment those loves render as "Unknown track
+  // / Unknown artist" cards. Batch-resolve any love with a
+  // recording_mbid via /metadata/recording to fill in track_name +
+  // artist_name + release info.
+  const lovesNeedingMeta = loves.filter(
+    (f) => f.created >= since && !f.track_metadata && f.recording_mbid,
+  );
+  const enrichedMeta = lovesNeedingMeta.length
+    ? await getRecordingMetadata(
+        lovesNeedingMeta.map((f) => f.recording_mbid as string),
+      ).catch(() => new Map())
+    : new Map();
+
   const events: FeedEvent[] = [];
 
   for (const p of pins) {
@@ -70,13 +87,50 @@ export async function getUserActivityFeed(
   }
   for (const f of loves) {
     if (f.created < since) continue;
+    let trackMeta = f.track_metadata ?? null;
+    if (!trackMeta && f.recording_mbid) {
+      const m = enrichedMeta.get(f.recording_mbid);
+      if (m?.recording?.name && m?.artist?.name) {
+        // Reshape the LB recording-metadata response into the
+        // listen-track-metadata shape the FeedEventList renderer
+        // expects (track_name + artist_name + optional release_name).
+        trackMeta = {
+          track_name: m.recording.name,
+          artist_name: m.artist.name,
+          release_name: m.release?.name ?? null,
+          additional_info: {
+            recording_mbid: f.recording_mbid,
+            ...(m.release?.mbid ? { release_mbid: m.release.mbid } : {}),
+          },
+          ...(m.release?.caa_id || m.release?.caa_release_mbid
+            ? {
+                mbid_mapping: {
+                  recording_mbid: f.recording_mbid,
+                  ...(m.release?.mbid
+                    ? { release_mbid: m.release.mbid }
+                    : {}),
+                  ...(m.release?.caa_id
+                    ? { caa_id: m.release.caa_id }
+                    : {}),
+                  ...(m.release?.caa_release_mbid
+                    ? { caa_release_mbid: m.release.caa_release_mbid }
+                    : {}),
+                },
+              }
+            : {}),
+        };
+      }
+    }
+    // Loves still without resolvable metadata are dropped — better
+    // to hide them than show "Unknown track" placeholder cards.
+    if (!trackMeta) continue;
     events.push({
       id: null,
       created: f.created,
       event_type: LOVED_RECORDING_EVENT_TYPE,
       user_name: userName,
       metadata: {
-        track_metadata: f.track_metadata ?? null,
+        track_metadata: trackMeta,
         recording_mbid: f.recording_mbid ?? null,
       },
     });
