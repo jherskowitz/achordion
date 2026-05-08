@@ -219,7 +219,7 @@ export default function AboutPage() {
             Your listens, loves, pins, follows, playlists, and stats all
             live in your ListenBrainz account, run by the MetaBrainz
             Foundation. Your identity lives at MusicBrainz. If Achordion
-            disappeared tomorrow, none of <em>your</em> data would go
+            disappeared tomorrow, none of <em>your</em>{" "}data would go
             with it — you&apos;d just point a different ListenBrainz
             client at the same account and pick up where you left off.
           </p>
@@ -281,7 +281,7 @@ export default function AboutPage() {
             recorded music — an MBID per recording, release, artist —
             and ListenBrainz has built the canonical listen-history
             layer on top of it. But the layer in between, &quot;where
-            can I actually play <em>this</em> recording right now?&quot;,
+            can I actually play <em>this</em>{" "}recording right now?&quot;,
             is arguably the data most lacking in the open music
             ecosystem today. There&apos;s no community-maintained,
             queryable map from MBID to Spotify / Apple Music / YouTube
@@ -298,9 +298,9 @@ export default function AboutPage() {
             services it&apos;s known to be available on, with the URL,
             service name, and host. Entries come from three sources, in
             increasing order of trust: third-party cross-service
-            resolution (used as a fallback while we bootstrap), {" "}
-            <strong>explicit</strong> human curation via MusicBrainz
-            URL relationships, and <strong>implicit</strong> human
+            resolution (used as a fallback while we bootstrap),{" "}
+            <strong>explicit</strong>{" "}human curation via MusicBrainz
+            URL relationships, and <strong>implicit</strong>{" "}human
             curation via Parachord — every time a listener plays an
             MBID via a streaming service and it works, Parachord
             submits that pairing. The match is human-validated by
