@@ -30,6 +30,15 @@ export function TopListenersList({
               key={l.user_name}
               className="border-border/60 hover:border-foreground/30 hover:bg-muted/30 group flex flex-col gap-2 rounded-xl border p-3 transition-colors"
             >
+              {/* Two-row layout inside the card:
+                    line 1: rank + avatar + username + count
+                    line 2: progress bar spanning the username column
+                  Count was previously a sibling of the avatar/
+                  username column with `self-start`, which floated
+                  it above the row's vertical center and visually
+                  detached it from the username. Pairing username
+                  and count on the same baseline matches the stack
+                  layout below and reads cleanly. */}
               <Link
                 href={`/user/${encodeURIComponent(l.user_name)}`}
                 className="flex min-w-0 items-center gap-3"
@@ -43,17 +52,21 @@ export function TopListenersList({
                   fallbackClassName="text-sm"
                 />
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium">{l.user_name}</p>
-                  <div className="bg-muted mt-1 h-0.5 w-full overflow-hidden rounded-full">
+                  <div className="flex items-baseline gap-2">
+                    <p className="min-w-0 flex-1 truncate text-sm font-medium">
+                      {l.user_name}
+                    </p>
+                    <span className="text-muted-foreground shrink-0 tabular-nums text-xs">
+                      {l.listen_count.toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="bg-muted mt-1.5 h-0.5 w-full overflow-hidden rounded-full">
                     <div
                       className="bg-foreground/60 h-full"
                       style={{ width: `${pct}%` }}
                     />
                   </div>
                 </div>
-                <span className="text-muted-foreground shrink-0 self-start tabular-nums text-xs">
-                  {l.listen_count.toLocaleString()}
-                </span>
               </Link>
               <Suspense fallback={null}>
                 <OnAirIndicator username={l.user_name} />
