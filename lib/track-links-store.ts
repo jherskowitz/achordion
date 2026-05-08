@@ -115,6 +115,18 @@ function key(mbid: string, entity: LinkEntity = "recording"): string {
   return `track-links:${entity}:${mbid.toLowerCase()}`;
 }
 
+/** Alias-key for an ISRC. Points at the same JSON shape as a
+ *  primary recording entry so reads can hit it directly without a
+ *  redirect lookup.
+ *
+ *  ISRCs are case-insensitive (the spec defines them as uppercase
+ *  alphanumerics, but real-world data has both forms). Normalise to
+ *  upper before keying so writes from different sources collapse.
+ */
+function isrcKey(isrc: string): string {
+  return `track-links:isrc:${isrc.trim().toUpperCase()}`;
+}
+
 /**
  * Look up cached external links for an entity. Returns null on
  * miss / expired / Upstash-not-configured. Caller should treat null
@@ -143,18 +155,59 @@ export async function getCachedTrackLinks(
 }
 
 /**
+ * Look up cached external links by ISRC alias. ISRCs uniquely
+ * identify a recording's *audio*, so this resolves the case where
+ * the same audio appears as two distinct recording MBIDs (single
+ * vs album-track variants are the most common shape) and we have
+ * cached links for one MBID but not the other.
+ *
+ * Returns the first non-null entry across the supplied ISRCs.
+ * Caller is responsible for back-filling the per-MBID cache after
+ * a successful ISRC hit so subsequent direct lookups are fast.
+ */
+export async function getCachedTrackLinksByIsrcs(
+  isrcs: string[],
+): Promise<CachedLink[] | null> {
+  if (!redis) return null;
+  if (!isrcs || isrcs.length === 0) return null;
+  for (const isrc of isrcs) {
+    if (!isrc) continue;
+    try {
+      const raw = await redis.get<CachedEntry | string | null>(isrcKey(isrc));
+      if (!raw) continue;
+      const entry = typeof raw === "string"
+        ? (JSON.parse(raw) as CachedEntry)
+        : raw;
+      if (!Array.isArray(entry.links) || entry.links.length === 0) continue;
+      return entry.links;
+    } catch {
+      // Try the next ISRC.
+    }
+  }
+  return null;
+}
+
+/**
  * Merge new links into the cache for an entity. Existing entries
  * with the same host are replaced ONLY when the incoming source has
  * equal or higher priority. Result is written back as a fresh
  * 90-day blob.
  *
  * `entity` defaults to `"recording"` (back-compat).
+ *
+ * `aliases.isrcs` (recording-only): write the same merged blob to
+ * each ISRC alias key as well, so reads for a different recording
+ * MBID with overlapping ISRCs find the same data without a separate
+ * resolve. ISRCs uniquely identify the *audio*, so this is the
+ * right shared key when MB has modeled the same audio as two
+ * distinct recordings (single + album-track is the canonical case).
  */
 export async function setCachedTrackLinks(
   mbid: string,
   incoming: CachedLink[],
   names?: TrackNames,
   entity: LinkEntity = "recording",
+  aliases?: { isrcs?: string[] },
 ): Promise<void> {
   if (!redis) return;
   if (!mbid) return;
@@ -191,9 +244,22 @@ export async function setCachedTrackLinks(
         ? { album_name: names?.albumName ?? prior?.album_name }
         : {}),
     };
-    await redis.set(key(mbid, entity), JSON.stringify(entry), {
-      ex: TTL_SECONDS,
-    });
+    const serialised = JSON.stringify(entry);
+    await redis.set(key(mbid, entity), serialised, { ex: TTL_SECONDS });
+    // ISRC aliases — only meaningful for recording entities. We
+    // duplicate the JSON rather than store a redirect, so reads via
+    // an alias don't pay a second round-trip. ISRCs are typically
+    // 1-3 per recording so the storage overhead is minor.
+    if (entity === "recording" && aliases?.isrcs?.length) {
+      for (const isrc of aliases.isrcs) {
+        if (!isrc) continue;
+        try {
+          await redis.set(isrcKey(isrc), serialised, { ex: TTL_SECONDS });
+        } catch {
+          // Best-effort — primary key already wrote successfully.
+        }
+      }
+    }
   } catch {
     // Best-effort — caller already has the resolved links, the
     // cache write is just optimisation.

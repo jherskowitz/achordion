@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { getRelease } from "@/lib/clients/musicbrainz";
+import { getRecording, getRelease } from "@/lib/clients/musicbrainz";
 import {
   setCachedTrackLinks,
   type CachedLink,
@@ -210,6 +210,22 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     );
   }
 
+  // For recording submissions, resolve ISRCs so the cache writes
+  // alias keys alongside the MBID key. Lets a different recording
+  // MBID with the same audio (single vs album-track variants)
+  // benefit from this submission without Parachord having to know
+  // about every variant. Best-effort — MB unavailable just falls
+  // back to MBID-only writes.
+  let isrcs: string[] = [];
+  if (entity === "recording") {
+    try {
+      const recording = await getRecording(mbid);
+      isrcs = recording.isrcs ?? [];
+    } catch {
+      // continue without alias coverage
+    }
+  }
+
   await setCachedTrackLinks(
     mbid,
     normalised,
@@ -219,6 +235,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       ...(albumName ? { albumName } : {}),
     },
     entity,
+    isrcs.length > 0 ? { isrcs } : undefined,
   );
 
   // Bust the edge cache for the entity's user-facing pages so the

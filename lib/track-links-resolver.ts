@@ -10,6 +10,7 @@ import {
 import {
   canonicalHost,
   getCachedTrackLinks,
+  getCachedTrackLinksByIsrcs,
   setCachedTrackLinks,
   type CachedLink,
   type LinkEntity,
@@ -107,8 +108,13 @@ export async function resolveTrackLinks(
   }
 
   // 2. MB url-rels — pre-fetched by the caller, or fetched here.
+  // For recordings we also pull ISRCs so we can try ISRC aliases
+  // before falling through to Odesli (handles the "same audio
+  // modeled as different MBIDs" case — single vs album-track
+  // variants typically share an ISRC).
   let mbStreamingUrls: { url: string; type?: string }[] = [];
   let mbNames: TrackNames = {};
+  let isrcs: string[] = [];
   if (prefetched) {
     mbStreamingUrls = prefetched.streamingUrls.filter((u) =>
       STREAMING_HOST_PATTERN.test(u.url),
@@ -134,6 +140,7 @@ export async function resolveTrackLinks(
         };
       } else {
         const recording = await getRecording(mbid);
+        isrcs = recording.isrcs ?? [];
         const { urls } = partitionArtistRelations({
           relations: recording.relations,
         });
@@ -157,6 +164,26 @@ export async function resolveTrackLinks(
       }
     } catch {
       // MB unreachable — degrade to Odesli-only.
+    }
+  }
+
+  // 2.5. ISRC alias fallback (recording entities only). The same
+  // audio is often modeled as two distinct recordings in MB —
+  // typically a single MBID and an album-track MBID. Parachord might
+  // have submitted streaming URLs under one but not the other.
+  // Reach across via ISRC before paying for an Odesli call.
+  if (entity === "recording" && mbid && isrcs.length > 0) {
+    const aliasHit = await getCachedTrackLinksByIsrcs(isrcs);
+    if (aliasHit && aliasHit.length > 0) {
+      // Back-fill the per-MBID cache so subsequent direct lookups
+      // don't have to walk the alias path again. Names + ISRCs go
+      // along so the entry stays self-describing.
+      void setCachedTrackLinks(mbid, aliasHit, mbNames, "recording", {
+        isrcs,
+      });
+      return sortByPlatformPriority(
+        aliasHit.map(({ url, label, host }) => ({ url, label, host })),
+      );
     }
   }
 
@@ -200,7 +227,16 @@ export async function resolveTrackLinks(
         );
       return { ...item, source: fromOdesli ? "odesli" : "mb" };
     });
-    void setCachedTrackLinks(mbid, tagged, mbNames, entity);
+    void setCachedTrackLinks(
+      mbid,
+      tagged,
+      mbNames,
+      entity,
+      // ISRC aliases are recording-only; the writer ignores them
+      // when entity is "release-group". Pass even on miss-then-
+      // resolve so future cross-MBID lookups via ISRC work.
+      isrcs.length > 0 ? { isrcs } : undefined,
+    );
   }
 
   return sortByPlatformPriority(items);
