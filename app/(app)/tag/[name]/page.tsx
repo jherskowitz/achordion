@@ -6,6 +6,7 @@ import {
   getArtistPopularityBatch,
   getLbRadio,
   getRecordingMetadata,
+  getReleaseGroupPopularityBatch,
   getSitewideTopReleaseGroups,
   type LbRadioTrack,
 } from "@/lib/clients/listenbrainz";
@@ -212,20 +213,20 @@ async function AlbumsForTag({ tag }: { tag: string }) {
   //
   //   1. LB Radio for the tag — gives us the *candidate set*: ~50
   //      tracks people are currently playing in this genre.
-  //   2. Resolve each track's recording_mbid → release_group_mbid via
-  //      LB recording metadata so we can dedupe at the canonical
-  //      album level (see AGENTS.md "Albums always link to release-
-  //      group, never release").
-  //   3. Score each release-group by its SITEWIDE listen count over
-  //      the past 30 days (LB's `range=month` on
-  //      `/stats/sitewide/release-groups`). That's the actual
-  //      "what's hot lately" signal — listen-counts users have
-  //      generated, not radio-algorithm artifacts.
-  //   4. Sort by month-listens DESC. Albums not in the global top-
-  //      1000 fall back to their radio-track-frequency (more tracks
-  //      from an album in the radio = niche-genre stand-in for
-  //      sitewide popularity), so niche tags whose albums never
-  //      crack the global top still get a meaningful order.
+  //   2. Resolve each track's recording_mbid → release_group_mbid +
+  //      first_release_date via LB recording metadata so we can
+  //      dedupe at the canonical album level (see AGENTS.md
+  //      "Albums always link to release-group, never release").
+  //   3. Score each release-group by:
+  //        listen_count_all_time * 0.5^(age_years / 3)
+  //      using `getReleaseGroupPopularityBatch` for the count and
+  //      the earliest first_release_date seen across the album's
+  //      tracks for `age_years`. 3-year halflife biases toward
+  //      records people are actually streaming this year while
+  //      keeping enough headroom for genuine catalog hits.
+  //   4. Tiebreak by sitewide past-30-day listens (when present
+  //      in the global top-1000) for things currently spiking,
+  //      then by radio track count, then by radio first-seen.
   const [radio, sitewideMonth] = await Promise.all([
     getLbRadio(`tag:(${tag})`, "easy").catch(() => null),
     getSitewideTopReleaseGroups("month", 1000).catch(() => []),
@@ -237,9 +238,6 @@ async function AlbumsForTag({ tag }: { tag: string }) {
       </p>
     );
   }
-  // Build a fast lookup of "month listen count" by release-group mbid
-  // from the sitewide top. Items absent from this map = not in the
-  // global top-1000 over the past month — score 0, falls back below.
   const monthListensByRg = new Map<string, number>();
   for (const r of sitewideMonth) {
     if (r.release_group_mbid) {
@@ -261,6 +259,9 @@ async function AlbumsForTag({ tag }: { tag: string }) {
     artistMbid: string | null;
     caaId: number | string | null;
     caaReleaseMbid: string | null;
+    /** Earliest `first_release_date` (YYYY-MM-DD) seen across the
+     *  album's tracks in the radio. Used for recency decay. */
+    earliestReleaseDate: string | null;
     count: number;
     firstSeen: number;
   }
@@ -270,9 +271,19 @@ async function AlbumsForTag({ tag }: { tag: string }) {
     const m = meta.get(t.recordingMbid);
     const releaseGroupMbid = m?.release?.release_group_mbid;
     if (!releaseGroupMbid) return;
+    const trackDate = m?.recording?.first_release_date ?? null;
     const existing = map.get(releaseGroupMbid);
     if (existing) {
       existing.count += 1;
+      // Keep the earliest first_release_date we've seen across the
+      // album's tracks — closer to "when did this album drop".
+      if (
+        trackDate &&
+        (!existing.earliestReleaseDate ||
+          trackDate < existing.earliestReleaseDate)
+      ) {
+        existing.earliestReleaseDate = trackDate;
+      }
       return;
     }
     map.set(releaseGroupMbid, {
@@ -280,28 +291,52 @@ async function AlbumsForTag({ tag }: { tag: string }) {
       releaseName: m?.release?.name ?? t.releaseName ?? "",
       artistName: t.artistName,
       artistMbid: t.artistMbid,
-      // Prefer the metadata's CAA fields (linked to the canonical
-      // release for the recording); fall back to whatever the radio
-      // track carried directly.
       caaId: m?.release?.caa_id ?? t.caaId ?? null,
       caaReleaseMbid: m?.release?.caa_release_mbid ?? t.caaReleaseMbid ?? null,
+      earliestReleaseDate: trackDate,
       count: 1,
       firstSeen: i,
     });
   });
-  // Sort priority:
-  //   1. Sitewide month-listen count DESC (the actual "hot in the
-  //      past 30 days" signal — comes from the global top-1000).
-  //   2. Radio track-count DESC (fallback for niche-genre albums
-  //      that never crack the global top — more tracks from the
-  //      album in the radio = stronger genre-internal popularity).
-  //   3. First-seen position in the radio (final tiebreaker).
+  // Pull all-time listen counts for every candidate release-group in
+  // ONE batch call. Without this, items not in the sitewide month
+  // top-1000 all scored zero and the visible order collapsed back
+  // to the radio's natural ordering — same albums in the same place
+  // regardless of what we did.
+  const candidateMbids = Array.from(map.keys());
+  const popularity = await getReleaseGroupPopularityBatch(
+    candidateMbids,
+  ).catch(() => new Map<string, number>());
+
+  // 3-year halflife: 1y album worth ~0.79×, 5y worth ~0.31×, 10y
+  // ~0.10×, 30y ~0.001×. Aggressive enough to surface 2024-2025
+  // releases above 90s catalog hits at similar popularity tiers.
+  const ALBUM_HALFLIFE_YEARS = 3;
+  const NOW_YEAR = new Date().getUTCFullYear();
+  function decay(date: string | null): number {
+    if (!date) return 0.05; // unknown date → mostly suppressed
+    const yr = Number.parseInt(date.slice(0, 4), 10);
+    if (!Number.isFinite(yr)) return 0.05;
+    const age = Math.max(0, NOW_YEAR - yr);
+    return Math.pow(0.5, age / ALBUM_HALFLIFE_YEARS);
+  }
+
+  // Sort:
+  //   1. score = listen_count * recency_decay  (primary)
+  //   2. sitewide month-listens DESC           (tiebreak when
+  //                                              currently spiking)
+  //   3. radio track-count DESC                (genre-internal pop)
+  //   4. radio first-seen                      (final tiebreak)
   const albums = Array.from(map.values())
-    .map((a) => ({
-      ...a,
-      monthListens: monthListensByRg.get(a.releaseGroupMbid) ?? 0,
-    }))
+    .map((a) => {
+      const allTime = popularity.get(a.releaseGroupMbid) ?? 0;
+      const score = allTime * decay(a.earliestReleaseDate);
+      const monthListens =
+        monthListensByRg.get(a.releaseGroupMbid) ?? 0;
+      return { ...a, score, monthListens };
+    })
     .sort((a, b) => {
+      if (a.score !== b.score) return b.score - a.score;
       if (a.monthListens !== b.monthListens) {
         return b.monthListens - a.monthListens;
       }
