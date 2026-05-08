@@ -68,20 +68,26 @@ export function InlineTrackLinks({
   if (!recordingMbid && !seedUrl) return null;
 
   return (
-    <span className="inline-flex items-center gap-2">
+    // Single pill that contains the icon trigger + the favicon
+    // expansion. When closed, the pill is icon-sized; when open
+    // it grows to fit the favicon row. One border + one bg color
+    // wrap the whole thing so it reads as one cohesive control
+    // sliding open.
+    <span
+      className={cn(
+        "border-border/60 inline-flex h-6 shrink-0 items-center overflow-hidden rounded-full border bg-transparent transition-colors duration-150 pointer-coarse:h-9",
+        open && "border-primary/30 bg-primary/10",
+      )}
+    >
       <button
         type="button"
         onClick={() => setOpen((x) => !x)}
         aria-expanded={open}
         aria-label={open ? "Hide streaming links" : "Show streaming links"}
         className={cn(
-          // Active state pops a ring + brand-accent text + bg so
-          // the trigger reads as "open" against the rest of the
-          // row. Inactive is the dim-by-default secondary action
-          // affordance.
-          "inline-flex size-6 items-center justify-center rounded-full transition-colors duration-150 pointer-coarse:size-9",
+          "inline-flex size-6 items-center justify-center rounded-full transition-colors pointer-coarse:size-9",
           open
-            ? "bg-primary/10 text-primary ring-1 ring-primary/30"
+            ? "text-primary"
             : "text-muted-foreground hover:text-foreground",
         )}
       >
@@ -91,24 +97,25 @@ export function InlineTrackLinks({
           <ExternalLink className="size-3.5" />
         )}
       </button>
-      {/* Expandable link row uses max-width + opacity transition so
-          the row eases out from the trigger instead of snapping in.
-          Always rendered (just collapsed) so the transition has
-          something to tween against. */}
+      {/* Expansion sits inside the pill — collapsed to zero width
+          when closed, eases open to fit the favicon row. The pill
+          border wraps both icon + expansion so the whole thing
+          looks like one shape that grew, not an icon next to a
+          row of buttons. */}
       <span
         aria-hidden={!open}
         className={cn(
-          "inline-flex max-w-0 items-center gap-1 overflow-hidden whitespace-nowrap opacity-0 transition-[max-width,opacity] duration-200 ease-out",
-          open && "max-w-[40rem] opacity-100",
+          "inline-flex max-w-0 items-center gap-0.5 overflow-hidden whitespace-nowrap pr-0 transition-[max-width,padding-right] duration-200 ease-out",
+          open && "max-w-[40rem] pr-1",
         )}
       >
         {error && (
-          <span className="text-muted-foreground text-xs">
+          <span className="text-muted-foreground px-2 text-xs">
             Couldn&apos;t load links
           </span>
         )}
         {data && data.links.length === 0 && !isFetching && (
-          <span className="text-muted-foreground text-xs">
+          <span className="text-muted-foreground px-2 text-xs">
             No streaming links found
           </span>
         )}
@@ -121,7 +128,7 @@ export function InlineTrackLinks({
             aria-label={link.label}
             title={link.label}
             tabIndex={open ? 0 : -1}
-            className="border-border/60 hover:border-foreground/40 hover:bg-muted/40 inline-flex size-7 items-center justify-center rounded-md border transition-colors pointer-coarse:size-9"
+            className="hover:bg-muted/60 inline-flex size-5 items-center justify-center rounded-full transition-colors pointer-coarse:size-7"
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
