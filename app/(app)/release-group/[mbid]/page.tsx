@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
   formatArtistCredit,
@@ -8,15 +9,17 @@ import {
   pickCanonicalRelease,
   type ReleaseDetail,
 } from "@/lib/clients/musicbrainz";
-import type { ParachordTrack } from "@/lib/parachord";
+import { parachordPlayAlbum, type ParachordTrack } from "@/lib/parachord";
 import {
   getReleaseGroupListeners,
   getTopRecordingsForArtist,
   type ReleaseGroupListeners,
 } from "@/lib/clients/listenbrainz";
+import { caaReleaseGroupUrl } from "@/lib/clients/coverart";
+import { PageHeader } from "@/components/achordion/page-header";
 import { PageShell } from "@/components/achordion/page-shell";
-import { AlbumHeader } from "@/components/achordion/album-header";
-import { Breadcrumbs } from "@/components/achordion/breadcrumbs";
+import { CoverArt } from "@/components/achordion/cover-art";
+import { PlayOnHoverFab } from "@/components/achordion/play-on-hover-fab";
 import { TrackList } from "@/components/achordion/track-list";
 import { TopListenersList } from "@/components/achordion/top-listeners-list";
 import {
@@ -26,6 +29,9 @@ import {
   tooltipLabel,
 } from "@/components/achordion/external-links";
 import { StreamingLinksRow } from "@/components/achordion/streaming-links-row";
+import { TrackListActionsMenu } from "@/components/achordion/track-list-actions-menu";
+import { EmbedShareButton } from "@/components/achordion/embed-share-button";
+import { TagChips } from "@/components/achordion/tag-chips";
 import { EmptyState } from "@/components/achordion/empty-state";
 import { AlbumReviews } from "@/components/achordion/album-reviews";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -177,30 +183,123 @@ async function AlbumBody({ mbid }: { mbid: string }) {
       ]
     : [];
 
+  // Genre / tag chips. Mirrors the recording page — capped at 8,
+  // sorted by editor-vote count, used by TagChips for the inline
+  // chip row below the header.
+  const tagsSource = rg.genres?.length ? rg.genres : rg.tags ?? [];
+  const tags = tagsSource
+    .filter((t) => t.count > 0)
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 8);
+  const year = rg["first-release-date"]?.slice(0, 4);
+  const albumType =
+    rg["primary-type"] ??
+    (rg["secondary-types"]?.length ? rg["secondary-types"][0] : "Release");
+
   return (
     <>
-      {breadcrumbs.length > 0 && (
-        <div className="mt-8">
-          <Breadcrumbs items={breadcrumbs} />
-        </div>
-      )}
-      <AlbumHeader
-        rg={rg}
-        parachordTracks={parachordTracks}
-        streamingLinksSlot={
-          <StreamingLinksRow
-            entity="release-group"
-            mbid={rg.id}
-            initialItems={initialStreamingItems}
-            seedUrl={albumOdesliSeed}
-          />
+      {/* Track-page-mirroring header: cover with hover play fab,
+          title + artist byline, ⋮ list-actions menu inline with
+          the streaming favicons row, listens/listeners stats
+          right-justified. Tag chips + Embed share button render
+          BELOW the header in their own row, same as the
+          recording page. */}
+      <PageHeader
+        breadcrumbs={breadcrumbs}
+        leading={
+          <div className="group relative aspect-square w-32 overflow-hidden rounded-md sm:w-40">
+            <CoverArt
+              src={caaReleaseGroupUrl(rg.id, 500)}
+              alt={rg.title}
+              size={500}
+              className="aspect-square w-full transition-opacity group-hover:opacity-90"
+              rounded="md"
+            />
+            <PlayOnHoverFab
+              href={parachordPlayAlbum({
+                ...(rg.id
+                  ? { mbid: rg.id }
+                  : {
+                      artist: credit.name,
+                      title: rg.title,
+                      tracks: parachordTracks,
+                    }),
+              })}
+              label={`Play "${rg.title}" by ${credit.name} in Parachord`}
+            />
+          </div>
         }
-        statsSlot={
+        eyebrow={
+          <>
+            {albumType}
+            {rg["secondary-types"]?.length ? (
+              <> · {rg["secondary-types"].join(" · ")}</>
+            ) : null}
+          </>
+        }
+        title={rg.title}
+        description={
+          <span className="inline-flex flex-wrap items-baseline gap-x-2 gap-y-1">
+            {credit.parts.map((p, i) => (
+              <span key={`${p.id ?? p.name}-${i}`}>
+                {p.id ? (
+                  <Link
+                    href={`/artist/${p.id}`}
+                    className="text-foreground hover:underline"
+                  >
+                    {p.name}
+                  </Link>
+                ) : (
+                  p.name
+                )}
+                {p.join}
+              </span>
+            ))}
+            {year && (
+              <>
+                <span className="text-muted-foreground/70">·</span>
+                <span className="text-muted-foreground tabular-nums">
+                  {year}
+                </span>
+              </>
+            )}
+            {rg.disambiguation && (
+              <>
+                <span className="text-muted-foreground/70">·</span>
+                <em className="text-muted-foreground">{rg.disambiguation}</em>
+              </>
+            )}
+          </span>
+        }
+        afterTitle={
+          <div className="flex flex-wrap items-center gap-2">
+            <TrackListActionsMenu
+              title={`${rg.title} — ${credit.name}`}
+              creator={credit.name}
+              tracks={parachordTracks ?? []}
+              triggerLabel={`${rg.title} actions`}
+            />
+            <StreamingLinksRow
+              entity="release-group"
+              mbid={rg.id}
+              initialItems={initialStreamingItems}
+              seedUrl={albumOdesliSeed}
+            />
+          </div>
+        }
+        actions={
           <Suspense fallback={<HeaderStatsSkeleton />}>
             <HeaderStats promise={listenersPromise} />
           </Suspense>
         }
       />
+
+      <div className="-mt-2 flex flex-wrap items-center justify-between gap-2 pb-4">
+        <div className="flex flex-wrap gap-1.5">
+          <TagChips entity="release-group" mbid={rg.id} initialTags={tags} />
+        </div>
+        <EmbedShareButton entity="album" mbid={rg.id} />
+      </div>
 
       <div className="grid grid-cols-1 gap-10 lg:grid-cols-[minmax(0,1fr)_240px]">
         <div className="min-w-0 space-y-12">

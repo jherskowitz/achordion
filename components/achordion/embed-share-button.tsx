@@ -15,19 +15,33 @@ import { cn } from "@/lib/utils";
 
 /**
  * "Embed" affordance for entity pages — opens a dialog with a
- * ready-to-copy iframe snippet that drops Achordion's track widget
- * into a third-party page. The widget itself lives at
- * `/embed/track/<mbid>` (see `app/embed/track/[mbid]/page.tsx`).
+ * ready-to-copy iframe snippet that drops Achordion's widget into a
+ * third-party page.
  *
- * Recommended dimensions: 600×180 baseline; the widget responds
- * down to ~360px wide for narrow column embeds.
+ * Supports two entity types today:
+ *   - `track` (recording MBID) → `/embed/track/<mbid>`, 600×180.
+ *   - `album` (release-group MBID) → `/embed/album/<mbid>`, 600×260
+ *     baseline. Has an expandable tracklist so the snippet's host
+ *     iframe should accommodate the expanded height with internal
+ *     scroll if needed.
+ *
+ * Defaults are tuned to the most common embed shape; consumers can
+ * override via `recommendedHeight` if they have a more specific
+ * surface in mind (e.g. a sidebar column).
  */
+type EmbedEntity = "track" | "album";
+
+const DEFAULT_HEIGHT: Record<EmbedEntity, number> = {
+  track: 180,
+  album: 260,
+};
+
 export function EmbedShareButton({
   entity,
   mbid,
-  recommendedHeight = 180,
+  recommendedHeight,
 }: {
-  entity: "track";
+  entity: EmbedEntity;
   mbid: string;
   recommendedHeight?: number;
 }) {
@@ -40,7 +54,8 @@ export function EmbedShareButton({
   const snippetSrc = `https://achordion.xyz${path}`;
   const previewHref =
     typeof window !== "undefined" ? window.location.origin + path : snippetSrc;
-  const snippet = `<iframe src="${snippetSrc}" width="600" height="${recommendedHeight}" loading="lazy" style="border:0;border-radius:12px" title="Achordion ${entity}"></iframe>`;
+  const height = recommendedHeight ?? DEFAULT_HEIGHT[entity];
+  const snippet = `<iframe src="${snippetSrc}" width="600" height="${height}" loading="lazy" style="border:0;border-radius:12px" title="Achordion ${entity}"></iframe>`;
 
   async function copyToClipboard() {
     try {
