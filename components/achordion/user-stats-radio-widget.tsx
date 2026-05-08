@@ -116,49 +116,53 @@ export function UserStatsRadioWidget({ username }: { username: string }) {
     </span>
   );
 
+  // Compact pairing: icon (with tooltip + hover Radio→Play swap) +
+  // a small chevron that toggles a popover with the range slider.
+  // Keeps the user header clean — the icon sits inline next to the
+  // username so the Follow button can right-justify on the row.
   return (
-    <div className="border-border/60 bg-background relative w-72 max-w-[80vw] rounded-2xl border">
-      <div className="flex items-center gap-3 p-3">
-        <IconTooltip
-          side="top"
-          align="start"
-          label={
-            parachordRunning
-              ? `Play ${radioName} in Parachord`
-              : "Parachord isn't running"
-          }
-        >
-          {icon}
-        </IconTooltip>
-        <div className="min-w-0 flex-1">
-          <h2 className="truncate text-sm font-semibold tracking-wide uppercase">
-            {radioName}
-          </h2>
-          <p className="text-muted-foreground/80 truncate text-xs">
-            {rangeLabel}
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={() => setOpen((x) => !x)}
-          aria-expanded={open}
-          aria-label={open ? "Hide range picker" : "Show range picker"}
-          aria-controls={`stats-radio-range-${username}`}
-          className="text-muted-foreground hover:bg-muted/40 hover:text-foreground inline-flex size-8 shrink-0 items-center justify-center rounded-md transition-colors pointer-coarse:size-11"
-        >
-          <ChevronDown
-            className={cn(
-              "size-4 transition-transform duration-200",
-              open && "rotate-180",
-            )}
-          />
-        </button>
-      </div>
+    <div className="relative inline-flex shrink-0 items-center gap-0.5">
+      <IconTooltip
+        side="top"
+        align="center"
+        label={
+          parachordRunning
+            ? `Play ${radioName} (${rangeLabel}) in Parachord`
+            : `${radioName} — Parachord isn't running`
+        }
+      >
+        {icon}
+      </IconTooltip>
+      <button
+        type="button"
+        onClick={() => setOpen((x) => !x)}
+        aria-expanded={open}
+        aria-label={open ? `Hide ${radioName} options` : `${radioName} options`}
+        aria-controls={`stats-radio-range-${username}`}
+        className="text-muted-foreground hover:bg-muted/40 hover:text-foreground inline-flex size-7 shrink-0 items-center justify-center rounded-md transition-colors pointer-coarse:size-9"
+      >
+        <ChevronDown
+          className={cn(
+            "size-3.5 transition-transform duration-200",
+            open && "rotate-180",
+          )}
+        />
+      </button>
       {open && (
         <div
           id={`stats-radio-range-${username}`}
-          className="border-border/60 bg-background absolute left-0 right-0 top-full z-40 mt-1 rounded-2xl border px-3 pb-3 pt-3 shadow-lg"
+          // Popover anchored to the chevron — fixed-width card with
+          // the same look as the LB Radio cards on /radio so the
+          // visual identity carries through even though the trigger
+          // has been collapsed to an icon.
+          className="border-border/60 bg-background absolute left-0 top-full z-40 mt-2 w-72 max-w-[80vw] rounded-2xl border p-3 shadow-lg"
         >
+          <h2 className="text-sm font-semibold tracking-wide uppercase">
+            {radioName}
+          </h2>
+          <p className="text-muted-foreground/80 mt-0.5 text-xs">
+            {rangeLabel}
+          </p>
           <input
             type="range"
             min={0}
@@ -167,7 +171,7 @@ export function UserStatsRadioWidget({ username }: { username: string }) {
             value={idx}
             onChange={(e) => setRange(STAT_RANGES[Number(e.target.value)])}
             aria-label="Stats time range"
-            className="accent-foreground h-1 w-full cursor-pointer"
+            className="accent-foreground mt-3 h-1 w-full cursor-pointer"
           />
           <p className="text-muted-foreground/80 mt-2 text-[11px] leading-5">
             <span className="text-foreground font-medium">{rangeLabel}</span> —

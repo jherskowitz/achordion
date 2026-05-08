@@ -68,9 +68,16 @@ export async function UserPageHeader({ name }: { name: string }) {
             <p className="text-muted-foreground text-xs tracking-wide uppercase">
               ListenBrainz user
             </p>
-            <h1 className="truncate text-3xl font-semibold tracking-tight sm:text-4xl">
-              {name}
-            </h1>
+            {/* Username + radio-station icon ride together — radio
+                acts as a small affordance hanging off the name, so
+                the Follow button can right-justify on the same row
+                instead of shoving the radio widget out to the edge. */}
+            <div className="flex items-center gap-2">
+              <h1 className="truncate text-3xl font-semibold tracking-tight sm:text-4xl">
+                {name}
+              </h1>
+              <UserStatsRadioWidget username={name} />
+            </div>
             <LiveOnAirIndicator
               username={name}
               initialListen={initialPlaying}
@@ -86,7 +93,6 @@ export async function UserPageHeader({ name }: { name: string }) {
               disabledReason={disabledReason}
             />
           )}
-          <UserStatsRadioWidget username={name} />
         </div>
         <SectionTabs tabs={userTabs(name)} />
       </div>
