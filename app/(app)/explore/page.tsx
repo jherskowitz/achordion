@@ -158,8 +158,18 @@ async function ThisWeekReleasesSection({ username }: { username: string }) {
     sort: "release_date",
   }).catch(() => [] as FreshRelease[]);
   const range = pastWeekRange();
+  // LB's `future: false` flag is meant to filter out unreleased
+  // entries, but in practice some still leak through (entries with
+  // release_date past the server's "today" by hours / a day). Apply
+  // a hard local guard: only items whose release_date is on or
+  // before today survive. Belt-and-suspenders alongside the `inPastWeek`
+  // bound which already excludes anything past `endIso` (tomorrow).
+  const todayIso = new Date().toISOString().slice(0, 10);
   const thisWeek = releases.filter(
-    (r) => inPastWeek(r, range) && isStudioRelease(r),
+    (r) =>
+      r.release_date <= todayIso &&
+      inPastWeek(r, range) &&
+      isStudioRelease(r),
   );
   if (thisWeek.length === 0) {
     return (
