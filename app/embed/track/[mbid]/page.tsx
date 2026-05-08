@@ -10,8 +10,9 @@ import { caaReleaseUrl } from "@/lib/clients/coverart";
 import { CoverArt } from "@/components/achordion/cover-art";
 import { PlayOnHoverFab } from "@/components/achordion/play-on-hover-fab";
 import { categoriseLinks } from "@/components/achordion/external-links";
-import { OdesliLinks } from "@/components/achordion/odesli-links";
 import { parachordPlayTrack } from "@/lib/parachord";
+import { resolveTrackLinks } from "@/lib/track-links-resolver";
+import { IconTooltip } from "@/components/ui/icon-tooltip";
 
 /**
  * Embeddable widget for a single track. Designed to drop into a
@@ -77,8 +78,26 @@ export default async function EmbedTrackPage({ params }: PageProps) {
     relations: recording.relations,
   });
   const { streaming } = categoriseLinks(urls);
-  const odesliSeed = streaming[0]?.url ?? null;
   const canonicalHref = `https://achordion.xyz/recording/${mbid}`;
+
+  // Cache-first resolve: hits our Upstash track-links store before
+  // calling Odesli or re-walking MB. Pre-feed the streaming url-rels
+  // we already pulled from the recording above so a cache miss
+  // doesn't trigger a duplicate MB round-trip. Renders zero-cost on
+  // every cache hit, which is the vast majority once a track has
+  // been viewed once.
+  const trackLinks = await resolveTrackLinks({
+    mbid,
+    seedUrl: streaming[0]?.url ?? null,
+    prefetched: {
+      streamingUrls: streaming.map((s) => ({ url: s.url, type: s.type })),
+      names: {
+        trackName: recording.title,
+        artistName: credit.name,
+        albumName: heroReleaseGroup?.title,
+      },
+    },
+  });
 
   return (
     <main className="bg-background min-h-screen p-3">
@@ -146,16 +165,44 @@ export default async function EmbedTrackPage({ params }: PageProps) {
             </p>
           </div>
           <div className="mt-3 flex items-center gap-2">
-            {/* Single inline row of streaming services. OdesliLinks
-                already dedupes Odesli + MB url-rels by hostname so
-                the favicons that show represent the union without
-                duplicates. No pill / click-to-expand on the embed
-                — the value of an embeddable widget is "links you
-                can click without thinking." */}
-            <OdesliLinks
-              seedUrl={odesliSeed}
-              mbStreamingLinks={streaming}
-            />
+            {/* Single inline row of streaming services. The resolver
+                hits our persistent Upstash cache first, falls back
+                to Odesli + MB url-rels on miss, and dedupes by
+                canonical host — so the favicons here are the union
+                of every source we know about without duplicates.
+                No pill / click-to-expand on the embed — the value
+                of an embeddable widget is "links you can click
+                without thinking." */}
+            {trackLinks.length > 0 && (
+              <ul
+                className="flex flex-wrap items-center gap-2"
+                role="list"
+              >
+                {trackLinks.map((link) => (
+                  <li key={link.url}>
+                    <IconTooltip label={link.label}>
+                      <a
+                        href={link.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        aria-label={link.label}
+                        className="border-border/60 hover:border-foreground/40 hover:bg-muted/40 inline-flex size-9 items-center justify-center rounded-md border transition-colors pointer-coarse:size-11"
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={`https://www.google.com/s2/favicons?domain=${link.host}&sz=64`}
+                          alt=""
+                          width={16}
+                          height={16}
+                          loading="lazy"
+                          className="size-4 opacity-80 hover:opacity-100"
+                        />
+                      </a>
+                    </IconTooltip>
+                  </li>
+                ))}
+              </ul>
+            )}
             <Link
               href={canonicalHref}
               target="_top"
