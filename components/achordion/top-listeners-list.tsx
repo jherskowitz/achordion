@@ -22,7 +22,7 @@ export function TopListenersList({
   const max = listeners[0]?.listen_count ?? 1;
   if (layout === "cards") {
     return (
-      <ol className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <ol className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {listeners.slice(0, 12).map((l, i) => {
           const pct = Math.round((l.listen_count / max) * 100);
           return (

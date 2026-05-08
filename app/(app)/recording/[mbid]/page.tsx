@@ -252,8 +252,10 @@ async function RecordingBody({ mbid }: { mbid: string }) {
       </div>
 
       {/* Two-column layout for the body: main column carries
-          "Also appears on" + the new Top Listeners cards section,
-          sidebar shrinks to just Other Links. */}
+          "Also appears on", sidebar shrinks to just Other Links.
+          Top Listeners moved BELOW the grid so it spans the full
+          page width — cards layout fills 3-up nicely at lg, but
+          gets crowded inside the constrained main column. */}
       <div className="mt-6 grid grid-cols-1 gap-10 lg:grid-cols-[minmax(0,1fr)_240px]">
         <div className="min-w-0 space-y-12">
           {otherReleaseGroups.length > 0 && (
@@ -309,18 +311,6 @@ async function RecordingBody({ mbid }: { mbid: string }) {
               </ul>
             </section>
           )}
-          {/* Top Listeners — moved out of the sidebar into the
-              main column as a card grid so it gets the breathing
-              room cards need to read well. Sourced from the hero
-              album's listeners (LB has no per-recording listeners
-              endpoint), same data the sidebar used to surface as a
-              compact list. */}
-          <Suspense fallback={null}>
-            <AlbumTopListenersStream
-              promise={albumListenersPromise}
-              layout="cards"
-            />
-          </Suspense>
         </div>
         <aside className="space-y-8">
           {otherUrls.length > 0 && (
@@ -334,6 +324,21 @@ async function RecordingBody({ mbid }: { mbid: string }) {
             </div>
           )}
         </aside>
+      </div>
+
+      {/* Top Listeners — full page width below the two-column grid.
+          Sourced from the hero album's listeners (LB has no per-
+          recording listeners endpoint). Cards layout breathes 3-up
+          at lg, falling back to 2 / 1 at sm / xs. mt-12 matches
+          the inner space-y-12 cadence the rest of the page uses
+          between sibling sections. */}
+      <div className="mt-12">
+        <Suspense fallback={null}>
+          <AlbumTopListenersStream
+            promise={albumListenersPromise}
+            layout="cards"
+          />
+        </Suspense>
       </div>
     </>
   );
