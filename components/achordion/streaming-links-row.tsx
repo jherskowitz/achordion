@@ -45,9 +45,15 @@ interface ResolvedLink {
   host: string;
 }
 
+type LinkEntity = "recording" | "release-group";
+
 interface StreamingLinksRowProps {
-  /** Recording MBID — used as the cache key for /api/track-links. */
-  recordingMbid: string;
+  /** Recording or release-group MBID — used as the cache key for
+   *  /api/track-links. */
+  mbid: string;
+  /** Which entity `mbid` refers to. Drives the cache namespace and
+   *  the entity-aware MB fetch on the API side. */
+  entity: LinkEntity;
   /** MB url-rels (or any pre-resolved links) the server has on hand.
    *  Rendered immediately on first paint so the row is clickable
    *  before the client fetch lands. Pass `[]` if nothing's available
@@ -60,14 +66,15 @@ interface StreamingLinksRowProps {
 }
 
 export function StreamingLinksRow({
-  recordingMbid,
+  mbid,
+  entity,
   initialItems,
   seedUrl,
 }: StreamingLinksRowProps) {
   const { data } = useQuery<{ links: ResolvedLink[] }>({
-    queryKey: ["track-links", recordingMbid, seedUrl ?? null],
+    queryKey: ["track-links", entity, mbid, seedUrl ?? null],
     queryFn: async () => {
-      const params = new URLSearchParams({ mbid: recordingMbid });
+      const params = new URLSearchParams({ mbid, entity });
       if (seedUrl) params.set("seedUrl", seedUrl);
       const r = await fetch(`/api/track-links?${params.toString()}`);
       if (!r.ok) throw new Error(`track-links ${r.status}`);
@@ -100,7 +107,7 @@ export function StreamingLinksRow({
         <FaviconTile key={it.url} url={it.url} label={it.label} host={it.host} />
       ))}
       <li>
-        <AddSourcesButton mbEntity="recording" mbid={recordingMbid} />
+        <AddSourcesButton mbEntity={entity} mbid={mbid} />
       </li>
     </ul>
   );

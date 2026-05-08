@@ -22,7 +22,10 @@ import { TopListenersList } from "@/components/achordion/top-listeners-list";
 import {
   ExternalLinks,
   categoriseLinks,
+  normalizeStreamingUrl,
+  tooltipLabel,
 } from "@/components/achordion/external-links";
+import { StreamingLinksRow } from "@/components/achordion/streaming-links-row";
 import { EmptyState } from "@/components/achordion/empty-state";
 import { AlbumReviews } from "@/components/achordion/album-reviews";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -99,6 +102,26 @@ async function AlbumBody({ mbid }: { mbid: string }) {
   // sidebar's "Other Links" so we don't show Spotify/Apple twice.
   const { streaming: streamingUrls, other: otherUrlsFromMb } =
     categoriseLinks(urls);
+  // Pre-render the MB streaming url-rels (rg-level + release-level
+  // merged) as clickable favicons on first paint, so a friend who
+  // lands here from a Parachord-shared link can play immediately
+  // even on a cold MBID. The <StreamingLinksRow> client island
+  // upgrades this set with the full Odesli-enriched / cache-resolved
+  // list once it mounts.
+  const initialStreamingItems = streamingUrls
+    .map((link) => {
+      const normalised = normalizeStreamingUrl(link.url);
+      if (!normalised) return null;
+      let host: string;
+      try {
+        host = new URL(normalised).hostname.toLowerCase();
+      } catch {
+        return null;
+      }
+      return { url: normalised, label: tooltipLabel(link), host };
+    })
+    .filter((x): x is { url: string; label: string; host: string } => x !== null);
+  const albumOdesliSeed = streamingUrls[0]?.url ?? null;
   // Always link back to MusicBrainz so users who care about a specific
   // release / format / catalog number can drill in there. Append rather
   // than prepend so MB sits below editorially-added rels (Wikipedia
@@ -164,7 +187,14 @@ async function AlbumBody({ mbid }: { mbid: string }) {
       <AlbumHeader
         rg={rg}
         parachordTracks={parachordTracks}
-        streamingLinks={streamingUrls}
+        streamingLinksSlot={
+          <StreamingLinksRow
+            entity="release-group"
+            mbid={rg.id}
+            initialItems={initialStreamingItems}
+            seedUrl={albumOdesliSeed}
+          />
+        }
         statsSlot={
           <Suspense fallback={<HeaderStatsSkeleton />}>
             <HeaderStats promise={listenersPromise} />

@@ -4,6 +4,7 @@ import { z } from "zod";
 import {
   setCachedTrackLinks,
   type CachedLink,
+  type LinkEntity,
 } from "@/lib/track-links-store";
 
 /**
@@ -43,6 +44,12 @@ const NO_STORE: Record<string, string> = {
 
 const SubmitSchema = z.object({
   mbid: z.string().min(1).max(100),
+  // Which MB entity the MBID refers to. Defaults to recording for
+  // back-compat with the existing track-only submission shape.
+  // Aliases: `track` → recording, `album` → release-group.
+  entity: z
+    .enum(["recording", "release-group", "track", "album"])
+    .optional(),
   links: z
     .array(
       z.object({
@@ -61,6 +68,11 @@ const SubmitSchema = z.object({
   artistName: z.string().max(500).optional(),
   albumName: z.string().max(500).optional(),
 });
+
+function normaliseEntity(raw?: string): LinkEntity {
+  if (raw === "release-group" || raw === "album") return "release-group";
+  return "recording";
+}
 
 function bearer(request: NextRequest): string | null {
   const header = request.headers.get("authorization") ?? "";
@@ -120,6 +132,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 
   const { mbid, links, trackName, artistName, albumName } = parsed.data;
+  const entity = normaliseEntity(parsed.data.entity);
 
   // Normalise + drop links we can't resolve to a host (malformed
   // URLs that snuck past the URL validator on weird inputs).
@@ -141,20 +154,29 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     );
   }
 
-  await setCachedTrackLinks(mbid, normalised, {
-    ...(trackName ? { trackName } : {}),
-    ...(artistName ? { artistName } : {}),
-    ...(albumName ? { albumName } : {}),
-  });
+  await setCachedTrackLinks(
+    mbid,
+    normalised,
+    {
+      ...(trackName ? { trackName } : {}),
+      ...(artistName ? { artistName } : {}),
+      ...(albumName ? { albumName } : {}),
+    },
+    entity,
+  );
 
-  // Bust the edge cache for the recording's user-facing pages so the
+  // Bust the edge cache for the entity's user-facing pages so the
   // freshly-submitted links appear without waiting out the 1h
   // s-maxage. `revalidatePath` is best-effort — failures here just
   // mean users see the new links once the edge entry naturally
   // refreshes (well within stale-while-revalidate).
   try {
-    revalidatePath(`/recording/${mbid}`);
-    revalidatePath(`/embed/track/${mbid}`);
+    if (entity === "release-group") {
+      revalidatePath(`/release-group/${mbid}`);
+    } else {
+      revalidatePath(`/recording/${mbid}`);
+      revalidatePath(`/embed/track/${mbid}`);
+    }
   } catch {
     // ignore — write to Redis already succeeded.
   }

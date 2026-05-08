@@ -2,7 +2,9 @@ import "server-only";
 
 import { getOdesliLinks } from "@/lib/clients/odesli";
 import {
+  formatArtistCredit,
   getRecording,
+  getReleaseGroup,
   partitionArtistRelations,
 } from "@/lib/clients/musicbrainz";
 import {
@@ -10,6 +12,7 @@ import {
   getCachedTrackLinks,
   setCachedTrackLinks,
   type CachedLink,
+  type LinkEntity,
   type TrackNames,
 } from "@/lib/track-links-store";
 
@@ -47,16 +50,22 @@ export interface ResolvedLink {
 }
 
 interface ResolveTrackLinksOpts {
-  /** Recording MBID — required for cache reads/writes. */
+  /** Recording or release-group MBID — required for cache
+   *  reads/writes. */
   mbid?: string | null;
+  /** Which MB entity the MBID refers to. Determines the cache
+   *  namespace and which MB endpoint we hit on a miss. Defaults to
+   *  `recording` for back-compat with track-link callers. */
+  entity?: LinkEntity;
   /** Explicit Odesli seed. When omitted, the first MB streaming
    *  rel is used. */
   seedUrl?: string | null;
   /**
    * Optional pre-fetched MB data. When the caller already loaded the
-   * recording (e.g. the embed page's hero block), pass the streaming
-   * url-rels + names through here to skip a duplicate MB round-trip
-   * on cache miss.
+   * entity (e.g. the embed page's hero block, or a release-group
+   * page that already has its url-rels), pass the streaming url-rels
+   * + names through here to skip a duplicate MB round-trip on cache
+   * miss.
    */
   prefetched?: {
     streamingUrls: { url: string; type?: string }[];
@@ -85,10 +94,11 @@ export async function resolveTrackLinks(
   opts: ResolveTrackLinksOpts,
 ): Promise<ResolvedLink[]> {
   const { mbid, seedUrl, prefetched } = opts;
+  const entity: LinkEntity = opts.entity ?? "recording";
 
   // 1. Cache hit short-circuits every external call.
   if (mbid) {
-    const cached = await getCachedTrackLinks(mbid);
+    const cached = await getCachedTrackLinks(mbid, entity);
     if (cached && cached.length > 0) {
       return sortByPlatformPriority(
         cached.map(({ url, label, host }) => ({ url, label, host })),
@@ -106,27 +116,45 @@ export async function resolveTrackLinks(
     mbNames = prefetched.names ?? {};
   } else if (mbid) {
     try {
-      const recording = await getRecording(mbid);
-      const { urls } = partitionArtistRelations({
-        relations: recording.relations,
-      });
-      mbStreamingUrls = urls
-        .filter((u) => STREAMING_HOST_PATTERN.test(u.url))
-        .map((u) => ({ url: u.url, type: u.type }));
-      const artistName = recording["artist-credit"]
-        ?.map((c) => c.name + (c.joinphrase ?? ""))
-        .join("")
-        .trim();
-      const release = (recording.releases ?? [])
-        .slice()
-        .sort((a, b) =>
-          (a.date ?? "9999").localeCompare(b.date ?? "9999"),
-        )[0];
-      mbNames = {
-        trackName: recording.title,
-        ...(artistName ? { artistName } : {}),
-        ...(release?.title ? { albumName: release.title } : {}),
-      };
+      if (entity === "release-group") {
+        // For release-groups the rg-level url-rels are often sparse,
+        // but we don't fetch the linked releases here — that'd be a
+        // second roundtrip per resolution. Callers that need richer
+        // url coverage (e.g. the album page) pre-fetch + dedup
+        // release-level rels themselves and pass via `prefetched`.
+        const rg = await getReleaseGroup(mbid);
+        const { urls } = partitionArtistRelations(rg);
+        mbStreamingUrls = urls
+          .filter((u) => STREAMING_HOST_PATTERN.test(u.url))
+          .map((u) => ({ url: u.url, type: u.type }));
+        const credit = formatArtistCredit(rg["artist-credit"]);
+        mbNames = {
+          albumName: rg.title,
+          ...(credit.name ? { artistName: credit.name } : {}),
+        };
+      } else {
+        const recording = await getRecording(mbid);
+        const { urls } = partitionArtistRelations({
+          relations: recording.relations,
+        });
+        mbStreamingUrls = urls
+          .filter((u) => STREAMING_HOST_PATTERN.test(u.url))
+          .map((u) => ({ url: u.url, type: u.type }));
+        const artistName = recording["artist-credit"]
+          ?.map((c) => c.name + (c.joinphrase ?? ""))
+          .join("")
+          .trim();
+        const release = (recording.releases ?? [])
+          .slice()
+          .sort((a, b) =>
+            (a.date ?? "9999").localeCompare(b.date ?? "9999"),
+          )[0];
+        mbNames = {
+          trackName: recording.title,
+          ...(artistName ? { artistName } : {}),
+          ...(release?.title ? { albumName: release.title } : {}),
+        };
+      }
     } catch {
       // MB unreachable — degrade to Odesli-only.
     }
@@ -172,7 +200,7 @@ export async function resolveTrackLinks(
         );
       return { ...item, source: fromOdesli ? "odesli" : "mb" };
     });
-    void setCachedTrackLinks(mbid, tagged, mbNames);
+    void setCachedTrackLinks(mbid, tagged, mbNames, entity);
   }
 
   return sortByPlatformPriority(items);

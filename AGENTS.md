@@ -483,14 +483,15 @@ If they aren't yet:
 
 ### Track-links submission (POST `/api/track-links/submit`)
 
-Parachord can push confirmed-on-playback recording → external-streaming-URL matches into Achordion's persistent links cache. Each submitted link is stored with `source: "parachord"`, which outranks the Odesli + MB lookups Achordion does itself — so the next user who clicks the inline link button sees the playback-verified URL, not Odesli's best-effort match.
+Parachord can push confirmed-on-playback MBID → external-streaming-URL matches into Achordion's persistent links cache. Each submitted link is stored with `source: "parachord"`, which outranks the Odesli + MB lookups Achordion does itself — so the next user who clicks the favicon row sees the playback-verified URL, not Odesli's best-effort match. Works for both **recordings** (per-track URLs) and **release-groups** (per-album URLs).
 
 - **Auth:** bearer token. Achordion reads `PARACHORD_TRACK_LINKS_TOKEN` from its env; Parachord side configures the matching value and presents `Authorization: Bearer <token>` on every request.
 - **Endpoint:** `POST https://achordion.xyz/api/track-links/submit` (or `localhost:3000/api/track-links/submit` for dev).
 - **Body:**
   ```json
   {
-    "mbid": "<recording-mbid>",
+    "mbid": "<entity-mbid>",
+    "entity": "recording",
     "links": [
       { "url": "https://open.spotify.com/track/...", "label": "Spotify", "host": "spotify.com" },
       { "url": "https://music.apple.com/...", "host": "music.apple.com" }
@@ -500,9 +501,11 @@ Parachord can push confirmed-on-playback recording → external-streaming-URL ma
     "albumName": "Album Name"
   }
   ```
-  `label` and `host` are optional — Achordion derives `host` from the URL and capitalises the second-level domain when missing. `trackName` / `artistName` / `albumName` are also optional but encouraged: they make the stored cache entry self-describing (so admins can scan keys without an MB roundtrip to identify what each track is) and unlock future search-by-name features over the cache.
+  - `entity` (optional, default `recording`) — `recording` for per-track URLs (Spotify track links etc.), `release-group` for per-album URLs (Spotify album links etc.). Aliases: `track` → recording, `album` → release-group. The two entity types use separate cache namespaces so a recording MBID and a release-group MBID can't collide.
+  - `label` and `host` are optional — Achordion derives `host` from the URL and capitalises the second-level domain when missing. `trackName` / `artistName` / `albumName` are also optional but encouraged: they make the stored cache entry self-describing (so admins can scan keys without an MB roundtrip to identify what each entry is) and unlock future search-by-name features over the cache.
 - **Response:** `200 { ok: true, accepted: <n> }` on success; `400` for malformed payload; `401` when the bearer is missing or wrong; `503` when the env var isn't configured (Achordion's signal that submissions aren't accepted on this deploy).
-- **TTL:** 90 days per MBID. Re-submit periodically to keep the entry warm.
+- **TTL:** 90 days per MBID per entity. Re-submit periodically to keep the entry warm.
+- **Cache busting:** the submit endpoint calls `revalidatePath` for the entity's user-facing route (`/recording/<mbid>` + `/embed/track/<mbid>` for recordings, `/release-group/<mbid>` for release-groups) so the new links appear immediately without waiting out the page-level edge cache.
 
 Submit only matches Parachord has actually played back successfully — that's the whole point of the source-priority. Drive-by URL matching belongs in Achordion's own Odesli/MB resolution path.
 

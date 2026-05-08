@@ -2,13 +2,9 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { CoverArt } from "./cover-art";
 import { caaReleaseGroupUrl } from "@/lib/clients/coverart";
-import type {
-  ArtistExternalLink,
-  ReleaseGroupDetail,
-} from "@/lib/clients/musicbrainz";
+import type { ReleaseGroupDetail } from "@/lib/clients/musicbrainz";
 import { formatArtistCredit } from "@/lib/clients/musicbrainz";
 import { ParachordCtaButton } from "./parachord-button";
-import { ExternalLinks } from "./external-links";
 import { TagChips } from "./tag-chips";
 import { parachordPlayAlbum, type ParachordTrack } from "@/lib/parachord";
 
@@ -18,11 +14,13 @@ interface AlbumHeaderProps {
   totalListeners?: number;
   parachordTracks?: ParachordTrack[];
   /**
-   * Streaming-service url-rels (Spotify / Apple / Bandcamp / etc.)
-   * rendered as a favicon row inline with the Play in Parachord
-   * button. Pass the merged rg-level + release-level streaming subset.
+   * Streaming-service favicon row (Spotify / Apple / Bandcamp / etc.)
+   * rendered inline with the Play in Parachord button. Pass a
+   * `<StreamingLinksRow>` (or anything that fits the slot) so the
+   * page can choose its own resolution strategy — server-rendered
+   * MB rels + client-island enrichment is the standard path.
    */
-  streamingLinks?: ArtistExternalLink[];
+  streamingLinksSlot?: ReactNode;
   /**
    * When provided, replaces the inline `totalListens / totalListeners`
    * stats block with this node. Lets the page wrap a Suspense around
@@ -64,7 +62,7 @@ export function AlbumHeader({
   totalListens,
   totalListeners,
   parachordTracks,
-  streamingLinks,
+  streamingLinksSlot,
   statsSlot,
 }: AlbumHeaderProps) {
   const credit = formatArtistCredit(rg["artist-credit"]);
@@ -157,15 +155,7 @@ export function AlbumHeader({
               })}
               label="Play in Parachord"
             />
-            {/* Always show the row when we have an MBID — empty
-                streaming list still gets the "+" affordance so users
-                can seed Spotify / Apple etc. on MB. */}
-            {rg.id && (
-              <ExternalLinks
-                links={streamingLinks ?? []}
-                addSources={{ mbEntity: "release-group", mbid: rg.id }}
-              />
-            )}
+            {streamingLinksSlot}
           </div>
         )}
       </div>

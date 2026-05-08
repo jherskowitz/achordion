@@ -100,22 +100,39 @@ const redis = (() => {
   return new Redis({ url, token });
 })();
 
-function key(mbid: string): string {
-  return `track-links:${mbid.toLowerCase()}`;
+/** Entity types we cache external links for. Recordings = per-track
+ *  Spotify / Apple Music / etc. URLs; release-groups = per-album.
+ *  Use a separate key namespace per entity so a track and an album
+ *  with the same MBID-shaped UUID (theoretically possible) don't
+ *  collide. */
+export type LinkEntity = "recording" | "release-group";
+
+function key(mbid: string, entity: LinkEntity = "recording"): string {
+  // Recording keeps the legacy `track-links:<mbid>` shape so the
+  // existing corpus + Parachord-submitted entries don't need
+  // migration. Release-group adds an explicit prefix.
+  if (entity === "recording") return `track-links:${mbid.toLowerCase()}`;
+  return `track-links:${entity}:${mbid.toLowerCase()}`;
 }
 
 /**
- * Look up cached external links for a recording. Returns null on
+ * Look up cached external links for an entity. Returns null on
  * miss / expired / Upstash-not-configured. Caller should treat null
  * as "go resolve and write back."
+ *
+ * `entity` defaults to `"recording"` for back-compat with existing
+ * call sites; pass `"release-group"` for album-level lookups.
  */
 export async function getCachedTrackLinks(
   mbid: string,
+  entity: LinkEntity = "recording",
 ): Promise<CachedLink[] | null> {
   if (!redis) return null;
   if (!mbid) return null;
   try {
-    const raw = await redis.get<CachedEntry | string | null>(key(mbid));
+    const raw = await redis.get<CachedEntry | string | null>(
+      key(mbid, entity),
+    );
     if (!raw) return null;
     const entry = typeof raw === "string" ? (JSON.parse(raw) as CachedEntry) : raw;
     if (!Array.isArray(entry.links)) return null;
@@ -126,14 +143,18 @@ export async function getCachedTrackLinks(
 }
 
 /**
- * Merge new links into the cache for an MBID. Existing entries with
- * the same host are replaced ONLY when the incoming source has equal
- * or higher priority. Result is written back as a fresh 90-day blob.
+ * Merge new links into the cache for an entity. Existing entries
+ * with the same host are replaced ONLY when the incoming source has
+ * equal or higher priority. Result is written back as a fresh
+ * 90-day blob.
+ *
+ * `entity` defaults to `"recording"` (back-compat).
  */
 export async function setCachedTrackLinks(
   mbid: string,
   incoming: CachedLink[],
   names?: TrackNames,
+  entity: LinkEntity = "recording",
 ): Promise<void> {
   if (!redis) return;
   if (!mbid) return;
@@ -143,7 +164,9 @@ export async function setCachedTrackLinks(
     // Keeps the entry self-describing across mixed-source writes.
     let prior: CachedEntry | null = null;
     try {
-      const raw = await redis.get<CachedEntry | string | null>(key(mbid));
+      const raw = await redis.get<CachedEntry | string | null>(
+        key(mbid, entity),
+      );
       prior = raw
         ? typeof raw === "string"
           ? (JSON.parse(raw) as CachedEntry)
@@ -168,7 +191,9 @@ export async function setCachedTrackLinks(
         ? { album_name: names?.albumName ?? prior?.album_name }
         : {}),
     };
-    await redis.set(key(mbid), JSON.stringify(entry), { ex: TTL_SECONDS });
+    await redis.set(key(mbid, entity), JSON.stringify(entry), {
+      ex: TTL_SECONDS,
+    });
   } catch {
     // Best-effort — caller already has the resolved links, the
     // cache write is just optimisation.
@@ -211,7 +236,10 @@ function mergeLinks(
  * TTL handles routine refresh, this is for manually busting bad
  * data (e.g. a misresolved link).
  */
-export async function clearCachedTrackLinks(mbid: string): Promise<void> {
+export async function clearCachedTrackLinks(
+  mbid: string,
+  entity: LinkEntity = "recording",
+): Promise<void> {
   if (!redis) return;
-  await redis.del(key(mbid)).catch(() => {});
+  await redis.del(key(mbid, entity)).catch(() => {});
 }

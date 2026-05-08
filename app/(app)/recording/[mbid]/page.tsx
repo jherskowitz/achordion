@@ -251,7 +251,8 @@ async function RecordingBody({ mbid }: { mbid: string }) {
               }}
             />
             <StreamingLinksRow
-              recordingMbid={recording.id}
+              entity="recording"
+              mbid={recording.id}
               initialItems={initialStreamingItems}
               seedUrl={odesliSeed}
             />
