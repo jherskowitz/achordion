@@ -207,11 +207,13 @@ export default function AboutPage() {
           <p>
             The only Achordion-side state is operational: a Redis cache
             that memoizes public ListenBrainz API responses (so we&apos;re
-            polite to MetaBrainz&apos;s servers and pages stay fast),
-            and Vercel&apos;s privacy-focused Web Analytics for
-            aggregate page-view counts. Neither one builds a profile of
-            you, and neither one stores anything you&apos;d consider
-            yours.
+            polite to MetaBrainz&apos;s servers and pages stay fast), a
+            separate cache mapping MusicBrainz recording IDs to known
+            streaming-service URLs (see &quot;the recording-to-streaming-
+            link gap&quot; further down for the why),
+            and Vercel&apos;s privacy-focused Web Analytics for aggregate
+            page-view counts. None of these build a profile of you, and
+            none of them store anything you&apos;d consider yours.
           </p>
           <p>
             Your listens, loves, pins, follows, playlists, and stats all
@@ -270,6 +272,48 @@ export default function AboutPage() {
           <p>
             You control the priority order; Achordion just hands over the
             tracklist.
+          </p>
+        </ContentSection>
+
+        <ContentSection title="The recording-to-streaming-link gap (and why we're filling it)">
+          <p>
+            MusicBrainz has built the canonical identity layer for
+            recorded music — an MBID per recording, release, artist —
+            and ListenBrainz has built the canonical listen-history
+            layer on top of it. But the layer in between, &quot;where
+            can I actually play <em>this</em> recording right now?&quot;,
+            is arguably the data most lacking in the open music
+            ecosystem today. There&apos;s no community-maintained,
+            queryable map from MBID to Spotify / Apple Music / YouTube
+            Music / Tidal / Bandcamp URLs. MusicBrainz&apos;s own URL
+            relationships are sparse and editor-dependent; Odesli is
+            commercial and rate-limited; the platforms themselves don&apos;t
+            cross-reference each other.
+          </p>
+          <p>
+            Achordion runs a public Redis-backed table that fills that
+            gap. Each entry maps one recording MBID to the streaming
+            services it&apos;s known to be available on, with the URL,
+            service name, and host. Entries come from three sources, in
+            increasing order of trust: cross-service link resolution
+            (Odesli) when we can spare a call, MusicBrainz&apos;s own
+            URL relationships when present, and{" "}
+            <strong>active playback confirmations submitted by
+            Parachord</strong> whenever a track plays successfully.
+            Parachord&apos;s submissions outrank the others because
+            they&apos;re proven matches, not inferred ones — they
+            represent &quot;a real listener pressed play on this MBID
+            via this URL and music came out.&quot;
+          </p>
+          <p>
+            The same entry serves every visitor — no per-user state.
+            Over time, as Parachord plays accumulate, the table becomes
+            a community-contributed asset useful to any client building
+            on top of MusicBrainz, not just Achordion. The eventual
+            goal is to retire the Odesli fallback entirely and rely on
+            the community-confirmed corpus, the same way MusicBrainz
+            replaced Gracenote-era proprietary fingerprint databases
+            for music identity.
           </p>
         </ContentSection>
 
