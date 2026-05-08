@@ -142,7 +142,7 @@ export function InlineTrackLinks({
                 width={16}
                 height={16}
                 loading="lazy"
-                className="size-4 rounded-sm opacity-90"
+                className="size-4 opacity-90"
               />
             </a>
           ))}
