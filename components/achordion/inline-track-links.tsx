@@ -67,16 +67,17 @@ export function InlineTrackLinks({
   // recording page where the full external-links block lives.
   if (!recordingMbid && !seedUrl) return null;
 
+  const hasLinks = data && data.links.length > 0;
   return (
-    // Single pill that contains the icon trigger + the favicon
-    // expansion. When closed, the pill is icon-sized; when open
-    // it grows to fit the favicon row. One border + one bg color
-    // wrap the whole thing so it reads as one cohesive control
-    // sliding open.
+    // Single pill: trigger icon + favicon row sliding open inside
+    // a shared rounded border. Pill height bumps slightly on
+    // expand for breathing room.
     <span
       className={cn(
-        "border-border/60 inline-flex h-6 shrink-0 items-center overflow-hidden rounded-full border bg-transparent transition-colors duration-150 pointer-coarse:h-9",
-        open && "border-primary/30 bg-primary/10",
+        "border-border/60 inline-flex shrink-0 items-center overflow-hidden rounded-full border bg-transparent transition-[background-color,border-color,height] duration-200 ease-out pointer-coarse:h-9",
+        open
+          ? "h-7 border-primary/30 bg-primary/10 pointer-coarse:h-9"
+          : "h-6",
       )}
     >
       <button
@@ -86,9 +87,7 @@ export function InlineTrackLinks({
         aria-label={open ? "Hide streaming links" : "Show streaming links"}
         className={cn(
           "inline-flex size-6 items-center justify-center rounded-full transition-colors pointer-coarse:size-9",
-          open
-            ? "text-primary"
-            : "text-muted-foreground hover:text-foreground",
+          open ? "size-7 text-primary pointer-coarse:size-9" : "text-muted-foreground hover:text-foreground",
         )}
       >
         {isFetching ? (
@@ -97,50 +96,57 @@ export function InlineTrackLinks({
           <ExternalLink className="size-3.5" />
         )}
       </button>
-      {/* Expansion sits inside the pill — collapsed to zero width
-          when closed, eases open to fit the favicon row. The pill
-          border wraps both icon + expansion so the whole thing
-          looks like one shape that grew, not an icon next to a
-          row of buttons. */}
+      {/* Slide-out region: collapsed to zero width when closed.
+          A vertical hairline separates the trigger from the
+          favicon row when there's content to show — gives the
+          pill a "two-zone" structure (action / results). */}
       <span
         aria-hidden={!open}
         className={cn(
-          "inline-flex max-w-0 items-center gap-0.5 overflow-hidden whitespace-nowrap pr-0 transition-[max-width,padding-right] duration-200 ease-out",
-          open && "max-w-[40rem] pr-1",
+          "flex max-w-0 items-center overflow-hidden whitespace-nowrap transition-[max-width] duration-200 ease-out",
+          open && "max-w-[40rem]",
         )}
       >
-        {error && (
-          <span className="text-muted-foreground px-2 text-xs">
-            Couldn&apos;t load links
-          </span>
+        {hasLinks && (
+          <span
+            aria-hidden
+            className="bg-primary/20 mx-0.5 my-1 h-4 w-px shrink-0"
+          />
         )}
-        {data && data.links.length === 0 && !isFetching && (
-          <span className="text-muted-foreground px-2 text-xs">
-            No streaming links found
-          </span>
-        )}
-        {data?.links.map((link) => (
-          <a
-            key={link.url}
-            href={link.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label={link.label}
-            title={link.label}
-            tabIndex={open ? 0 : -1}
-            className="hover:bg-muted/60 inline-flex size-5 items-center justify-center rounded-full transition-colors pointer-coarse:size-7"
-          >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={`https://www.google.com/s2/favicons?domain=${link.host}&sz=64`}
-              alt=""
-              width={14}
-              height={14}
-              loading="lazy"
-              className="size-3.5 opacity-80"
-            />
-          </a>
-        ))}
+        <span className="flex items-center gap-0.5 px-1">
+          {error && (
+            <span className="text-muted-foreground px-1 text-xs">
+              Couldn&apos;t load links
+            </span>
+          )}
+          {data && data.links.length === 0 && !isFetching && (
+            <span className="text-muted-foreground px-1 text-xs">
+              No streaming links found
+            </span>
+          )}
+          {data?.links.map((link) => (
+            <a
+              key={link.url}
+              href={link.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label={link.label}
+              title={link.label}
+              tabIndex={open ? 0 : -1}
+              className="hover:bg-foreground/10 inline-flex size-6 items-center justify-center rounded-full transition-colors pointer-coarse:size-7"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={`https://www.google.com/s2/favicons?domain=${link.host}&sz=64`}
+                alt=""
+                width={16}
+                height={16}
+                loading="lazy"
+                className="size-4 rounded-sm opacity-90"
+              />
+            </a>
+          ))}
+        </span>
       </span>
     </span>
   );
