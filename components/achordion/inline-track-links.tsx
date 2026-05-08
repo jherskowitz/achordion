@@ -75,8 +75,14 @@ export function InlineTrackLinks({
         aria-expanded={open}
         aria-label={open ? "Hide streaming links" : "Show streaming links"}
         className={cn(
-          "text-muted-foreground hover:text-foreground inline-flex size-6 items-center justify-center rounded-full transition-colors pointer-coarse:size-9",
-          open && "text-foreground bg-muted/40",
+          // Active state pops a ring + brand-accent text + bg so
+          // the trigger reads as "open" against the rest of the
+          // row. Inactive is the dim-by-default secondary action
+          // affordance.
+          "inline-flex size-6 items-center justify-center rounded-full transition-colors duration-150 pointer-coarse:size-9",
+          open
+            ? "bg-primary/10 text-primary ring-1 ring-primary/30"
+            : "text-muted-foreground hover:text-foreground",
         )}
       >
         {isFetching ? (
@@ -85,41 +91,50 @@ export function InlineTrackLinks({
           <ExternalLink className="size-3.5" />
         )}
       </button>
-      {open && (
-        <span className="inline-flex flex-wrap items-center gap-1">
-          {error && (
-            <span className="text-muted-foreground text-xs">
-              Couldn&apos;t load links
-            </span>
-          )}
-          {data && data.links.length === 0 && !isFetching && (
-            <span className="text-muted-foreground text-xs">
-              No streaming links found
-            </span>
-          )}
-          {data?.links.map((link) => (
-            <a
-              key={link.url}
-              href={link.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label={link.label}
-              title={link.label}
-              className="border-border/60 hover:border-foreground/40 hover:bg-muted/40 inline-flex size-7 items-center justify-center rounded-md border transition-colors pointer-coarse:size-9"
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={`https://www.google.com/s2/favicons?domain=${link.host}&sz=64`}
-                alt=""
-                width={14}
-                height={14}
-                loading="lazy"
-                className="size-3.5 opacity-80"
-              />
-            </a>
-          ))}
-        </span>
-      )}
+      {/* Expandable link row uses max-width + opacity transition so
+          the row eases out from the trigger instead of snapping in.
+          Always rendered (just collapsed) so the transition has
+          something to tween against. */}
+      <span
+        aria-hidden={!open}
+        className={cn(
+          "inline-flex max-w-0 items-center gap-1 overflow-hidden whitespace-nowrap opacity-0 transition-[max-width,opacity] duration-200 ease-out",
+          open && "max-w-[40rem] opacity-100",
+        )}
+      >
+        {error && (
+          <span className="text-muted-foreground text-xs">
+            Couldn&apos;t load links
+          </span>
+        )}
+        {data && data.links.length === 0 && !isFetching && (
+          <span className="text-muted-foreground text-xs">
+            No streaming links found
+          </span>
+        )}
+        {data?.links.map((link) => (
+          <a
+            key={link.url}
+            href={link.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label={link.label}
+            title={link.label}
+            tabIndex={open ? 0 : -1}
+            className="border-border/60 hover:border-foreground/40 hover:bg-muted/40 inline-flex size-7 items-center justify-center rounded-md border transition-colors pointer-coarse:size-9"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={`https://www.google.com/s2/favicons?domain=${link.host}&sz=64`}
+              alt=""
+              width={14}
+              height={14}
+              loading="lazy"
+              className="size-3.5 opacity-80"
+            />
+          </a>
+        ))}
+      </span>
     </span>
   );
 }
