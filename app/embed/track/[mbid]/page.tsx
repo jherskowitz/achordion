@@ -12,7 +12,6 @@ import { PlayOnHoverFab } from "@/components/achordion/play-on-hover-fab";
 import { categoriseLinks } from "@/components/achordion/external-links";
 import { parachordPlayTrack } from "@/lib/parachord";
 import { resolveTrackLinks } from "@/lib/track-links-resolver";
-import { IconTooltip } from "@/components/ui/icon-tooltip";
 
 /**
  * Embeddable widget for a single track. Designed to drop into a
@@ -180,25 +179,29 @@ export default async function EmbedTrackPage({ params }: PageProps) {
               >
                 {trackLinks.map((link) => (
                   <li key={link.url}>
-                    <IconTooltip label={link.label}>
-                      <a
-                        href={link.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        aria-label={link.label}
-                        className="border-border/60 hover:border-foreground/40 hover:bg-muted/40 inline-flex size-9 items-center justify-center rounded-md border transition-colors pointer-coarse:size-11"
-                      >
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={`https://www.google.com/s2/favicons?domain=${link.host}&sz=64`}
-                          alt=""
-                          width={16}
-                          height={16}
-                          loading="lazy"
-                          className="size-4 opacity-80 hover:opacity-100"
-                        />
-                      </a>
-                    </IconTooltip>
+                    {/* Native `title` (vs. our IconTooltip popover)
+                        because the embed runs in an iframe — popover
+                        tooltips are clipped by the iframe boundary,
+                        but browser-chrome tooltips render at the OS
+                        layer and escape it. */}
+                    <a
+                      href={link.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label={link.label}
+                      title={link.label}
+                      className="border-border/60 hover:border-foreground/40 hover:bg-muted/40 inline-flex size-9 items-center justify-center rounded-md border transition-colors pointer-coarse:size-11"
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={`https://www.google.com/s2/favicons?domain=${link.host}&sz=64`}
+                        alt=""
+                        width={16}
+                        height={16}
+                        loading="lazy"
+                        className="size-4 opacity-80 hover:opacity-100"
+                      />
+                    </a>
                   </li>
                 ))}
               </ul>
