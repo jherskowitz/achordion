@@ -1,4 +1,5 @@
 import type { ArtistExternalLink } from "@/lib/clients/musicbrainz";
+import { faviconUrl as sharedFaviconUrl } from "@/lib/favicon";
 import { IconTooltip } from "@/components/ui/icon-tooltip";
 import { AddSourcesButton } from "./add-sources-button";
 
@@ -321,23 +322,19 @@ export function tooltipLabel(link: ArtistExternalLink): string {
 }
 
 /**
- * Build a Google s2 favicons URL for any host. s2 returns a generic
- * globe glyph when the domain doesn't have a favicon, so we don't need
- * an extra fallback path. Empty string for malformed URLs (the `<img>`
- * shows the browser's broken-image glyph then).
+ * Build a Google s2 favicons URL for the host of any URL. s2 returns
+ * a generic globe glyph when the domain doesn't have a favicon, so we
+ * don't need an extra fallback path. Empty string for malformed URLs
+ * (the `<img>` shows the browser's broken-image glyph then).
  *
- * Special-case: every artist on Bandcamp lives on `<artist>.bandcamp.com`
- * and most don't set a favicon, so the s2 lookup returns a generic
- * globe. Force the canonical `bandcamp.com` icon for any *.bandcamp.com
- * URL so the row stays recognisable.
+ * Per-tenant subdomains (Bandcamp et al.) are normalised to their
+ * canonical service domain by `faviconUrl` in lib/favicon.ts — see
+ * there for the rewrite rules. This function only adapts the URL →
+ * host lookup.
  */
-function faviconUrl(url: string): string {
+function faviconUrlForLink(url: string): string {
   try {
-    const host = new URL(url).hostname;
-    if (host.toLowerCase().endsWith(".bandcamp.com")) {
-      return `https://www.google.com/s2/favicons?domain=bandcamp.com&sz=64`;
-    }
-    return `https://www.google.com/s2/favicons?domain=${host}&sz=64`;
+    return sharedFaviconUrl(new URL(url).hostname);
   } catch {
     return "";
   }
@@ -390,7 +387,7 @@ export function ExternalLinks({
     <ul className="flex flex-wrap gap-2" role="list">
       {sorted.map((link) => {
         const label = tooltipLabel(link);
-        const src = faviconUrl(link.url);
+        const src = faviconUrlForLink(link.url);
         // Render the country-stripped URL so Apple Music / iTunes /
         // Spotify auto-route to the user's storefront instead of the
         // one MB's editor happened to use. Already non-null here —

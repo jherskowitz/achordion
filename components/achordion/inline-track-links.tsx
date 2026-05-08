@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ExternalLink, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { faviconUrl } from "@/lib/favicon";
 
 /**
  * Per-row affordance that lazy-loads a track's external streaming
@@ -137,7 +138,7 @@ export function InlineTrackLinks({
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={`https://www.google.com/s2/favicons?domain=${link.host}&sz=64`}
+                src={faviconUrl(link.host)}
                 alt=""
                 width={16}
                 height={16}

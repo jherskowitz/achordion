@@ -1,6 +1,7 @@
 import type { ArtistExternalLink } from "@/lib/clients/musicbrainz";
 import { getOdesliLinks } from "@/lib/clients/odesli";
 import { resolveTrackLinks } from "@/lib/track-links-resolver";
+import { faviconUrl } from "@/lib/favicon";
 import { IconTooltip } from "@/components/ui/icon-tooltip";
 import { AddSourcesButton } from "./add-sources-button";
 import { normalizeStreamingUrl, tooltipLabel } from "./external-links";
@@ -50,9 +51,9 @@ const PLATFORM_ORDER: { key: string; label: string; host: string }[] = [
   { key: "amazonStore", label: "Amazon Store", host: "amazon.com" },
 ];
 
-function favicon(host: string): string {
-  return `https://www.google.com/s2/favicons?domain=${host}&sz=64`;
-}
+// Use the shared faviconUrl so per-tenant subdomains (notably
+// `<artist>.bandcamp.com`) collapse to their canonical service
+// favicon — see lib/favicon.ts for the rewrite rules.
 
 interface OdesliLinksProps {
   /** Service URL to seed Odesli with — typically the first MB streaming url-rel. */
@@ -189,7 +190,7 @@ function FaviconLink({
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={favicon(host)}
+            src={faviconUrl(host)}
             alt=""
             width={16}
             height={16}

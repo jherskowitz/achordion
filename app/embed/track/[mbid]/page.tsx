@@ -12,6 +12,7 @@ import { PlayOnHoverFab } from "@/components/achordion/play-on-hover-fab";
 import { categoriseLinks } from "@/components/achordion/external-links";
 import { parachordPlayTrack } from "@/lib/parachord";
 import { resolveTrackLinks } from "@/lib/track-links-resolver";
+import { faviconUrl } from "@/lib/favicon";
 
 /**
  * Embeddable widget for a single track. Designed to drop into a
@@ -209,7 +210,7 @@ export default async function EmbedTrackPage({ params }: PageProps) {
                       </span>
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
-                        src={`https://www.google.com/s2/favicons?domain=${link.host}&sz=64`}
+                        src={faviconUrl(link.host)}
                         alt=""
                         width={16}
                         height={16}
