@@ -6,6 +6,7 @@ import {
   getArtistPopularityBatch,
   getLbRadio,
   getRecordingMetadata,
+  getSitewideTopReleaseGroups,
   type LbRadioTrack,
 } from "@/lib/clients/listenbrainz";
 import { caaReleaseGroupUrl } from "@/lib/clients/coverart";
@@ -207,25 +208,43 @@ async function ArtistsForTag({ tag }: { tag: string }) {
 }
 
 async function AlbumsForTag({ tag }: { tag: string }) {
-  // "Hot albums" are derived from LB Radio's track list — the radio
-  // is "tracks people are currently playing for this tag", so the
-  // unique RELEASE-GROUPS behind those tracks are the hot albums by
-  // construction.
+  // "Hot albums" pipeline:
   //
-  // LB Radio hands us per-track release MBIDs (specific editions),
-  // not release-group MBIDs (the abstract "this album"). Achordion's
-  // album navigation is canonical at the release-group level — see
-  // AGENTS.md "Albums always link to release-group, never release"
-  // — so we resolve recording → release_group via batched recording
-  // metadata. One extra LB call (50 mbids per chunk), no per-release
-  // MB roundtrips.
-  const radio = await getLbRadio(`tag:(${tag})`, "easy").catch(() => null);
+  //   1. LB Radio for the tag — gives us the *candidate set*: ~50
+  //      tracks people are currently playing in this genre.
+  //   2. Resolve each track's recording_mbid → release_group_mbid via
+  //      LB recording metadata so we can dedupe at the canonical
+  //      album level (see AGENTS.md "Albums always link to release-
+  //      group, never release").
+  //   3. Score each release-group by its SITEWIDE listen count over
+  //      the past 30 days (LB's `range=month` on
+  //      `/stats/sitewide/release-groups`). That's the actual
+  //      "what's hot lately" signal — listen-counts users have
+  //      generated, not radio-algorithm artifacts.
+  //   4. Sort by month-listens DESC. Albums not in the global top-
+  //      1000 fall back to their radio-track-frequency (more tracks
+  //      from an album in the radio = niche-genre stand-in for
+  //      sitewide popularity), so niche tags whose albums never
+  //      crack the global top still get a meaningful order.
+  const [radio, sitewideMonth] = await Promise.all([
+    getLbRadio(`tag:(${tag})`, "easy").catch(() => null),
+    getSitewideTopReleaseGroups("month", 1000).catch(() => []),
+  ]);
   if (!radio || radio.length === 0) {
     return (
       <p className="text-muted-foreground text-sm">
         No hot albums for this tag right now.
       </p>
     );
+  }
+  // Build a fast lookup of "month listen count" by release-group mbid
+  // from the sitewide top. Items absent from this map = not in the
+  // global top-1000 over the past month — score 0, falls back below.
+  const monthListensByRg = new Map<string, number>();
+  for (const r of sitewideMonth) {
+    if (r.release_group_mbid) {
+      monthListensByRg.set(r.release_group_mbid, r.listen_count);
+    }
   }
   const recordingMbids = radio
     .map((t) => t.recordingMbid)
@@ -270,11 +289,22 @@ async function AlbumsForTag({ tag }: { tag: string }) {
       firstSeen: i,
     });
   });
-  // Sort: by track-count desc (more tracks of an album in the radio
-  // = hotter album), then by first-seen position (radio's intrinsic
-  // ordering as a tiebreaker).
+  // Sort priority:
+  //   1. Sitewide month-listen count DESC (the actual "hot in the
+  //      past 30 days" signal — comes from the global top-1000).
+  //   2. Radio track-count DESC (fallback for niche-genre albums
+  //      that never crack the global top — more tracks from the
+  //      album in the radio = stronger genre-internal popularity).
+  //   3. First-seen position in the radio (final tiebreaker).
   const albums = Array.from(map.values())
+    .map((a) => ({
+      ...a,
+      monthListens: monthListensByRg.get(a.releaseGroupMbid) ?? 0,
+    }))
     .sort((a, b) => {
+      if (a.monthListens !== b.monthListens) {
+        return b.monthListens - a.monthListens;
+      }
       if (a.count !== b.count) return b.count - a.count;
       return a.firstSeen - b.firstSeen;
     })
