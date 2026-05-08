@@ -100,8 +100,13 @@ export default async function EmbedTrackPage({ params }: PageProps) {
 
   return (
     <main className="bg-background min-h-screen p-3">
-      <article className="border-border/60 flex max-w-2xl items-stretch gap-3 overflow-hidden rounded-xl border">
-        <div className="group relative aspect-square w-32 shrink-0 overflow-hidden sm:w-36">
+      {/* `overflow-visible` on the article — was `overflow-hidden`,
+          but that clipped the favicon hover-tooltips at the article's
+          rounded edge. The cover-art wrapper still clips itself
+          (overflow-hidden + rounded-l-xl) so the rounded top-left
+          corner survives without the article-level clip. */}
+      <article className="border-border/60 flex max-w-2xl items-stretch gap-3 rounded-xl border">
+        <div className="group relative aspect-square w-32 shrink-0 overflow-hidden rounded-l-xl sm:w-36">
           <CoverArt
             src={cover}
             alt={recording.title}
@@ -179,19 +184,29 @@ export default async function EmbedTrackPage({ params }: PageProps) {
               >
                 {trackLinks.map((link) => (
                   <li key={link.url}>
-                    {/* Native `title` (vs. our IconTooltip popover)
-                        because the embed runs in an iframe — popover
-                        tooltips are clipped by the iframe boundary,
-                        but browser-chrome tooltips render at the OS
-                        layer and escape it. */}
+                    {/* CSS-only tooltip: pops above the favicon on
+                        hover. Native `title` tooltips behave
+                        inconsistently inside iframes (long delay,
+                        some browsers suppress entirely) and our
+                        popover IconTooltip clips against the
+                        iframe boundary — a positioned span lets us
+                        guarantee visibility within the embed's
+                        ~180px height. `title` stays as accessibility
+                        + non-hover (touch) fallback. */}
                     <a
                       href={link.url}
                       target="_blank"
                       rel="noopener noreferrer"
                       aria-label={link.label}
                       title={link.label}
-                      className="border-border/60 hover:border-foreground/40 hover:bg-muted/40 inline-flex size-9 items-center justify-center rounded-md border transition-colors pointer-coarse:size-11"
+                      className="group/fav border-border/60 hover:border-foreground/40 hover:bg-muted/40 relative inline-flex size-9 items-center justify-center rounded-md border transition-colors pointer-coarse:size-11"
                     >
+                      <span
+                        aria-hidden
+                        className="bg-foreground text-background pointer-events-none absolute bottom-full left-1/2 z-10 mb-1.5 -translate-x-1/2 rounded-md px-2 py-0.5 text-[10px] font-medium whitespace-nowrap opacity-0 shadow-sm transition-opacity duration-150 group-hover/fav:opacity-100"
+                      >
+                        {link.label}
+                      </span>
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         src={`https://www.google.com/s2/favicons?domain=${link.host}&sz=64`}
