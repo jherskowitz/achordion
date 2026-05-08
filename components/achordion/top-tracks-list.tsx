@@ -2,6 +2,7 @@ import Link from "next/link";
 import { CoverArt } from "./cover-art";
 import { caaReleaseGroupUrl, caaReleaseUrl } from "@/lib/clients/coverart";
 import { parachordPlayTrack } from "@/lib/parachord";
+import { InlineTrackLinks } from "./inline-track-links";
 import { PlayOverNumberCell } from "./parachord-button";
 import { artistHref, recordingHref } from "@/lib/entity-links";
 import { TrackActionsMenuSlot } from "./track-actions-menu-slot";
@@ -78,6 +79,7 @@ export function TopTracksList({ tracks }: { tracks: TrackEntry[] }) {
                 </Link>
               </p>
             </div>
+            <InlineTrackLinks recordingMbid={t.recording_mbid} />
             <span className="text-muted-foreground shrink-0 tabular-nums text-xs">
               {t.listen_count.toLocaleString()}
             </span>

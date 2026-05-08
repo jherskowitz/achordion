@@ -5,6 +5,7 @@ import type {
 } from "@/lib/clients/listenbrainz";
 import { CoverArt } from "./cover-art";
 import { caaReleaseUrl } from "@/lib/clients/coverart";
+import { InlineTrackLinks } from "./inline-track-links";
 import { parachordPlayTrack } from "@/lib/parachord";
 import { releaseGroupHref } from "@/lib/entity-links";
 import { PlayOverNumberCell } from "./parachord-button";
@@ -95,6 +96,7 @@ export function ExploreTrackList({
                 )}
               </p>
             </div>
+            <InlineTrackLinks recordingMbid={r.recording_mbid} />
           </li>
         );
       })}

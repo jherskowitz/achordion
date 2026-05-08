@@ -13,6 +13,7 @@ import {
   Star,
 } from "lucide-react";
 import { CoverArt } from "./cover-art";
+import { InlineTrackLinks } from "./inline-track-links";
 import { ThanksButton } from "./thanks-button";
 import { TrackActionsMenu } from "./track-actions-menu";
 import {
@@ -122,8 +123,13 @@ function TrackEventTrailing({
 }) {
   const ref = toTrackRef(trackMeta, ownerUsername, listenedAt);
   const viewerObj = viewer ? { mbUsername: viewer } : null;
+  const recordingMbid =
+    trackMeta?.additional_info?.recording_mbid ??
+    trackMeta?.mbid_mapping?.recording_mbid ??
+    null;
   return (
     <span className="inline-flex shrink-0 items-center gap-1">
+      <InlineTrackLinks recordingMbid={recordingMbid} />
       {thanks}
       {ref && viewerObj && (
         <TrackActionsMenu track={ref} viewer={viewerObj} />

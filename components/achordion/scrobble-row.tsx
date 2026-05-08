@@ -3,6 +3,7 @@ import Link from "next/link";
 import { caaUrlFromListen } from "@/lib/clients/coverart";
 import type { Listen } from "@/lib/clients/listenbrainz";
 import { parachordPlayTrack } from "@/lib/parachord";
+import { InlineTrackLinks } from "./inline-track-links";
 import { PlayOverCover } from "./parachord-button";
 import {
   artistHref,
@@ -103,6 +104,9 @@ export function ScrobbleRow({
           )}
         </p>
       </div>
+      {/* Lazy streaming-link expansion sits as the first column
+          after the track info, matching the album tracklist layout. */}
+      <InlineTrackLinks recordingMbid={recordingMbid} />
       {showRelative && (
         <time
           dateTime={new Date(listen.listened_at * 1000).toISOString()}
