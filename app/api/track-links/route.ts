@@ -4,6 +4,11 @@ import {
   getRecording,
   partitionArtistRelations,
 } from "@/lib/clients/musicbrainz";
+import {
+  getCachedTrackLinks,
+  setCachedTrackLinks,
+  type CachedLink,
+} from "@/lib/track-links-store";
 
 /**
  * Resolve a track's external streaming links on demand. Pulled by the
@@ -67,6 +72,21 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const mbid = url.searchParams.get("mbid")?.trim() || null;
   const seedUrl = url.searchParams.get("seedUrl")?.trim() || null;
 
+  // Read-through cache: when we have an MBID, check the persistent
+  // store first. Hit → return immediately. Miss → resolve via
+  // Odesli + MB, write back below. Survives Next data-cache
+  // resets on deploy and bypasses Odesli's rate limit on cached
+  // tracks.
+  if (mbid) {
+    const cached = await getCachedTrackLinks(mbid);
+    if (cached && cached.length > 0) {
+      return NextResponse.json(
+        { links: cached.map(stripSource) },
+        { headers: CACHE_HEADERS },
+      );
+    }
+  }
+
   // Resolve MB url-rels when an mbid is on hand — gives us streaming
   // services Odesli doesn't cover (Bandcamp, Qobuz) AND a seed URL
   // for Odesli when the caller didn't supply one.
@@ -122,7 +142,34 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     seen.add(h);
   }
 
+  // Write-through to the persistent cache. We can only key by MBID
+  // (the cache contract) — drop the write when the lookup was seed-
+  // URL-only. Tag each link with its origin so future merges from
+  // Parachord can override appropriately.
+  if (mbid && items.length > 0) {
+    const tagged: CachedLink[] = [];
+    for (const item of items) {
+      const fromOdesli = !!odesli?.linksByPlatform &&
+        Object.values(odesli.linksByPlatform).some(
+          (l) => l?.url === item.url,
+        );
+      tagged.push({
+        ...item,
+        source: fromOdesli ? "odesli" : "mb",
+      });
+    }
+    // Don't await — let the response return while the cache write
+    // happens in the background. Best-effort either way.
+    void setCachedTrackLinks(mbid, tagged);
+  }
+
   return NextResponse.json({ links: items }, { headers: CACHE_HEADERS });
+}
+
+/** Drop the internal `source` tag before sending links to clients —
+ *  the public response shape stays `{ url, label, host }`. */
+function stripSource(link: CachedLink) {
+  return { url: link.url, label: link.label, host: link.host };
 }
 
 function prettyLabel(host: string): string {

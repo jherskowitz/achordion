@@ -481,6 +481,28 @@ If they aren't yet:
 - The "Get Parachord" disabled-state link points at `https://parachord.com` (constant `PARACHORD_HOMEPAGE` in `parachord-button.tsx` and `play-on-hover-fab.tsx`). If the canonical install URL changes, search both files.
 - On `(pointer: coarse)` clients we render every play surface as Parachord-present-by-default — assume installed, deep-link through the OS. Don't add a separate "is mobile?" check inside individual components; piggyback on `useParachordPresence` which handles the gate centrally.
 
+### Track-links submission (POST `/api/track-links/submit`)
+
+Parachord can push confirmed-on-playback recording → external-streaming-URL matches into Achordion's persistent links cache. Each submitted link is stored with `source: "parachord"`, which outranks the Odesli + MB lookups Achordion does itself — so the next user who clicks the inline link button sees the playback-verified URL, not Odesli's best-effort match.
+
+- **Auth:** bearer token. Achordion reads `PARACHORD_TRACK_LINKS_TOKEN` from its env; Parachord side configures the matching value and presents `Authorization: Bearer <token>` on every request.
+- **Endpoint:** `POST https://achordion.xyz/api/track-links/submit` (or `localhost:3000/api/track-links/submit` for dev).
+- **Body:**
+  ```json
+  {
+    "mbid": "<recording-mbid>",
+    "links": [
+      { "url": "https://open.spotify.com/track/...", "label": "Spotify", "host": "spotify.com" },
+      { "url": "https://music.apple.com/...", "host": "music.apple.com" }
+    ]
+  }
+  ```
+  `label` and `host` are optional — Achordion derives `host` from the URL and capitalises the second-level domain when missing.
+- **Response:** `200 { ok: true, accepted: <n> }` on success; `400` for malformed payload; `401` when the bearer is missing or wrong; `503` when the env var isn't configured (Achordion's signal that submissions aren't accepted on this deploy).
+- **TTL:** 90 days per MBID. Re-submit periodically to keep the entry warm.
+
+Submit only matches Parachord has actually played back successfully — that's the whole point of the source-priority. Drive-by URL matching belongs in Achordion's own Odesli/MB resolution path.
+
 ---
 
 ## File map (where things live)
@@ -497,6 +519,7 @@ If they aren't yet:
 - `app/api/` — internal API routes:
   - `search/` — typeahead JSON endpoint (artists/albums/songs/users + popularity sort + `artist:` `album:` `song:` `user:` power filters)
   - `track-cover/` — `(artist, title, album)` → CAA URL resolver for radio rewinds
+  - `track-links/` — recording MBID → external streaming-service URLs. Read-through cached in Upstash Redis (`track-links:<mbid>` blob, 90-day TTL). Cold cache resolves via Odesli + MB url-rels and writes back. The companion `track-links/submit` endpoint accepts authenticated POSTs from Parachord (bearer token via `PARACHORD_TRACK_LINKS_TOKEN`) so confirmed-on-playback matches override the lookup-derived ones — see Parachord interop contract section.
   - `artist-image/` — MBID → Wikidata-hosted thumbnail for typeahead artist rows
   - `playlist/[mbid]/xspf/` — XSPF export
 - `app/{artist,recording,release-group}/lookup/route.ts` — click-time MBID resolvers (outside the (app) group on purpose, since they 302 elsewhere)
