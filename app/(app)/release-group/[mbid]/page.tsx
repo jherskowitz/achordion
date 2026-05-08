@@ -285,6 +285,7 @@ async function AlbumBody({ mbid }: { mbid: string }) {
               initialItems={initialStreamingItems}
               seedUrl={albumOdesliSeed}
             />
+            <EmbedShareButton entity="album" mbid={rg.id} />
           </div>
         }
         actions={
@@ -294,11 +295,8 @@ async function AlbumBody({ mbid }: { mbid: string }) {
         }
       />
 
-      <div className="-mt-2 flex flex-wrap items-center justify-between gap-2 pb-4">
-        <div className="flex flex-wrap gap-1.5">
-          <TagChips entity="release-group" mbid={rg.id} initialTags={tags} />
-        </div>
-        <EmbedShareButton entity="album" mbid={rg.id} />
+      <div className="-mt-2 flex flex-wrap gap-1.5 pb-4">
+        <TagChips entity="release-group" mbid={rg.id} initialTags={tags} />
       </div>
 
       <div className="grid grid-cols-1 gap-10 lg:grid-cols-[minmax(0,1fr)_240px]">

@@ -255,17 +255,18 @@ export default async function EmbedAlbumPage({ params }: PageProps) {
                         t.title
                       )}
                     </span>
-                    {length && (
-                      <span className="text-muted-foreground/70 shrink-0 text-xs tabular-nums">
-                        {length}
-                      </span>
-                    )}
                     {recordingMbid && (
                       // Per-track click-to-expand favicon pill —
                       // lazy-fetches /api/track-links on click so the
                       // accordion stays cheap to expand even on big
-                      // albums.
+                      // albums. Sits left of the duration so the
+                      // right edge mirrors the album-page tracklist.
                       <InlineTrackLinks recordingMbid={recordingMbid} />
+                    )}
+                    {length && (
+                      <span className="text-muted-foreground/70 shrink-0 text-xs tabular-nums">
+                        {length}
+                      </span>
                     )}
                   </li>
                 );

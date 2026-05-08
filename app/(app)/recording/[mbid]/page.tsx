@@ -256,6 +256,7 @@ async function RecordingBody({ mbid }: { mbid: string }) {
               initialItems={initialStreamingItems}
               seedUrl={odesliSeed}
             />
+            <EmbedShareButton entity="track" mbid={recording.id} />
           </div>
         }
         actions={
@@ -265,11 +266,8 @@ async function RecordingBody({ mbid }: { mbid: string }) {
         }
       />
 
-      <div className="-mt-2 flex flex-wrap items-center justify-between gap-2 pb-4">
-        <div className="flex flex-wrap gap-1.5">
-          <TagChips entity="recording" mbid={recording.id} initialTags={tags} />
-        </div>
-        <EmbedShareButton entity="track" mbid={recording.id} />
+      <div className="-mt-2 flex flex-wrap gap-1.5 pb-4">
+        <TagChips entity="recording" mbid={recording.id} initialTags={tags} />
       </div>
 
       {/* Two-column layout for the body: main column carries

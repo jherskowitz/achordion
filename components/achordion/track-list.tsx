@@ -85,12 +85,6 @@ function TrackRow({
           </p>
         )}
       </div>
-      {/* Lazy streaming-link expansion sits as the first column
-          after the track info — surfaces the affordance closer to
-          the title (where the user's eye is) while listen-count /
-          duration / overflow stay right-anchored. Renders nothing
-          without an MBID. */}
-      <InlineTrackLinks recordingMbid={recordingMbid} />
       {/* Always render the listen-count cell — even when undefined
           we keep the slot so neighboring columns (link icon /
           duration / overflow) don't shift left/right between rows
@@ -103,6 +97,10 @@ function TrackRow({
       >
         {listenCount !== undefined ? listenCount.toLocaleString() : ""}
       </span>
+      {/* Streaming-link pill sits directly left of the duration so
+          the right edge has a consistent shape across rows: links →
+          duration → overflow. Renders nothing without an MBID. */}
+      <InlineTrackLinks recordingMbid={recordingMbid} />
       <span className="text-muted-foreground shrink-0 tabular-nums text-xs">
         {formatLength(track.length ?? track.recording?.length)}
       </span>
