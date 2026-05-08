@@ -9,7 +9,6 @@ import {
 import { caaReleaseUrl } from "@/lib/clients/coverart";
 import { CoverArt } from "@/components/achordion/cover-art";
 import { PlayOnHoverFab } from "@/components/achordion/play-on-hover-fab";
-import { InlineTrackLinks } from "@/components/achordion/inline-track-links";
 import { categoriseLinks } from "@/components/achordion/external-links";
 import { OdesliLinks } from "@/components/achordion/odesli-links";
 import { parachordPlayTrack } from "@/lib/parachord";
@@ -147,21 +146,21 @@ export default async function EmbedTrackPage({ params }: PageProps) {
             </p>
           </div>
           <div className="mt-3 flex items-center gap-2">
-            <InlineTrackLinks recordingMbid={mbid} seedUrl={odesliSeed} />
-            {/* Server-rendered streaming favicons fill the rest of
-                the row inline so the iframe renders useful content
-                without needing a click to expand. */}
-            <span className="ml-auto inline-flex shrink-0 items-center gap-1">
-              <OdesliLinks
-                seedUrl={odesliSeed}
-                mbStreamingLinks={streaming}
-              />
-            </span>
+            {/* Single inline row of streaming services. OdesliLinks
+                already dedupes Odesli + MB url-rels by hostname so
+                the favicons that show represent the union without
+                duplicates. No pill / click-to-expand on the embed
+                — the value of an embeddable widget is "links you
+                can click without thinking." */}
+            <OdesliLinks
+              seedUrl={odesliSeed}
+              mbStreamingLinks={streaming}
+            />
             <Link
               href={canonicalHref}
               target="_top"
               rel="noopener"
-              className="text-muted-foreground hover:text-foreground inline-flex shrink-0 items-center gap-1 text-[11px] underline-offset-4 hover:underline"
+              className="text-muted-foreground hover:text-foreground ml-auto inline-flex shrink-0 items-center gap-1 text-[11px] underline-offset-4 hover:underline"
             >
               Open in Achordion →
             </Link>
