@@ -6,17 +6,32 @@ import type { Listen } from "@/lib/clients/listenbrainz";
 import { ScrobbleList } from "./scrobble-list";
 import { TrackActionsMenu, type TrackRef } from "./track-actions-menu";
 
-const POLL_INTERVAL_MS = 25_000;
+// Tightened from 25s → 15s. ListenBrainz ingestion adds ~10-20s of
+// its own lag between scrobble submission and the listen being
+// queryable via /user/<name>/listens, so the perceived freshness is
+// roughly poll-interval + LB-lag. 15s keeps the visible delay under
+// ~30s most of the time without piling on requests.
+const POLL_INTERVAL_MS = 15_000;
+/** Floor on extra polls fired by user interaction (focus,
+ *  pointerdown, keydown) — keeps a click-heavy session from
+ *  hammering /api/user/<name>/recent-listens. */
+const INTERACTION_POLL_COOLDOWN_MS = 8_000;
 
 /**
  * Recent listens that auto-update as new scrobbles arrive. Initial
  * render uses the server-fetched data so there's no flash; thereafter
- * we poll the route handler at ~25s and swap the list when the newest
+ * we poll the route handler and swap the list when the newest
  * `listened_at` changes.
  *
- * Polling pauses when the document is hidden — no point fetching for a
- * background tab. We re-fetch immediately on visibility-return so the
- * user sees current state when they switch back.
+ * Update strategy:
+ *   - Immediate poll on mount so users who hit the page after a fresh
+ *     scrobble don't sit on stale SSR for a full interval.
+ *   - 15s background timer (paused while the document is hidden).
+ *   - Interaction-driven catch-up polls on focus / pointerdown /
+ *     keydown when the last fetch is older than the cooldown — the
+ *     user touching the page is a strong signal to surface what's
+ *     current.
+ *   - Re-fetch on visibilitychange when the tab comes back.
  *
  * For signed-in viewers we also slot a `<TrackActionsMenu>` (⋮) into
  * each row's right edge. We use `useSession()` rather than threading
@@ -41,10 +56,15 @@ export function LiveScrobbleList({
   useEffect(() => {
     let cancelled = false;
     let timer: number | null = null;
+    // Timestamp of the last poll fire. Lets the interaction handler
+    // decide whether an extra fetch is worth it (vs. a noisy click
+    // burst right after a scheduled tick).
+    let lastPollAt = 0;
 
     async function poll() {
       if (cancelled) return;
       if (typeof document !== "undefined" && document.hidden) return;
+      lastPollAt = Date.now();
       try {
         const res = await fetch(
           `/api/user/${encodeURIComponent(username)}/recent-listens`,
@@ -66,8 +86,6 @@ export function LiveScrobbleList({
     }
 
     function start() {
-      // Small initial offset so we don't double-fetch right after the
-      // server-rendered page hydrates.
       timer = window.setInterval(poll, POLL_INTERVAL_MS);
     }
     function stop() {
@@ -86,14 +104,33 @@ export function LiveScrobbleList({
         if (timer === null) start();
       }
     }
+    // Cheap "user is back" signal: focus / pointer / key activity
+    // after a quiet stretch fires one extra poll so freshly-arrived
+    // listens surface without waiting for the next interval. Cooldown
+    // keeps a click-heavy session from hammering the route.
+    function onInteraction() {
+      if (cancelled) return;
+      if (typeof document !== "undefined" && document.hidden) return;
+      if (Date.now() - lastPollAt < INTERACTION_POLL_COOLDOWN_MS) return;
+      void poll();
+    }
 
+    // Fire once on mount — bridges the gap between SSR (which may be
+    // edge-cached for up to an hour) and the first scheduled tick.
+    void poll();
     start();
     document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("focus", onInteraction);
+    document.addEventListener("pointerdown", onInteraction, { passive: true });
+    document.addEventListener("keydown", onInteraction);
 
     return () => {
       cancelled = true;
       stop();
       document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("focus", onInteraction);
+      document.removeEventListener("pointerdown", onInteraction);
+      document.removeEventListener("keydown", onInteraction);
     };
   }, [username]);
 
