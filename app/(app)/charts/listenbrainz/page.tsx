@@ -158,11 +158,6 @@ export default async function ListenBrainzChartsPage({
       </header>
 
       <div className="mb-6 flex flex-wrap items-center gap-3">
-        {tab === "songs" && (
-          <Suspense fallback={null}>
-            <SongsChartCta range={range} />
-          </Suspense>
-        )}
         {/* Albums / Songs — same tab strip pattern as Apple Music. */}
         <div
           role="tablist"
@@ -191,6 +186,16 @@ export default async function ListenBrainzChartsPage({
             );
           })}
         </div>
+
+        {/* Play CTA sits AFTER the Albums/Songs strip so toggling
+            tabs (which shows/hides the CTA) doesn't shift the
+            strip itself horizontally. Range picker stays right-
+            justified via ml-auto regardless. */}
+        {tab === "songs" && (
+          <Suspense fallback={null}>
+            <SongsChartCta range={range} />
+          </Suspense>
+        )}
 
         {/* Range picker — Week / Month / Year / All time. Same pill
             tab pattern; sits to the right with ml-auto. */}
