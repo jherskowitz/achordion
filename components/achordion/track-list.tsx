@@ -91,16 +91,18 @@ function TrackRow({
           duration / overflow stay right-anchored. Renders nothing
           without an MBID. */}
       <InlineTrackLinks recordingMbid={recordingMbid} />
-      {listenCount !== undefined && (
-        // `min-w-[7ch]` + `text-right` so the listen-count column
-        // stays a fixed width regardless of how many digits the
-        // number has — otherwise neighboring columns (the link
-        // icon, duration) shift left/right between rows depending
-        // on whether the count is 6 or 7 digits.
-        <span className="text-muted-foreground/80 shrink-0 tabular-nums text-right text-xs min-w-[7ch]">
-          {listenCount.toLocaleString()}
-        </span>
-      )}
+      {/* Always render the listen-count cell — even when undefined
+          we keep the slot so neighboring columns (link icon /
+          duration / overflow) don't shift left/right between rows
+          based on whether a particular track has a count or not.
+          `min-w-[7ch]` + `text-right` also pin the cell width so
+          digit-length variance doesn't drift the icon column. */}
+      <span
+        aria-hidden={listenCount === undefined}
+        className="text-muted-foreground/80 shrink-0 tabular-nums text-right text-xs min-w-[7ch]"
+      >
+        {listenCount !== undefined ? listenCount.toLocaleString() : ""}
+      </span>
       <span className="text-muted-foreground shrink-0 tabular-nums text-xs">
         {formatLength(track.length ?? track.recording?.length)}
       </span>
