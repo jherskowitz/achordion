@@ -11,21 +11,7 @@ import {
   releaseGroupHref,
 } from "@/lib/entity-links";
 import { cn } from "@/lib/utils";
-
-function relativeTime(unixSeconds: number): string {
-  const now = Math.floor(Date.now() / 1000);
-  const diff = now - unixSeconds;
-  if (diff < 60) return "just now";
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-  if (diff < 86400 * 7) return `${Math.floor(diff / 86400)}d ago`;
-  const date = new Date(unixSeconds * 1000);
-  return date.toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-    year: now - unixSeconds > 86400 * 365 ? "numeric" : undefined,
-  });
-}
+import { RelativeTime } from "./relative-time";
 
 export function ScrobbleRow({
   listen,
@@ -108,12 +94,11 @@ export function ScrobbleRow({
           after the track info, matching the album tracklist layout. */}
       <InlineTrackLinks recordingMbid={recordingMbid} />
       {showRelative && (
-        <time
-          dateTime={new Date(listen.listened_at * 1000).toISOString()}
+        <RelativeTime
+          value={listen.listened_at}
+          asTime
           className="text-muted-foreground shrink-0 text-xs tabular-nums"
-        >
-          {relativeTime(listen.listened_at)}
-        </time>
+        />
       )}
       {trailing}
     </li>

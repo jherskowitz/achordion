@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Pin } from "lucide-react";
 import { CoverArt } from "./cover-art";
 import { PlayOnHoverFab } from "./play-on-hover-fab";
+import { relativeFromNow } from "./relative-time";
 import { caaUrlFromListen } from "@/lib/clients/coverart";
 import type { PinnedRecording } from "@/lib/clients/listenbrainz";
 import {
@@ -120,23 +121,6 @@ function PinnedExternalLinksSkeleton() {
       ))}
     </div>
   );
-}
-
-function relativeFromNow(unixSeconds: number): string {
-  const now = Math.floor(Date.now() / 1000);
-  const diff = unixSeconds - now;
-  const abs = Math.abs(diff);
-  if (abs < 60) return diff < 0 ? "just now" : "in seconds";
-  if (abs < 3600) {
-    const mins = Math.floor(abs / 60);
-    return diff < 0 ? `${mins}m ago` : `in ${mins}m`;
-  }
-  if (abs < 86400) {
-    const hrs = Math.floor(abs / 3600);
-    return diff < 0 ? `${hrs}h ago` : `in ${hrs}h`;
-  }
-  const days = Math.floor(abs / 86400);
-  return diff < 0 ? `${days}d ago` : `in ${days}d`;
 }
 
 function PinnedByline({
@@ -259,7 +243,15 @@ export function PinnedTrackCard({
           <p className="text-muted-foreground inline-flex items-center gap-1.5 text-xs tracking-wide uppercase">
             <Pin className="size-3" />
             {isActive ? "Pinned" : "Was pinned"}
-            <span className="text-muted-foreground/60 ml-1 normal-case tracking-normal">
+            {/* suppressHydrationWarning: relativeFromNow reads
+                Date.now() implicitly, so a render that crosses a
+                minute boundary between SSR and hydration produces
+                a tiny mismatch ("2h ago" → "1h ago"). The drift
+                is harmless and the client value is more accurate. */}
+            <span
+              className="text-muted-foreground/60 ml-1 normal-case tracking-normal"
+              suppressHydrationWarning
+            >
               · pinned {relativeFromNow(pin.created)}
               {isActive && (
                 <>

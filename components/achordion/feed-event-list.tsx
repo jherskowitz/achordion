@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { CoverArt } from "./cover-art";
 import { InlineTrackLinks } from "./inline-track-links";
+import { RelativeTime } from "./relative-time";
 import { ThanksButton } from "./thanks-button";
 import { TrackActionsMenu } from "./track-actions-menu";
 import {
@@ -30,23 +31,6 @@ import {
   getRecordingMetadata,
   type FeedEvent,
 } from "@/lib/clients/listenbrainz";
-
-function relativeTime(unixSeconds: number): string {
-  const diff = Math.floor(Date.now() / 1000) - unixSeconds;
-  if (diff < 60) return "just now";
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-  if (diff < 86400 * 7) return `${Math.floor(diff / 86400)}d ago`;
-  const date = new Date(unixSeconds * 1000);
-  return date.toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-    year:
-      Math.floor(Date.now() / 1000) - unixSeconds > 86400 * 365
-        ? "numeric"
-        : undefined,
-  });
-}
 
 function stripHtml(s: string): string {
   return s.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
@@ -285,7 +269,7 @@ function PinEvent({ event, viewer }: { event: FeedEvent; viewer: string | null }
           <UserLink name={event.user_name} /> pinned a track
           <span className="text-muted-foreground/70">
             {" · "}
-            {relativeTime(event.created)}
+            <RelativeTime value={event.created} />
           </span>
         </>
       }
@@ -339,7 +323,7 @@ function ListenEvent({
           <UserLink name={event.user_name} /> listened
           <span className="text-muted-foreground/70">
             {" · "}
-            {relativeTime(when)}
+            <RelativeTime value={when} />
           </span>
         </>
       }
@@ -389,7 +373,7 @@ function LovedRecordingEvent({
           <UserLink name={event.user_name} /> loved a track
           <span className="text-muted-foreground/70">
             {" · "}
-            {relativeTime(event.created)}
+            <RelativeTime value={event.created} />
           </span>
         </>
       }
@@ -431,7 +415,7 @@ function RecordingRecommendationEvent({
           <UserLink name={event.user_name} /> recommended a track
           <span className="text-muted-foreground/70">
             {" · "}
-            {relativeTime(event.created)}
+            <RelativeTime value={event.created} />
           </span>
         </>
       }
@@ -483,7 +467,7 @@ function PersonalRecommendationEvent({
           <UserLink name={event.user_name} /> sent you a track
           <span className="text-muted-foreground/70">
             {" · "}
-            {relativeTime(event.created)}
+            <RelativeTime value={event.created} />
           </span>
         </>
       }
@@ -572,7 +556,7 @@ function CritiqueBrainzReviewEvent({
           )}
           <span className="text-muted-foreground/70">
             {" · "}
-            {relativeTime(event.created)}
+            <RelativeTime value={event.created} />
           </span>
         </>
       }
@@ -655,7 +639,7 @@ function ThanksEvent({ event }: { event: FeedEvent }) {
           their {what}
           <span className="text-muted-foreground/70">
             {" · "}
-            {relativeTime(event.created)}
+            <RelativeTime value={event.created} />
           </span>
         </>
       }
@@ -692,7 +676,7 @@ function FollowEvent({ event }: { event: FeedEvent }) {
           <UserLink name={m?.user_name_1} />
           <span className="text-muted-foreground/70">
             {" · "}
-            {relativeTime(event.created)}
+            <RelativeTime value={event.created} />
           </span>
         </>
       }
@@ -724,7 +708,7 @@ function NotificationEvent({ event }: { event: FeedEvent }) {
               {" · "}
             </>
           ) : null}
-          {relativeTime(event.created)}
+          <RelativeTime value={event.created} />
         </>
       }
     >
