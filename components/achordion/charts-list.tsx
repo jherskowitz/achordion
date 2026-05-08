@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { Play } from "lucide-react";
 import { FadeInImage } from "./fade-in-image";
+import { InlineTrackLinks } from "./inline-track-links";
 import { LazyAlbumCover } from "./lazy-album-cover";
 import {
   parachordPlayAlbum,
@@ -88,6 +89,10 @@ export function ChartsSongsList({ items }: { items: AppleChartItem[] }) {
               )}
             </p>
           </div>
+          {/* Apple Music URL is a perfectly good Odesli seed even
+              without an MBID — `seedUrl` lets the route resolve
+              cross-service links from the Apple URL alone. */}
+          <InlineTrackLinks seedUrl={t.url ?? null} />
         </li>
       ))}
     </ol>

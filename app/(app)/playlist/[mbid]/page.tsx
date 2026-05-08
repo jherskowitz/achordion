@@ -24,6 +24,7 @@ import { PlaylistCoverMosaic } from "@/components/achordion/playlist-cover-mosai
 import { PlaylistOwnerToolsMenu } from "@/components/achordion/playlist-owner-tools-menu";
 import { TrackListActionsMenu } from "@/components/achordion/track-list-actions-menu";
 import { PlaylistVisibilityToggle } from "@/components/achordion/playlist-visibility-toggle";
+import { InlineTrackLinks } from "@/components/achordion/inline-track-links";
 import { TrackActionsMenuSlot } from "@/components/achordion/track-actions-menu-slot";
 import { IconTooltip } from "@/components/ui/icon-tooltip";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -374,6 +375,7 @@ async function PlaylistBody({ mbid }: { mbid: string }) {
                     )}
                   </p>
                 </div>
+                <InlineTrackLinks recordingMbid={t.recordingMbid} />
                 <span className="text-muted-foreground shrink-0 tabular-nums text-xs">
                   {formatLength(t.durationMs)}
                 </span>

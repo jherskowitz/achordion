@@ -10,6 +10,7 @@ import {
 } from "@/lib/entity-links";
 import { caaReleaseUrl } from "@/lib/clients/coverart";
 import { CoverArt } from "./cover-art";
+import { InlineTrackLinks } from "./inline-track-links";
 import { LazyAlbumCover } from "./lazy-album-cover";
 import { LazyTrackCover } from "./lazy-track-cover";
 import { PlayOnHoverFab } from "./play-on-hover-fab";
@@ -214,7 +215,8 @@ export function LbSongsChartList({
                 </Link>
               </p>
             </div>
-            <span className="text-muted-foreground/70 shrink-0 tabular-nums text-xs">
+            <InlineTrackLinks recordingMbid={item.recording_mbid} />
+            <span className="text-muted-foreground/70 shrink-0 tabular-nums text-right text-xs min-w-[7ch]">
               {item.listen_count.toLocaleString()}
             </span>
           </li>
