@@ -100,6 +100,33 @@ function key(mbid: string): string {
 }
 
 /**
+ * Normalize a hostname to a canonical form for dedup. Different
+ * variants of the same service (`open.spotify.com` vs `spotify.com`,
+ * `m.youtube.com` vs `youtube.com`) should collapse to one cache
+ * entry — without this, mergeLinks treats them as distinct keys and
+ * we end up with a duplicate Spotify pill, etc.
+ *
+ * Stripped prefixes are device / variant markers that don't change
+ * the service identity. We deliberately do NOT strip `music.`:
+ * `music.youtube.com` is YouTube Music (different service from
+ * YouTube), `music.apple.com` is Apple Music (different from
+ * iTunes' `itunes.apple.com`).
+ */
+export function canonicalHost(host: string): string {
+  let h = host.toLowerCase().trim();
+  // Order matters — `mobile.` first so it strips before plain `m.`
+  // would mis-match a non-mobile host that happens to start with m.
+  const PREFIXES = ["open.", "www.", "mobile.", "m.", "play.", "listen."];
+  for (const prefix of PREFIXES) {
+    if (h.startsWith(prefix)) {
+      h = h.slice(prefix.length);
+      break;
+    }
+  }
+  return h;
+}
+
+/**
  * Look up cached external links for a recording. Returns null on
  * miss / expired / Upstash-not-configured. Caller should treat null
  * as "go resolve and write back."
@@ -171,24 +198,31 @@ export async function setCachedTrackLinks(
 }
 
 /**
- * Deduplicate links by hostname, preferring higher-priority sources.
- * Order in the output mirrors the input platform order (matters for
- * UI rendering — we want Bandcamp / Spotify / Apple at the top).
+ * Deduplicate links by canonical hostname, preferring higher-
+ * priority sources. Order in the output mirrors the input platform
+ * order (matters for UI rendering — we want Bandcamp / Spotify /
+ * Apple at the top). Each stored link's `host` is also canonicalised
+ * so future reads return the normalised form.
  */
 function mergeLinks(
   existing: CachedLink[],
   incoming: CachedLink[],
 ): CachedLink[] {
   const byHost = new Map<string, CachedLink>();
+  const normalise = (link: CachedLink): CachedLink => ({
+    ...link,
+    host: canonicalHost(link.host),
+  });
   // Existing first so input order can override on tied priority.
-  for (const link of existing) byHost.set(link.host, link);
+  for (const link of existing) byHost.set(canonicalHost(link.host), normalise(link));
   for (const next of incoming) {
-    const prev = byHost.get(next.host);
+    const k = canonicalHost(next.host);
+    const prev = byHost.get(k);
     if (
       !prev ||
       SOURCE_PRIORITY[next.source] >= SOURCE_PRIORITY[prev.source]
     ) {
-      byHost.set(next.host, next);
+      byHost.set(k, normalise(next));
     }
   }
   return Array.from(byHost.values());
