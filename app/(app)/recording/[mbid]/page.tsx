@@ -247,11 +247,11 @@ async function RecordingBody({ mbid }: { mbid: string }) {
         <TagChips entity="recording" mbid={recording.id} initialTags={tags} />
       </div>
 
-      {/* Two-column layout for the body: "Also appears on" fills the
-          left rail, sidebar (Top listeners + Other Links) anchors the
-          right. Same pattern the artist page uses. */}
+      {/* Two-column layout for the body: main column carries
+          "Also appears on" + the new Top Listeners cards section,
+          sidebar shrinks to just Other Links. */}
       <div className="mt-6 grid grid-cols-1 gap-10 lg:grid-cols-[minmax(0,1fr)_240px]">
-        <div className="min-w-0">
+        <div className="min-w-0 space-y-12">
           {otherReleaseGroups.length > 0 && (
             <section>
               <h2 className="mb-4 text-sm font-semibold tracking-wide uppercase">
@@ -305,11 +305,20 @@ async function RecordingBody({ mbid }: { mbid: string }) {
               </ul>
             </section>
           )}
+          {/* Top Listeners — moved out of the sidebar into the
+              main column as a card grid so it gets the breathing
+              room cards need to read well. Sourced from the hero
+              album's listeners (LB has no per-recording listeners
+              endpoint), same data the sidebar used to surface as a
+              compact list. */}
+          <Suspense fallback={null}>
+            <AlbumTopListenersStream
+              promise={albumListenersPromise}
+              layout="cards"
+            />
+          </Suspense>
         </div>
         <aside className="space-y-8">
-          <Suspense fallback={null}>
-            <AlbumTopListenersStream promise={albumListenersPromise} />
-          </Suspense>
           {otherUrls.length > 0 && (
             <div>
               {/* h2 (not h3): sibling of the main column's content
@@ -369,23 +378,32 @@ function PopularityStatsSkeleton() {
   );
 }
 
-/** Streams the sidebar Top Listeners list (sourced from the hero
- *  album's listeners — LB has no per-recording listeners endpoint). */
+/** Streams the Top Listeners section (sourced from the hero
+ *  album's listeners — LB has no per-recording listeners endpoint).
+ *  `layout="cards"` renders multi-column cards in the main column;
+ *  `layout="stack"` (default) renders a compact sidebar list. */
 async function AlbumTopListenersStream({
   promise,
+  layout = "stack",
 }: {
   promise: Promise<ReleaseGroupListeners | null>;
+  layout?: "stack" | "cards";
 }) {
   const listeners = await promise;
   if (!listeners?.listeners || listeners.listeners.length === 0) return null;
   return (
-    <div>
-      {/* h2 (sidebar): sibling of the main column's content h2s. */}
-      <h2 className="mb-3 text-xs tracking-wide uppercase text-muted-foreground">
+    <section>
+      <h2
+        className={
+          layout === "cards"
+            ? "mb-4 text-sm font-semibold tracking-wide uppercase"
+            : "mb-3 text-xs tracking-wide uppercase text-muted-foreground"
+        }
+      >
         Top listeners
       </h2>
-      <TopListenersList listeners={listeners.listeners} />
-    </div>
+      <TopListenersList listeners={listeners.listeners} layout={layout} />
+    </section>
   );
 }
 

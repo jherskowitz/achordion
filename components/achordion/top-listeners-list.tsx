@@ -8,9 +8,62 @@ interface ListenerEntry {
   listen_count: number;
 }
 
-export function TopListenersList({ listeners }: { listeners: ListenerEntry[] }) {
+export function TopListenersList({
+  listeners,
+  /** "stack" — narrow vertical list (default; sidebar use).
+   *  "cards" — multi-column responsive bordered cards for full-width
+   *  page sections. */
+  layout = "stack",
+}: {
+  listeners: ListenerEntry[];
+  layout?: "stack" | "cards";
+}) {
   if (listeners.length === 0) return null;
   const max = listeners[0]?.listen_count ?? 1;
+  if (layout === "cards") {
+    return (
+      <ol className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {listeners.slice(0, 12).map((l, i) => {
+          const pct = Math.round((l.listen_count / max) * 100);
+          return (
+            <li
+              key={l.user_name}
+              className="border-border/60 hover:border-foreground/30 hover:bg-muted/30 group flex flex-col gap-2 rounded-xl border p-3 transition-colors"
+            >
+              <Link
+                href={`/user/${encodeURIComponent(l.user_name)}`}
+                className="flex min-w-0 items-center gap-3"
+              >
+                <span className="text-muted-foreground/70 w-5 shrink-0 text-xs tabular-nums">
+                  {i + 1}
+                </span>
+                <UserAvatar
+                  username={l.user_name}
+                  className="size-9 shrink-0"
+                  fallbackClassName="text-sm"
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium">{l.user_name}</p>
+                  <div className="bg-muted mt-1 h-0.5 w-full overflow-hidden rounded-full">
+                    <div
+                      className="bg-foreground/60 h-full"
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                </div>
+                <span className="text-muted-foreground shrink-0 self-start tabular-nums text-xs">
+                  {l.listen_count.toLocaleString()}
+                </span>
+              </Link>
+              <Suspense fallback={null}>
+                <OnAirIndicator username={l.user_name} />
+              </Suspense>
+            </li>
+          );
+        })}
+      </ol>
+    );
+  }
   return (
     <ol className="space-y-1.5">
       {listeners.slice(0, 10).map((l, i) => {
