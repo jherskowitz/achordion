@@ -1,6 +1,7 @@
 import "server-only";
 
 import { Redis } from "@upstash/redis";
+import { revalidateTag, unstable_cache } from "next/cache";
 import { canonicalHost } from "@/lib/host";
 
 // Re-export so existing call sites that import canonicalHost from
@@ -127,17 +128,20 @@ function isrcKey(isrc: string): string {
   return `track-links:isrc:${isrc.trim().toUpperCase()}`;
 }
 
+/** Tag used by unstable_cache + revalidateTag so write-throughs
+ *  immediately invalidate the Next-layer cache for an entry. */
+function cacheTag(mbid: string, entity: LinkEntity): string {
+  return `track-links:${entity}:${mbid.toLowerCase()}`;
+}
+
 /**
- * Look up cached external links for an entity. Returns null on
- * miss / expired / Upstash-not-configured. Caller should treat null
- * as "go resolve and write back."
- *
- * `entity` defaults to `"recording"` for back-compat with existing
- * call sites; pass `"release-group"` for album-level lookups.
+ * Raw Redis read — bypasses the Next-layer cache. Internal only;
+ * the public `getCachedTrackLinks` wraps this in `unstable_cache`
+ * so hot reads within the TTL window don't re-hit Upstash.
  */
-export async function getCachedTrackLinks(
+async function readCachedTrackLinksFromRedis(
   mbid: string,
-  entity: LinkEntity = "recording",
+  entity: LinkEntity,
 ): Promise<CachedLink[] | null> {
   if (!redis) return null;
   if (!mbid) return null;
@@ -152,6 +156,39 @@ export async function getCachedTrackLinks(
   } catch {
     return null;
   }
+}
+
+/**
+ * Look up cached external links for an entity. Returns null on
+ * miss / expired / Upstash-not-configured. Caller should treat null
+ * as "go resolve and write back."
+ *
+ * `entity` defaults to `"recording"` for back-compat with existing
+ * call sites; pass `"release-group"` for album-level lookups.
+ *
+ * **Two-level caching:** the Redis read is wrapped in Next's
+ * `unstable_cache` (60s TTL, tagged per (entity, mbid) pair). Hot
+ * reads on the same node within the window avoid re-hitting
+ * Upstash entirely — significant when a popular recording renders
+ * across multiple surfaces in quick succession. Writes invalidate
+ * via `revalidateTag` in `setCachedTrackLinks`, so newly-submitted
+ * Parachord URLs surface immediately rather than waiting for the
+ * 60s TTL to lapse.
+ */
+export async function getCachedTrackLinks(
+  mbid: string,
+  entity: LinkEntity = "recording",
+): Promise<CachedLink[] | null> {
+  if (!mbid) return null;
+  // unstable_cache requires the closure to be stable across renders;
+  // we capture the entity + mbid in the cache key list so each
+  // (entity, mbid) pair gets its own cache slot.
+  const cached = unstable_cache(
+    () => readCachedTrackLinksFromRedis(mbid, entity),
+    [`track-links`, entity, mbid.toLowerCase()],
+    { revalidate: 60, tags: [cacheTag(mbid, entity)] },
+  );
+  return cached();
 }
 
 /**
@@ -246,6 +283,17 @@ export async function setCachedTrackLinks(
     };
     const serialised = JSON.stringify(entry);
     await redis.set(key(mbid, entity), serialised, { ex: TTL_SECONDS });
+    // Invalidate the Next-layer cache for this (entity, mbid) so
+    // freshly-submitted links surface immediately rather than
+    // waiting for the 60s unstable_cache window to lapse. Next 16
+    // requires a `profile` second arg ("default" matches the
+    // standard cache profile used by unstable_cache).
+    try {
+      revalidateTag(cacheTag(mbid, entity), "default");
+    } catch {
+      // revalidateTag throws when called from a non-render context
+      // (e.g., during build static analysis). Best-effort either way.
+    }
     // ISRC aliases — only meaningful for recording entities. We
     // duplicate the JSON rather than store a redirect, so reads via
     // an alias don't pay a second round-trip. ISRCs are typically

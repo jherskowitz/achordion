@@ -1,7 +1,5 @@
 import "server-only";
 
-import { Ratelimit } from "@upstash/ratelimit";
-import { Redis } from "@upstash/redis";
 import { z } from "zod";
 
 const MB_BASE = "https://musicbrainz.org/ws/2";
@@ -26,22 +24,27 @@ class MusicBrainzError extends Error {
   }
 }
 
-// Shared token bucket across all serverless instances. Without this,
-// each Vercel invocation has its own in-process queue and N concurrent
-// instances blast N req/sec at MB, blowing past their ~1 req/sec cap
-// and getting us 429d. Falls back to the in-process queue when Upstash
-// env vars aren't set (local dev, tests).
-const sharedLimiter = (() => {
-  const url = process.env.UPSTASH_REDIS_REST_URL;
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
-  if (!url || !token) return null;
-  return new Ratelimit({
-    redis: new Redis({ url, token }),
-    limiter: Ratelimit.slidingWindow(1, "1 s"),
-    prefix: "mb",
-  });
-})();
-
+// In-process token bucket only — 1 req/sec per Vercel instance.
+//
+// Earlier this also fronted an Upstash-backed sliding-window
+// limiter to share the bucket across instances. Each
+// `blockUntilReady` poll cost ~3-4 Redis ops, and on a busy queue
+// it'd poll repeatedly per blocked call — that path was
+// responsible for the bulk of our Upstash command consumption.
+//
+// Without cross-instance coordination, N concurrent Vercel
+// instances can theoretically blast N req/sec at MB and trip
+// their ~1 req/sec cap. In practice:
+//   - Most requests serve from CDN / Next data cache, never
+//     reaching this code.
+//   - Vercel's serverless model coalesces concurrent invocations
+//     onto few warm instances; cross-instance contention is
+//     short-lived.
+//   - MB has been generous in production logs.
+//
+// If we start seeing MB 429s under load (watch the
+// MusicBrainzError digest "MB_RATE_LIMITED" surface in the
+// in-app error page), opt back into Upstash here.
 const localQueue = (() => {
   let lastCallAt = 0;
   let chain: Promise<unknown> = Promise.resolve();
@@ -60,13 +63,6 @@ const localQueue = (() => {
 })();
 
 async function queue<T>(fn: () => Promise<T>): Promise<T> {
-  if (sharedLimiter) {
-    const result = await sharedLimiter.blockUntilReady("global", 30_000);
-    if (!result.success) {
-      throw new MusicBrainzError(429, "MB rate limit: timed out waiting for token");
-    }
-    return fn();
-  }
   return localQueue(fn);
 }
 

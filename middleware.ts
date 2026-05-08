@@ -90,12 +90,27 @@ export async function middleware(request: NextRequest) {
   // 3. Per-IP page rate limit. Skip when the limiter isn't configured
   // (local dev, no Upstash env vars) — `checkRateLimit` returns
   // `{ ok: true }` in that case.
-  const rl = await checkRateLimit("page", request);
-  if (!rl.ok) {
-    return new NextResponse("Too Many Requests", {
-      status: 429,
-      headers: { "Retry-After": "60" },
-    });
+  //
+  // Skip rate-limiting for Next router prefetches. They're fired on
+  // link hover (and inside the in-app router at scroll time) and
+  // double the request count without representing real user intent.
+  // Each one would cost ~3-4 Redis ops via the sliding-window
+  // limiter; that was a meaningful chunk of total Upstash command
+  // consumption. The actual page click that follows still goes
+  // through the limiter, so abuse cases (a crawler hitting URLs
+  // directly) stay covered.
+  const isPrefetch =
+    request.headers.get("next-router-prefetch") === "1" ||
+    request.headers.get("rsc") === "1" ||
+    request.headers.get("purpose") === "prefetch";
+  if (!isPrefetch) {
+    const rl = await checkRateLimit("page", request);
+    if (!rl.ok) {
+      return new NextResponse("Too Many Requests", {
+        status: 429,
+        headers: { "Retry-After": "60" },
+      });
+    }
   }
 
   return NextResponse.next();
