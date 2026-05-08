@@ -6,6 +6,7 @@ import {
   partitionArtistRelations,
 } from "@/lib/clients/musicbrainz";
 import {
+  canonicalHost,
   getCachedTrackLinks,
   setCachedTrackLinks,
   type CachedLink,
@@ -89,7 +90,9 @@ export async function resolveTrackLinks(
   if (mbid) {
     const cached = await getCachedTrackLinks(mbid);
     if (cached && cached.length > 0) {
-      return cached.map(({ url, label, host }) => ({ url, label, host }));
+      return sortByPlatformPriority(
+        cached.map(({ url, label, host }) => ({ url, label, host })),
+      );
     }
   }
 
@@ -172,7 +175,30 @@ export async function resolveTrackLinks(
     void setCachedTrackLinks(mbid, tagged, mbNames);
   }
 
-  return items;
+  return sortByPlatformPriority(items);
+}
+
+/**
+ * Re-order links to match PLATFORM_ORDER regardless of how they
+ * arrived (Odesli output is already ordered, MB merge appends
+ * niche services at the end, but Parachord submissions land in
+ * whatever order Parachord sent them and the cache merge preserves
+ * insertion order — meaning a cache hit could surface Spotify
+ * after YouTube, etc.). Hosts not in PLATFORM_ORDER fall to the
+ * end in their original order (stable sort by `original` index).
+ */
+function sortByPlatformPriority(items: ResolvedLink[]): ResolvedLink[] {
+  const orderIndex = (host: string): number => {
+    const h = canonicalHost(host);
+    const idx = PLATFORM_ORDER.findIndex((p) => p.host === h);
+    return idx >= 0 ? idx : Number.POSITIVE_INFINITY;
+  };
+  return items
+    .map((item, i) => ({ item, idx: orderIndex(item.host), original: i }))
+    .sort((a, b) =>
+      a.idx !== b.idx ? a.idx - b.idx : a.original - b.original,
+    )
+    .map(({ item }) => item);
 }
 
 function hostOf(url: string): string | null {
