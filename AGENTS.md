@@ -541,6 +541,34 @@ Parachord can ask Achordion for the canonical Achordion URL for any artist / alb
 
 Use case: every Parachord surface that wants a "View on Achordion" link (Now Playing card, library detail views, share sheet) can resolve through this endpoint without coordinating route shapes with Achordion.
 
+### Embed-code lookup (GET `/api/embed-code`)
+
+Companion to the entity-link endpoint: returns a ready-to-paste iframe snippet for Achordion's track / album embed widgets. Lets Parachord render a "Copy embed code" UI in its share sheet without hard-coding our embed URL conventions or recommended dimensions — both ship from this endpoint.
+
+- **Auth:** bearer token. Same `ACHORDION_API_READ_TOKEN` as the entity-link endpoint.
+- **Endpoint:** `GET https://achordion.xyz/api/embed-code?entity=<entity>&mbid=<mbid>[&width=<n>&height=<n>]`
+- **Inputs:**
+  - `entity`: `track` | `album`. Aliases: `recording` → track, `release-group` → album.
+  - `mbid`: 36-char UUID.
+  - `width` (optional): override the iframe `width` attribute. Default 600. Range 200–2000.
+  - `height` (optional): override the iframe `height` attribute. Defaults match what `<EmbedShareButton>` ships in-app (180 for track, 260 for album). Range 200–2000.
+- **Response shape:**
+  ```json
+  {
+    "entity": "track",
+    "mbid": "de699185-...",
+    "embed_url": "https://achordion.xyz/embed/track/de699185-...",
+    "page_url": "https://achordion.xyz/recording/de699185-...",
+    "width": 600,
+    "height": 180,
+    "html": "<iframe src=\"https://achordion.xyz/embed/track/...\" width=\"600\" height=\"180\" loading=\"lazy\" style=\"border:0;border-radius:12px\" title=\"Achordion track\"></iframe>"
+  }
+  ```
+  `400` on a malformed `entity` / `mbid` / out-of-range dimensions; `401` on missing/wrong bearer; `503` when the env var isn't configured.
+- **Cache:** `private, no-store`. Pure string formatting; no external calls; per-request render is negligibly cheap.
+
+Use case: Parachord's share sheet renders a "Copy embed code" pill alongside its existing "Copy link" pill, sourced from this endpoint so the recommended height stays in sync with the in-app `<EmbedShareButton>` defaults.
+
 ---
 
 ## File map (where things live)
