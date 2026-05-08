@@ -32,10 +32,15 @@ export function EmbedShareButton({
   recommendedHeight?: number;
 }) {
   const [copied, setCopied] = useState(false);
-  // We always link to achordion.xyz in the snippet — even from
-  // local dev — since users are copying it for a public page.
-  const src = `https://achordion.xyz/embed/${entity}/${mbid}`;
-  const snippet = `<iframe src="${src}" width="600" height="${recommendedHeight}" loading="lazy" style="border:0;border-radius:12px" title="Achordion ${entity}"></iframe>`;
+  // The snippet ALWAYS hard-codes achordion.xyz — users copy it
+  // for external pages, so it shouldn't reflect the dev origin.
+  // The Preview link below uses the CURRENT origin so dev works
+  // without a deploy.
+  const path = `/embed/${entity}/${mbid}`;
+  const snippetSrc = `https://achordion.xyz${path}`;
+  const previewHref =
+    typeof window !== "undefined" ? window.location.origin + path : snippetSrc;
+  const snippet = `<iframe src="${snippetSrc}" width="600" height="${recommendedHeight}" loading="lazy" style="border:0;border-radius:12px" title="Achordion ${entity}"></iframe>`;
 
   async function copyToClipboard() {
     try {
@@ -93,7 +98,7 @@ export function EmbedShareButton({
               {copied ? "Copied" : "Copy code"}
             </Button>
             <a
-              href={src}
+              href={previewHref}
               target="_blank"
               rel="noopener noreferrer"
               className={cn(
