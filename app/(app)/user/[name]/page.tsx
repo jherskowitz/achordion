@@ -78,7 +78,11 @@ async function ActivityFeedSection({
 
 async function RecentListensSection({ name }: { name: string }) {
   try {
-    const listens = await getRecentListens(name, { count: 25 });
+    // 10-item display cap — the full listen history lives at
+    // /user/<name>/listens. Keep this section compact alongside the
+    // activity feed. The Parachord-export CTA still pulls 100
+    // tracks so "Play all" has a meaningful queue.
+    const listens = await getRecentListens(name, { count: 10 });
     return (
       <>
         <LiveScrobbleList username={name} initialListens={listens} />
@@ -135,7 +139,7 @@ async function RecentListensCta({ name }: { name: string }) {
 function ScrobbleListSkeleton() {
   return (
     <ul className="border-border/60 divide-border/60 divide-y rounded-xl border px-4">
-      {Array.from({ length: 8 }).map((_, i) => (
+      {Array.from({ length: 10 }).map((_, i) => (
         <li key={i} className="flex items-center gap-3 py-3">
           <Skeleton className="size-12 rounded-md" />
           <div className="flex-1 space-y-2">
