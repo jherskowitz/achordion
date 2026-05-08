@@ -4,6 +4,7 @@ import { formatArtistCredit } from "@/lib/clients/musicbrainz";
 import { parachordPlayTrack } from "@/lib/parachord";
 import { recordingHref } from "@/lib/entity-links";
 import { ArtistCreditLinks } from "./artist-credit-links";
+import { InlineTrackLinks } from "./inline-track-links";
 import { PlayOverNumberCell } from "./parachord-button";
 import { TrackActionsMenuSlot } from "./track-actions-menu-slot";
 
@@ -92,6 +93,10 @@ function TrackRow({
       <span className="text-muted-foreground shrink-0 tabular-nums text-xs">
         {formatLength(track.length ?? track.recording?.length)}
       </span>
+      {/* Lazy streaming-link expansion. Renders nothing without an
+          MBID (no way to seed the lookup); collapses by default and
+          fetches Odesli + MB url-rels on first click. */}
+      <InlineTrackLinks recordingMbid={recordingMbid} />
       <TrackActionsMenuSlot
         track={{
           recordingMbid: recordingMbid ?? null,
