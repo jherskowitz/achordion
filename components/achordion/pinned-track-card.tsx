@@ -10,12 +10,11 @@ import {
   partitionArtistRelations,
 } from "@/lib/clients/musicbrainz";
 import { parachordPlayTrack } from "@/lib/parachord";
-import {
-  categoriseLinks,
-  normalizeStreamingUrl,
-  tooltipLabel,
-} from "./external-links";
-import { StreamingLinksRow } from "./streaming-links-row";
+import { categoriseLinks } from "./external-links";
+import { resolveTrackLinks } from "@/lib/track-links-resolver";
+import { faviconUrl } from "@/lib/favicon";
+import { IconTooltip } from "@/components/ui/icon-tooltip";
+import { AddSourcesButton } from "./add-sources-button";
 import { TrackActionsMenuSlot } from "./track-actions-menu-slot";
 import { ThanksButton } from "./thanks-button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -23,44 +22,88 @@ import { artistHref, releaseGroupHref } from "@/lib/entity-links";
 import { cn } from "@/lib/utils";
 
 /**
- * Async server component that pre-renders whatever streaming URLs MB
- * has on hand for the recording, then hands off to <StreamingLinksRow>
- * so the row reloads with the full Parachord-fed / Odesli-enriched
- * set (and any ISRC-alias hits) post-mount. Wrapped in <Suspense> by
- * the card so the rest of the pin paints immediately while MB
- * resolves.
+ * Async server component that resolves the recording's streaming
+ * URLs (cache → MB url-rels → ISRC alias → Odesli) and renders the
+ * favicon row directly into the SSR HTML. Server-side resolution is
+ * the right shape here even though entity pages use a client island:
+ *
+ *   - Pins are 1-5 cards per page, low cost.
+ *   - Eliminates client-side variability (extensions, hydration race,
+ *     React Query state) that was leaving favicons missing on some
+ *     pin renders.
+ *   - Edge-cached HTML carries the favicons baked in, so repeat
+ *     visitors get them instantly without a /api/track-links call.
+ *
+ * Wrapped in <Suspense> by the card so the rest of the pin paints
+ * immediately while the resolver runs.
  */
 async function PinnedExternalLinks({
   recordingMbid,
 }: {
   recordingMbid: string;
 }) {
+  // Pre-fetch the recording's MB rels so the resolver doesn't make a
+  // second MB roundtrip on a cache miss. We need it anyway for the
+  // partitionArtistRelations / categoriseLinks call.
   const recording = await getRecording(recordingMbid).catch(() => null);
-  const streaming = recording
+  const streamingMb = recording
     ? categoriseLinks(
         partitionArtistRelations({ relations: recording.relations }).urls,
       ).streaming
     : [];
-  const initialItems = streaming
-    .map((link) => {
-      const normalised = normalizeStreamingUrl(link.url);
-      if (!normalised) return null;
-      let host: string;
-      try {
-        host = new URL(normalised).hostname.toLowerCase();
-      } catch {
-        return null;
-      }
-      return { url: normalised, label: tooltipLabel(link), host };
-    })
-    .filter((x): x is { url: string; label: string; host: string } => x !== null);
+  const links = await resolveTrackLinks({
+    mbid: recordingMbid,
+    entity: "recording",
+    seedUrl: streamingMb[0]?.url ?? null,
+    prefetched: {
+      streamingUrls: streamingMb.map((s) => ({ url: s.url, type: s.type })),
+      ...(recording
+        ? {
+            names: {
+              trackName: recording.title,
+              ...(recording["artist-credit"]?.[0]?.name
+                ? {
+                    artistName: recording["artist-credit"]
+                      .map((c) => c.name + (c.joinphrase ?? ""))
+                      .join("")
+                      .trim(),
+                  }
+                : {}),
+            },
+          }
+        : {}),
+    },
+  });
   return (
-    <StreamingLinksRow
-      entity="recording"
-      mbid={recordingMbid}
-      initialItems={initialItems}
-      seedUrl={streaming[0]?.url ?? null}
-    />
+    <ul className="flex flex-wrap items-center gap-2" role="list">
+      {links.map((link) => (
+        <li key={link.url}>
+          <IconTooltip label={link.label}>
+            <a
+              href={link.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label={link.label}
+              suppressHydrationWarning
+              className="border-border/60 hover:border-foreground/40 hover:bg-muted/40 inline-flex size-9 items-center justify-center rounded-md border transition-colors pointer-coarse:size-11"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={faviconUrl(link.host)}
+                alt=""
+                width={16}
+                height={16}
+                loading="lazy"
+                className="size-4 opacity-80 hover:opacity-100"
+              />
+            </a>
+          </IconTooltip>
+        </li>
+      ))}
+      <li>
+        <AddSourcesButton mbEntity="recording" mbid={recordingMbid} />
+      </li>
+    </ul>
   );
 }
 
