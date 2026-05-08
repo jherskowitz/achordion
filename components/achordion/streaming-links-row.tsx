@@ -95,12 +95,11 @@ export function StreamingLinksRow({
     ? mergeByHost(initialItems, data.links)
     : initialItems;
 
-  if (items.length === 0) {
-    // Nothing to render and no MBID-driven AddSources affordance
-    // would help here either. Caller can render its own empty state.
-    return null;
-  }
-
+  // Always render the row when we have an MBID — even with zero
+  // resolved items the "+ Add sources" tile gives editors a path to
+  // wire up streaming services on MB. Returning null here was the
+  // regression that hid favicon rows on obscure recordings (no MB
+  // url-rels, nothing cached, Odesli empty).
   return (
     <ul className="flex flex-wrap items-center gap-2" role="list">
       {items.map((it) => (
