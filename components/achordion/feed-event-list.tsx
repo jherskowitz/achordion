@@ -231,17 +231,18 @@ function EventShell({
   children?: React.ReactNode;
 }) {
   return (
-    <li className="flex items-start gap-3 py-3">
-      <div className="bg-muted/60 mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full">
+    // `items-center` so the trailing slot vertically centers against
+    // the whole row (header + content block). The icon overrides via
+    // `self-start` to stay top-anchored alongside the header line.
+    <li className="flex items-center gap-3 py-3">
+      <div className="bg-muted/60 mt-0.5 flex size-8 shrink-0 items-center justify-center self-start rounded-full">
         {icon}
       </div>
       <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <p className="text-muted-foreground text-xs">{header}</p>
-          {trailing}
-        </div>
+        <p className="text-muted-foreground text-xs">{header}</p>
         {children}
       </div>
+      {trailing && <div className="shrink-0">{trailing}</div>}
     </li>
   );
 }
