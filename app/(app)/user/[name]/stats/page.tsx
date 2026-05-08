@@ -27,9 +27,12 @@ interface PageParams {
 }
 
 function parseRange(value: string | undefined): StatRange {
+  // Default to "year" (last year) — gives a richer picture than
+  // "month" for most listeners while staying recent enough that the
+  // top items reflect current taste rather than a decade of history.
   return STAT_RANGES.includes(value as StatRange)
     ? (value as StatRange)
-    : "all_time";
+    : "year";
 }
 
 async function ArtistsSection({
@@ -192,10 +195,11 @@ export default async function StatsPage({ params, searchParams }: PageParams) {
 
   return (
     <PageShell className="pt-8">
-      <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
-        <h2 className="text-sm font-semibold tracking-wide uppercase">
-          Top items
-        </h2>
+      {/* Range picker stands alone at the top-left — the previous
+          "Top items" h2 was redundant once each section header
+          carries "Top" itself ("Top Artists", "Top Albums", "Top
+          Tracks"). */}
+      <div className="mb-8 flex flex-wrap items-center gap-4">
         <StatRangePicker active={range} />
       </div>
 
@@ -203,7 +207,7 @@ export default async function StatsPage({ params, searchParams }: PageParams) {
         <div className="min-w-0 space-y-12">
           <section>
             <h3 className="mb-3 text-xs tracking-wide uppercase text-muted-foreground">
-              Artists
+              Top Artists
             </h3>
             <Suspense key={`artists-${range}`} fallback={<ListSkeleton />}>
               <ArtistsSection name={name} range={range} />
@@ -212,7 +216,7 @@ export default async function StatsPage({ params, searchParams }: PageParams) {
 
           <section>
             <h3 className="mb-3 text-xs tracking-wide uppercase text-muted-foreground">
-              Albums
+              Top Albums
             </h3>
             <Suspense key={`albums-${range}`} fallback={<GridSkeleton />}>
               <AlbumsSection name={name} range={range} />
@@ -222,7 +226,7 @@ export default async function StatsPage({ params, searchParams }: PageParams) {
           <section>
             <div className="mb-3 flex items-center justify-between gap-3">
               <h3 className="text-xs tracking-wide uppercase text-muted-foreground">
-                Tracks
+                Top Tracks
               </h3>
               <Suspense key={`tracks-menu-${range}`} fallback={null}>
                 <TopTracksCta name={name} range={range} />
@@ -236,9 +240,10 @@ export default async function StatsPage({ params, searchParams }: PageParams) {
 
         <aside className="space-y-8">
           <section>
-            {/* h2, not h3: sibling of the main column's "Top items"
-                h2, not nested under it. Same logical level even
-                though visual size is smaller. (#10) */}
+            {/* h2 (sibling of main-column section h2-equivalents):
+                this aside lives at the same logical level as the
+                Top Artists / Albums / Tracks sections, not nested
+                under them. (#10) */}
             <h2 className="mb-3 text-xs tracking-wide uppercase text-muted-foreground">
               Listening over time
             </h2>
