@@ -104,16 +104,42 @@ export function TagChips({
         : "/";
     // Two-step re-auth: sign out THEN sign in. With Auth.js v5 +
     // an active session, calling signIn() alone doesn't always
-    // re-run the OAuth handshake — it can return the existing
-    // session token unchanged, so the JWT never picks up the new
-    // `mbAccessToken` / `mbScope` fields and tag voting keeps
-    // 401-ing in a loop. Clearing the session first guarantees a
-    // fresh OAuth round-trip with the widened scope, after which
-    // the JWT callback fires with `account` populated and we
-    // capture the access token.
+    // re-run the OAuth handshake. Clearing the session first
+    // guarantees a fresh OAuth round-trip with the widened scope.
+    //
+    // `prompt: "consent"` forces MB's authorize endpoint to show
+    // its consent screen and issue a new access token, even if the
+    // user has previously approved this app. Without it, MB can
+    // silently re-use a cached `profile`-only grant and re-issue
+    // the same token that doesn't have the `tag` scope — leading
+    // to a vote-401-reauth-401 loop.
+    //
+    // Also pin a timestamp so the loop guard below can break the
+    // cycle if MB STILL hands back a tag-less token (e.g. user
+    // declined consent, or MB grant on file is stale and we need
+    // human intervention).
+    if (typeof sessionStorage !== "undefined") {
+      sessionStorage.setItem("mb-tag-reauth-at", String(Date.now()));
+    }
     await signOut({ redirect: false });
-    void signIn("musicbrainz", { callbackUrl });
+    void signIn(
+      "musicbrainz",
+      { callbackUrl },
+      { prompt: "consent" },
+    );
   };
+
+  /** True when we've already bounced through MB OAuth on this
+   *  page session and a vote STILL just 401'd — implies MB isn't
+   *  granting the `tag` scope no matter how many times we retry,
+   *  so we should stop looping and surface a clear error. */
+  function reAuthRecentlyAttempted(): boolean {
+    if (typeof sessionStorage === "undefined") return false;
+    const ts = sessionStorage.getItem("mb-tag-reauth-at");
+    if (!ts) return false;
+    const age = Date.now() - Number.parseInt(ts, 10);
+    return Number.isFinite(age) && age < 60_000; // 1 minute window
+  }
 
   const merged = mergeTags(initialTags, pendingTags);
   const visible = merged.slice(0, limit);
@@ -192,6 +218,18 @@ export function TagChips({
       }
       const reason = (err as Error & { reason?: string }).reason;
       if (reason === "unauthenticated" || reason === "scope_required") {
+        // Loop guard: if we re-auth'd less than a minute ago and
+        // we're STILL getting an auth error, MB isn't granting the
+        // `tag` scope no matter how many bounces we do. Stop the
+        // cycle and surface the error so the user can take action
+        // (e.g. revoke + re-grant the app on MB) instead of an
+        // infinite redirect loop.
+        if (reAuthRecentlyAttempted()) {
+          setErrorMsg(
+            "Tag voting requires extra permission MB didn't grant. Try revoking Achordion at musicbrainz.org/account/applications and signing in again.",
+          );
+          return;
+        }
         void triggerReAuth();
       } else {
         setErrorMsg(
@@ -203,6 +241,12 @@ export function TagChips({
 
   function handleVote(name: string, vote: TagVote) {
     if (sessionStatus !== "authenticated") {
+      if (reAuthRecentlyAttempted()) {
+        setErrorMsg(
+          "Sign-in didn't complete. Try a fresh page load and click again.",
+        );
+        return;
+      }
       void triggerReAuth();
       return;
     }
