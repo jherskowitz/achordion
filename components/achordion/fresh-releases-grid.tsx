@@ -75,6 +75,20 @@ export function FreshReleasesGrid({
     .sort((a, b) => b.release_date.localeCompare(a.release_date));
   const today = new Date().toISOString().slice(0, 10);
 
+  // When week headers are hidden the parent already frames the
+  // time range, so we collapse everything into a single continuous
+  // grid — each week's items used to render in its own grid
+  // container, and shorter weeks left visible row gaps. Single grid
+  // = continuous row-fill regardless of where the week boundary
+  // falls.
+  if (hideWeekHeaders) {
+    return (
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+        {sorted.map((r) => renderTile(r))}
+      </div>
+    );
+  }
+
   const buckets = new Map<string, FreshRelease[]>();
   for (const r of sorted) {
     const week = startOfWeek(r.release_date);
@@ -86,78 +100,78 @@ export function FreshReleasesGrid({
     <div className="space-y-12">
       {Array.from(buckets.entries()).map(([weekStart, items]) => (
         <section key={weekStart}>
-          {!hideWeekHeaders && (
-            <h3 className="text-muted-foreground mb-4 text-xs tracking-wide uppercase">
-              {weekLabel(weekStart, today)}
-            </h3>
-          )}
+          <h3 className="text-muted-foreground mb-4 text-xs tracking-wide uppercase">
+            {weekLabel(weekStart, today)}
+          </h3>
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-            {items.map((r) => {
-              const target = r.release_group_mbid
-                ? `/release-group/${r.release_group_mbid}`
-                : `/release/${r.release_mbid}`;
-              const artistMbid = r.artist_mbids?.[0];
-              const cover = coverFor(r);
-              return (
-                <article key={r.release_mbid} className="min-w-0">
-                  <div className="group relative overflow-hidden rounded-md">
-                    <Link href={target} className="block">
-                      <CoverArt
-                        src={cover}
-                        alt={r.release_name}
-                        size={500}
-                        className="aspect-square h-auto w-full transition-opacity group-hover:opacity-90"
-                        rounded="md"
-                      />
-                    </Link>
-                    <PlayOnHoverFab
-                      href={parachordPlayAlbum({
-                        ...(r.release_group_mbid
-                          ? { mbid: r.release_group_mbid }
-                          : {
-                              artist: r.artist_credit_name,
-                              title: r.release_name,
-                            }),
-                      })}
-                      label={`Play "${r.release_name}" by ${r.artist_credit_name} in Parachord`}
-                    />
-                  </div>
-                  <p className="mt-2 truncate text-sm font-medium">
-                    <Link href={target} className="hover:underline">
-                      {r.release_name}
-                    </Link>
-                  </p>
-                  <p className="text-muted-foreground truncate text-xs">
-                    <Link
-                      href={artistHref({
-                        mbid: artistMbid,
-                        name: r.artist_credit_name,
-                      })}
-                      className="hover:text-foreground"
-                    >
-                      {r.artist_credit_name}
-                    </Link>
-                  </p>
-                  <p className="text-muted-foreground/70 mt-1 flex items-center gap-1.5 text-xs">
-                    <time dateTime={r.release_date} className="tabular-nums">
-                      {formatDate(r.release_date)}
-                    </time>
-                    {r.release_group_primary_type && (
-                      <>
-                        <span aria-hidden>·</span>
-                        <span>
-                          {r.release_group_secondary_type ??
-                            r.release_group_primary_type}
-                        </span>
-                      </>
-                    )}
-                  </p>
-                </article>
-              );
-            })}
+            {items.map((r) => renderTile(r))}
           </div>
         </section>
       ))}
     </div>
+  );
+}
+
+function renderTile(r: FreshRelease) {
+  const target = r.release_group_mbid
+    ? `/release-group/${r.release_group_mbid}`
+    : `/release/${r.release_mbid}`;
+  const artistMbid = r.artist_mbids?.[0];
+  const cover = coverFor(r);
+  return (
+    <article key={r.release_mbid} className="min-w-0">
+      <div className="group relative overflow-hidden rounded-md">
+        <Link href={target} className="block">
+          <CoverArt
+            src={cover}
+            alt={r.release_name}
+            size={500}
+            className="aspect-square h-auto w-full transition-opacity group-hover:opacity-90"
+            rounded="md"
+          />
+        </Link>
+        <PlayOnHoverFab
+          href={parachordPlayAlbum({
+            ...(r.release_group_mbid
+              ? { mbid: r.release_group_mbid }
+              : {
+                  artist: r.artist_credit_name,
+                  title: r.release_name,
+                }),
+          })}
+          label={`Play "${r.release_name}" by ${r.artist_credit_name} in Parachord`}
+        />
+      </div>
+      <p className="mt-2 truncate text-sm font-medium">
+        <Link href={target} className="hover:underline">
+          {r.release_name}
+        </Link>
+      </p>
+      <p className="text-muted-foreground truncate text-xs">
+        <Link
+          href={artistHref({
+            mbid: artistMbid,
+            name: r.artist_credit_name,
+          })}
+          className="hover:text-foreground"
+        >
+          {r.artist_credit_name}
+        </Link>
+      </p>
+      <p className="text-muted-foreground/70 mt-1 flex items-center gap-1.5 text-xs">
+        <time dateTime={r.release_date} className="tabular-nums">
+          {formatDate(r.release_date)}
+        </time>
+        {r.release_group_primary_type && (
+          <>
+            <span aria-hidden>·</span>
+            <span>
+              {r.release_group_secondary_type ??
+                r.release_group_primary_type}
+            </span>
+          </>
+        )}
+      </p>
+    </article>
   );
 }
