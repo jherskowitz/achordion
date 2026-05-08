@@ -12,10 +12,12 @@ import { auth } from "@/auth";
 import { PinnedTrackCard } from "@/components/achordion/pinned-track-card";
 import { PageShell } from "@/components/achordion/page-shell";
 import { EmptyState } from "@/components/achordion/empty-state";
+import { FeedEventList } from "@/components/achordion/feed-event-list";
 import {
   WeeklyStatsSidebar,
   WeeklyStatsSidebarSkeleton,
 } from "@/components/achordion/weekly-stats-sidebar";
+import { getUserActivityFeed } from "@/lib/user-activity-feed";
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface PageParams {
@@ -43,6 +45,32 @@ async function PinnedSection({
   } catch {
     return null;
   }
+}
+
+async function ActivityFeedSection({
+  name,
+  viewer,
+}: {
+  name: string;
+  viewer: string | null;
+}) {
+  // 30-day window for "is this profile actively producing pins +
+  // loves we should surface as a feed?" The threshold gates the
+  // section visibility entirely — quiet accounts don't get a
+  // half-empty Activity card eating space above the listens list.
+  const since = Math.floor(Date.now() / 1000) - 30 * 86400;
+  const events = await getUserActivityFeed(name, { since }).catch(
+    () => [],
+  );
+  if (events.length === 0) return null;
+  return (
+    <section className="mb-8">
+      <h2 className="mb-4 text-sm font-semibold tracking-wide uppercase">
+        Recent activity
+      </h2>
+      <FeedEventList events={events} viewer={viewer} />
+    </section>
+  );
 }
 
 async function RecentListensSection({ name }: { name: string }) {
@@ -129,6 +157,13 @@ export default async function UserOverviewPage({ params }: PageParams) {
       </Suspense>
       <div className="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_280px]">
         <div className="min-w-0">
+          {/* Activity feed — pins + loves from the past 30 days,
+              suspended so it doesn't block the listens list. Renders
+              null when the user has no recent activity (quiet
+              accounts shouldn't reserve space for an empty section). */}
+          <Suspense fallback={null}>
+            <ActivityFeedSection name={name} viewer={viewer} />
+          </Suspense>
           <div className="mb-4 flex items-center justify-between gap-3">
             <h2 className="text-sm font-semibold tracking-wide uppercase">
               Recent listens
