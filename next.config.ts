@@ -171,9 +171,44 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       {
-        // Security headers on every path.
-        source: "/:path*",
+        // Security headers on every path EXCEPT /embed/*. The
+        // global SECURITY_HEADERS set has frame-ancestors 'self' /
+        // X-Frame-Options SAMEORIGIN, which would block third-party
+        // sites from iframing us — exactly what /embed/<entity>
+        // routes are designed to allow. The /embed override below
+        // re-enables embedding with a relaxed CSP.
+        source: "/((?!embed).*)",
         headers: SECURITY_HEADERS,
+      },
+      {
+        // Embed routes — strip frame-ancestors restriction so any
+        // origin can iframe the widget. Other security headers
+        // (referrer policy, MIME sniffing, HSTS) still apply.
+        // X-Frame-Options is omitted entirely because it can't
+        // express "allow any" — modern browsers treat its absence
+        // + frame-ancestors * as universal allow.
+        source: "/embed/:path*",
+        headers: [
+          {
+            key: "Content-Security-Policy",
+            value: CSP.replace(
+              "frame-ancestors 'self'",
+              "frame-ancestors *",
+            ),
+          },
+          {
+            key: "X-Content-Type-Options",
+            value: "nosniff",
+          },
+          {
+            key: "Referrer-Policy",
+            value: "strict-origin-when-cross-origin",
+          },
+          {
+            key: "Strict-Transport-Security",
+            value: "max-age=63072000; includeSubDomains; preload",
+          },
+        ],
       },
       // NOTE: We intentionally do NOT set Cache-Control on
       // `/_next/static/:path*` or `/_next/image`. Vercel already

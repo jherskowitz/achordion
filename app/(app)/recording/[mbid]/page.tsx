@@ -27,6 +27,7 @@ import { OdesliLinks } from "@/components/achordion/odesli-links";
 import { PageHeader } from "@/components/achordion/page-header";
 import { PageShell } from "@/components/achordion/page-shell";
 import { TopListenersList } from "@/components/achordion/top-listeners-list";
+import { EmbedShareButton } from "@/components/achordion/embed-share-button";
 import { TagChips } from "@/components/achordion/tag-chips";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -243,8 +244,11 @@ async function RecordingBody({ mbid }: { mbid: string }) {
         }
       />
 
-      <div className="-mt-2 flex flex-wrap gap-1.5 pb-4">
-        <TagChips entity="recording" mbid={recording.id} initialTags={tags} />
+      <div className="-mt-2 flex flex-wrap items-center justify-between gap-2 pb-4">
+        <div className="flex flex-wrap gap-1.5">
+          <TagChips entity="recording" mbid={recording.id} initialTags={tags} />
+        </div>
+        <EmbedShareButton entity="track" mbid={recording.id} />
       </div>
 
       {/* Two-column layout for the body: main column carries
