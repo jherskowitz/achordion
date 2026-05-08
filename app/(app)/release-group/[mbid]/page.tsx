@@ -17,6 +17,10 @@ import {
 } from "@/lib/clients/listenbrainz";
 import { caaReleaseGroupUrl } from "@/lib/clients/coverart";
 import { PageHeader } from "@/components/achordion/page-header";
+import {
+  EntityHeaderStats,
+  EntityHeaderStatsSkeleton,
+} from "@/components/achordion/entity-header-stats";
 import { PageShell } from "@/components/achordion/page-shell";
 import { CoverArt } from "@/components/achordion/cover-art";
 import { PlayOnHoverFab } from "@/components/achordion/play-on-hover-fab";
@@ -289,7 +293,7 @@ async function AlbumBody({ mbid }: { mbid: string }) {
           </div>
         }
         actions={
-          <Suspense fallback={<HeaderStatsSkeleton />}>
+          <Suspense fallback={<EntityHeaderStatsSkeleton />}>
             <HeaderStats promise={listenersPromise} />
           </Suspense>
         }
@@ -342,41 +346,21 @@ async function AlbumBody({ mbid }: { mbid: string }) {
   );
 }
 
-/** Streams the listens / listeners line in the album header. */
+/** Streams the album's listens / listeners into the shared
+ *  EntityHeaderStats block — same visual treatment as the
+ *  recording header. */
 async function HeaderStats({
   promise,
 }: {
   promise: Promise<ReleaseGroupListeners | null>;
 }) {
   const listeners = await promise;
-  const totalListens = listeners?.total_listen_count;
-  const totalListeners = listeners?.total_user_count;
-  if (totalListens === undefined && totalListeners === undefined) return null;
   return (
-    <p className="text-muted-foreground text-sm tabular-nums">
-      {totalListens !== undefined && (
-        <>
-          <span className="text-foreground font-medium">
-            {totalListens.toLocaleString()}
-          </span>{" "}
-          listens
-        </>
-      )}
-      {totalListeners !== undefined && totalListens !== undefined && " · "}
-      {totalListeners !== undefined && (
-        <>
-          <span className="text-foreground font-medium">
-            {totalListeners.toLocaleString()}
-          </span>{" "}
-          listeners
-        </>
-      )}
-    </p>
+    <EntityHeaderStats
+      totalListens={listeners?.total_listen_count}
+      totalListeners={listeners?.total_user_count}
+    />
   );
-}
-
-function HeaderStatsSkeleton() {
-  return <Skeleton className="h-4 w-44" />;
 }
 
 /** Streams the sidebar's Top Listeners list. Renders nothing when the

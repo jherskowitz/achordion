@@ -27,6 +27,10 @@ import {
 } from "@/components/achordion/external-links";
 import { StreamingLinksRow } from "@/components/achordion/streaming-links-row";
 import { PageHeader } from "@/components/achordion/page-header";
+import {
+  EntityHeaderStats,
+  EntityHeaderStatsSkeleton,
+} from "@/components/achordion/entity-header-stats";
 import { PageShell } from "@/components/achordion/page-shell";
 import { TopListenersList } from "@/components/achordion/top-listeners-list";
 import { EmbedShareButton } from "@/components/achordion/embed-share-button";
@@ -260,8 +264,8 @@ async function RecordingBody({ mbid }: { mbid: string }) {
           </div>
         }
         actions={
-          <Suspense fallback={<PopularityStatsSkeleton />}>
-            <PopularityStats promise={popularityPromise} />
+          <Suspense fallback={<EntityHeaderStatsSkeleton />}>
+            <RecordingHeaderStats promise={popularityPromise} />
           </Suspense>
         }
       />
@@ -363,8 +367,10 @@ async function RecordingBody({ mbid }: { mbid: string }) {
   );
 }
 
-/** Streams the listens / listeners stats block in the page header. */
-async function PopularityStats({
+/** Streams the recording's listens / listeners into the shared
+ *  EntityHeaderStats block — same visual treatment as the album
+ *  header. */
+async function RecordingHeaderStats({
   promise,
 }: {
   promise: Promise<{ totalListenCount: number; totalUserCount: number } | null>;
@@ -372,37 +378,10 @@ async function PopularityStats({
   const popularity = await promise;
   if (!popularity) return null;
   return (
-    <div className="flex items-baseline gap-6 text-right">
-      <div>
-        <p className="text-foreground text-2xl font-semibold tabular-nums">
-          {popularity.totalListenCount.toLocaleString()}
-        </p>
-        <p className="text-muted-foreground text-xs tracking-wide uppercase">
-          listens
-        </p>
-      </div>
-      <div>
-        <p className="text-foreground text-2xl font-semibold tabular-nums">
-          {popularity.totalUserCount.toLocaleString()}
-        </p>
-        <p className="text-muted-foreground text-xs tracking-wide uppercase">
-          listeners
-        </p>
-      </div>
-    </div>
-  );
-}
-
-function PopularityStatsSkeleton() {
-  return (
-    <div className="flex items-baseline gap-6 text-right">
-      {[0, 1].map((i) => (
-        <div key={i} className="space-y-1">
-          <Skeleton className="ml-auto h-7 w-20" />
-          <Skeleton className="ml-auto h-3 w-14" />
-        </div>
-      ))}
-    </div>
+    <EntityHeaderStats
+      totalListens={popularity.totalListenCount}
+      totalListeners={popularity.totalUserCount}
+    />
   );
 }
 
