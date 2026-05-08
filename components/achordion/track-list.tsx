@@ -85,6 +85,12 @@ function TrackRow({
           </p>
         )}
       </div>
+      {/* Lazy streaming-link expansion sits as the first column
+          after the track info — surfaces the affordance closer to
+          the title (where the user's eye is) while listen-count /
+          duration / overflow stay right-anchored. Renders nothing
+          without an MBID. */}
+      <InlineTrackLinks recordingMbid={recordingMbid} />
       {listenCount !== undefined && (
         <span className="text-muted-foreground/80 shrink-0 tabular-nums text-xs">
           {listenCount.toLocaleString()}
@@ -93,10 +99,6 @@ function TrackRow({
       <span className="text-muted-foreground shrink-0 tabular-nums text-xs">
         {formatLength(track.length ?? track.recording?.length)}
       </span>
-      {/* Lazy streaming-link expansion. Renders nothing without an
-          MBID (no way to seed the lookup); collapses by default and
-          fetches Odesli + MB url-rels on first click. */}
-      <InlineTrackLinks recordingMbid={recordingMbid} />
       <TrackActionsMenuSlot
         track={{
           recordingMbid: recordingMbid ?? null,
