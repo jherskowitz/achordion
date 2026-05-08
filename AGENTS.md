@@ -399,7 +399,91 @@ Together: a cover-art URL resolves once per (artist, album) pair globally, and o
 
 The `href` rendered for Apple Music / iTunes / Spotify URLs is run through `normalizeStreamingUrl`, which strips the country / `intl-XX` path segment so the user's geo gets routed correctly by the destination service rather than getting forced into whichever store the MB editor used.
 
-`<IconTooltip>` shows the friendly site name (X for twitter.com / x.com, MusicBrainz for musicbrainz.org, Bandcamp always uses the canonical favicon regardless of the per-artist subdomain).
+Favicon hosts are normalised through `faviconUrl(host)` / `faviconHost(host)` in `lib/favicon.ts` — currently rewrites `<artist>.bandcamp.com` to `bandcamp.com` so artist subdomains always show the canonical Bandcamp orange-dot favicon instead of whatever (or nothing) each artist has configured. Add new rewrite rules to `FAVICON_HOST_REWRITES` if other tenant-subdomain services join the row.
+
+`<IconTooltip>` shows the friendly site name (X for twitter.com / x.com, MusicBrainz for musicbrainz.org, etc.).
+
+---
+
+## Track-links cache (Redis) + resolver
+
+Persistent MBID → external-streaming-URL store backed by Upstash Redis. Lives in **`lib/track-links-store.ts`** (raw cache CRUD) + **`lib/track-links-resolver.ts`** (the read-through pipeline). Read by every favicon row on the site and populated by Parachord submissions plus Achordion's own Odesli / MB lookups. Disclosed publicly in the About page section "The recording-to-streaming-link gap (and why we're filling it)" — the long-term goal is an open, community-curated mapping fed by Parachord playback, not a private cache.
+
+### Resolver pipeline
+
+`resolveTrackLinks({ mbid, entity, seedUrl?, prefetched? })` runs steps in order, returning the first non-empty result:
+
+1. **Direct cache hit** — `getCachedTrackLinks(mbid, entity)`. Recording uses key `track-links:<mbid>`; release-group uses `track-links:release-group:<mbid>`.
+2. **MB fetch** — for cache miss, fetches the recording / release-group from MB to extract url-rels + ISRCs (recording only). Skipped when caller passes `prefetched` (entity pages already have the recording loaded).
+3. **ISRC alias fallback** (recording only) — `getCachedTrackLinksByIsrcs(isrcs)`. Same audio is often modeled as two distinct recording MBIDs (single + album-track variants); ISRC is the canonical "same audio" identifier MB exposes. On hit, back-fills the per-MBID cache.
+4. **Odesli + MB merge** — calls `getOdesliLinks(seedUrl ?? mbStreamingUrls[0])` and merges with any MB url-rels. Skipped when seed is unavailable.
+5. **Write-through** — writes the resolved set under MBID + each ISRC alias key (90-day TTL). Always pass through `setCachedTrackLinks` even on partial resolves so the next ISRC-equivalent lookup hits.
+
+Output is sorted by `sortByPlatformPriority` against the same `STREAMING_HOST_PRIORITY` table the renderer uses.
+
+### Source priority
+
+Each cached link is tagged with its origin: `parachord` > `odesli` > `mb`. `mergeLinks` in the store resolves host conflicts by priority — a Parachord-confirmed Spotify URL overrides an Odesli-resolved one, which overrides an MB url-rel. **Parachord's tier exists because those URLs are implicit-human-curated** (a real listener picked the MBID, picked a service, pressed play, and audio came out — see About page framing).
+
+### Where the cache is read
+
+| Surface | Pattern |
+|---|---|
+| Recording page favicon row | `<StreamingLinksRow entity="recording">` (client island) |
+| Album page favicon row | `<StreamingLinksRow entity="release-group">` (client island) |
+| Embed track widget | server-await `resolveTrackLinks` (iframe context, no client JS bloat) |
+| Embed album widget | server-await `resolveTrackLinks` |
+| Pin cards | server-await `resolveTrackLinks` (1-5 cards per page; cheap; eliminates client variability) |
+| Per-track click-to-expand pills | `<InlineTrackLinks>` → `/api/track-links` GET (lazy on click) |
+
+**When to pick which:** server-side resolution is the default. Use the `<StreamingLinksRow>` client island only when SSR-blocking is a concern (entity hero rows where a cold Odesli call would block the page paint). The client island server-renders the MB url-rels as initial paint then upgrades on mount via `/api/track-links`.
+
+**Don't reach for `<OdesliLinks>` for new code** — it's the legacy SSR-only path that bypasses the cache. New favicon rows should go through `<StreamingLinksRow>` or `resolveTrackLinks` directly.
+
+### Local dev caveat
+
+Without `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN` (or `KV_REST_API_URL` / `KV_REST_API_TOKEN`) in `.env.local`, the Redis client doesn't get instantiated and every cache call no-ops. Resolver still works but loses the cache layer — you'll only see MB url-rels + Odesli-resolved entries, never Parachord-submitted ones. Pull the same creds prod uses to match production behavior locally.
+
+---
+
+## Hydration-stable timestamp rendering
+
+Anything that displays "X ago" / "in Xm" implicitly reads `Date.now()` during render. Server-side and client-side renders that straddle a minute / hour boundary produce different strings, which React 19 / Next 16 surface as a recoverable error.
+
+Use **`<RelativeTime value={unixSeconds} />`** (or `<RelativeTime asTime />` for a `<time dateTime=...>` wrapper) from `components/achordion/relative-time.tsx`. The component sets `suppressHydrationWarning` on the rendered element. The absolute `dateTime` / `value` is the source of truth; the visible client-rendered string is the more accurate one anyway.
+
+For mixed text where the relative time is one of several children of a single parent ("· pinned 2h ago · expires in 4d"), put `suppressHydrationWarning` on the parent span instead of wrapping each call individually.
+
+The pure helpers `relativeTime(unixSeconds)` and `relativeFromNow(unixSeconds)` (the past + future variant) are exported from the same module if you need the string for an `aria-label` / tooltip.
+
+---
+
+## Page loading skeletons (`loading.tsx`)
+
+Two layers of loading state, distinct purposes:
+
+1. **Route-level `loading.tsx`** — fires during cross-page soft navigation while the destination's RSC is resolving. Without it, the previous page's content stays mounted until the new RSC is fully ready. Living examples: `app/(app)/loading.tsx` (generic catch-all), plus per-route overrides for entity pages (artist / release-group / recording / playlist) and the user profile (`/user/[name]/loading.tsx`, which inherits to all sub-routes by default).
+2. **In-page `<Suspense fallback={...}>`** — fires during the streaming render of a single page (initial direct-arrival load). Lets the page shell paint while async server components inside resolve.
+
+When adding a new route, decide:
+- If the route's body is mostly one async block, the in-page `<Suspense>` may not be necessary — `loading.tsx` covers it.
+- If the page header can paint instantly while different sections stream in independently (artist hero + Suspense'd discography + Suspense'd similar artists), keep the in-page Suspense. `loading.tsx` covers the cross-page navigation gap; Suspense covers the streaming inside the page.
+
+The generic `(app)/loading.tsx` catches every (app) route that doesn't ship its own — start there. Add a per-route override only when the generic shape (eyebrow + title + 8-row list) feels jarring against the real layout.
+
+---
+
+## Entity-page header convention
+
+Artist / album / track pages share one component tree:
+
+- **`<PageHeader>`** for the structural shell — `breadcrumbs`, `eyebrow`, `title`, `description`, `leading` (cover or avatar), `afterTitle` (action row), `actions` (right-justified slot).
+- **`<EntityHeaderStats>`** in the `actions` slot for the listens / listeners "big numbers stacked over uppercase eyebrow labels" treatment. Single source of truth for that block — three pages used to define it inline as duplicate JSX.
+- **Cover / avatar** wrapped in a `group relative aspect-square overflow-hidden rounded-md` container with `<PlayOnHoverFab>` overlay (or no overlay for non-playable entities). Replaces the old "Play in Parachord" pill that used to sit under the byline.
+- **Action row in `afterTitle`** carries `<TrackActionsMenuSlot>` / `<TrackListActionsMenu>` (overflow ⋮), `<StreamingLinksRow>` (favicons), and `<EmbedShareButton>` (track / album only). All three share one row directly under the byline.
+- **Tags + page-level actions** render BELOW `<PageHeader>` in a sibling row — `<TagChips>` left, no longer flush with the embed button (the embed button moved into the favicons row).
+
+When adding a new entity page, copy the pattern from `app/(app)/recording/[mbid]/page.tsx` — it's the most current reference.
 
 ---
 
@@ -610,6 +694,10 @@ Use case: Parachord's share sheet renders a "Copy embed code" pill alongside its
 - `lib/exclude-listened.ts` — `buildExcludedArtistSet` / `buildExcludedRecordingSet` for recommendation filtering
 - `lib/dicebear-shapes.ts` — generated avatar palette (deliberately non-violet so it doesn't fight the Parachord-purple Play CTAs)
 - `lib/apple-charts-countries.ts`, `lib/college-charts-countries.ts` — country pickers
+- `lib/track-links-store.ts` — Upstash Redis CRUD for the MBID → external-link cache (`server-only`)
+- `lib/track-links-resolver.ts` — read-through pipeline: cache → MB → ISRC alias → Odesli → write-through
+- `lib/host.ts` — `canonicalHost(host)` for cache dedup (strips `www.` / `m.` / `open.` / etc.; non-server-only so client components can import)
+- `lib/favicon.ts` — `faviconUrl(host)` / `faviconHost(host)` with per-tenant rewrites (Bandcamp subdomains → `bandcamp.com`)
 
 ### Components
 - `components/ui/` — shadcn primitives + custom `tooltip.tsx`, `icon-tooltip.tsx`
@@ -617,6 +705,11 @@ Use case: Parachord's share sheet renders a "Copy embed code" pill alongside its
   - `play-on-hover-fab.tsx` — universal album-grid hover play button
   - `parachord-button.tsx` — `<ParachordCtaButton>`, `<ParachordPlayButton>`, `<PlayOverNumberCell>`
   - `open-in-parachord-button.tsx` — playlist / radio / import variants
+  - `streaming-links-row.tsx` — client-island favicon row that server-renders MB rels then upgrades from cache via `/api/track-links`
+  - `inline-track-links.tsx` — per-row click-to-expand favicon pill (lazy `/api/track-links` fetch on click)
+  - `entity-header-stats.tsx` — shared big-numbers listens / listeners block for artist / album / track headers
+  - `relative-time.tsx` — hydration-stable "X ago" wrapper + pure helpers
+  - `embed-share-button.tsx` — copy-ready iframe snippet dialog (track + album)
   - `artist-credit-links.tsx` — multi-artist credit with preserved join phrases
   - `release-type-chip.tsx` — Album/EP overlay for mixed-type album grids
   - `add-sources-button.tsx` — "+" tile linking to MB `/edit` page
@@ -638,6 +731,33 @@ Use case: Parachord's share sheet renders a "Copy embed code" pill alongside its
 6. **Don't add per-card `Suspense` to chart grids.** That was a workaround for per-card MB lookups, which we removed in favor of click-time resolution.
 7. **Don't reach for native browser `title=` tooltips** unless you genuinely have no other option. Both tooltip primitives are available; pick the right one.
 8. **Don't bypass `mbFetch`** for MusicBrainz calls — the rate limit is real, and the cache tags matter.
+9. **Don't add `<OdesliLinks>` to new code.** It bypasses the track-links cache and the ISRC alias path. Use `<StreamingLinksRow>` (client island) or `resolveTrackLinks()` (server-side) instead.
+10. **Don't render `relativeTime(...)` directly inline.** Use `<RelativeTime value={...} />` so the SSR/CSR clock-drift mismatch gets `suppressHydrationWarning` automatically. Mixed-text parents can take `suppressHydrationWarning` directly if there are multiple relative-time children.
+11. **Don't render listens / listeners stats inline.** Use `<EntityHeaderStats totalListens totalListeners />` from `components/achordion/entity-header-stats.tsx` — three pages used to define duplicate copies of the block.
+
+---
+
+## Embed widgets
+
+Iframe-friendly widgets at `/embed/track/<mbid>` (180px) and `/embed/album/<mbid>` (260px). Designed for third-party pages — no site nav, no auth, identical HTML for every visitor so the response is safe to edge-cache.
+
+- **CSP exception** at `/embed/:path*` in `next.config.ts` swaps `frame-ancestors 'self'` for `frame-ancestors *`. Other security headers still apply.
+- **Both widgets server-await `resolveTrackLinks`** rather than using the client-island pattern. Iframe context favors no-JS rendering; the cache + Odesli path produces a fast SSR cycle on warm cache hits.
+- **Native `title=` tooltips** on favicons (not the popover `<IconTooltip>`) because popover tooltips clip at the iframe boundary. CSS-only label spans positioned `bottom-full` are the alternative pattern when we want richer copy (album embed uses this above the favicons; track embed uses native title).
+- **Album embed has a `<details>` accordion** with the full tracklist, each row carrying its own `<InlineTrackLinks>` click-to-expand pill. Pure HTML, no JS hydration cost.
+- **Title / album links use `target="_top"`** so clicking from inside an iframe breaks out to `https://achordion.xyz/<entity>/<mbid>` rather than navigating inside the iframe.
+
+`<EmbedShareButton entity="track|album" mbid={...} />` is the in-app affordance that shows the copy-ready iframe snippet (see `components/achordion/embed-share-button.tsx`). Lives in the `afterTitle` row on entity pages alongside the streaming favicons.
+
+---
+
+## Changelog convention
+
+`/changelog` (`app/(content)/changelog/page.tsx`) is a curated, day-by-day list of user-visible improvements — not a 1:1 mirror of git log. The data lives in a typed `ENTRIES: ChangelogEntry[]` array at the top of the file; add new days at the **head** of the array as you ship them.
+
+Each entry needs a `date` (ISO `YYYY-MM-DD`), an optional one-line `intro` framing the day's theme, and an array of `highlights` strings. Keep the language at the level a regular visitor would notice — what's actually different for them as a listener — not engineering minutiae. The page comment in the file restates the curation criteria; lean on that when in doubt.
+
+Footer link is in `components/layout/site-footer.tsx`.
 
 ---
 
