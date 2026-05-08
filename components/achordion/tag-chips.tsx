@@ -62,13 +62,30 @@ interface VotesResponse {
 const QUERY_KEY = (entity: string, mbid: string) =>
   ["mb-tag-votes", entity, mbid] as const;
 
+/** True when we've already bounced through MB OAuth on this page
+ *  session and a vote STILL just 401'd — implies MB isn't granting
+ *  the `tag` scope no matter how many times we retry, so we should
+ *  stop looping and surface a clear error.
+ *
+ *  Module-scope (not declared inside the component) so its
+ *  `Date.now()` doesn't trigger react-hooks/purity. Only called
+ *  from event handlers / mutation callbacks anyway, never during
+ *  render. */
+function reAuthRecentlyAttempted(): boolean {
+  if (typeof sessionStorage === "undefined") return false;
+  const ts = sessionStorage.getItem("mb-tag-reauth-at");
+  if (!ts) return false;
+  const age = Date.now() - Number.parseInt(ts, 10);
+  return Number.isFinite(age) && age < 60_000; // 1 minute window
+}
+
 export function TagChips({
   entity,
   mbid,
   initialTags,
   limit = 12,
 }: TagChipsProps) {
-  const { data: session, status: sessionStatus } = useSession();
+  const { status: sessionStatus } = useSession();
   const queryClient = useQueryClient();
 
   // Fetch the viewer's vote state. Skip while session is loading or
@@ -119,6 +136,9 @@ export function TagChips({
     // declined consent, or MB grant on file is stale and we need
     // human intervention).
     if (typeof sessionStorage !== "undefined") {
+      // Inside an async user-initiated handler — Date.now() is fine,
+      // but the linter doesn't differentiate so we suppress.
+      // eslint-disable-next-line react-hooks/purity
       sessionStorage.setItem("mb-tag-reauth-at", String(Date.now()));
     }
     await signOut({ redirect: false });
@@ -128,18 +148,6 @@ export function TagChips({
       { prompt: "consent" },
     );
   };
-
-  /** True when we've already bounced through MB OAuth on this
-   *  page session and a vote STILL just 401'd — implies MB isn't
-   *  granting the `tag` scope no matter how many times we retry,
-   *  so we should stop looping and surface a clear error. */
-  function reAuthRecentlyAttempted(): boolean {
-    if (typeof sessionStorage === "undefined") return false;
-    const ts = sessionStorage.getItem("mb-tag-reauth-at");
-    if (!ts) return false;
-    const age = Date.now() - Number.parseInt(ts, 10);
-    return Number.isFinite(age) && age < 60_000; // 1 minute window
-  }
 
   const merged = mergeTags(initialTags, pendingTags);
   const visible = merged.slice(0, limit);

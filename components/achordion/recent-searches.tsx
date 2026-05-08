@@ -38,8 +38,15 @@ export function RecentSearchesRow() {
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
+    // Initial hydrate from localStorage. Can't be a useState lazy
+    // initializer because localStorage isn't available during SSR,
+    // and a window-typeof guard there triggers a hydration mismatch.
+    // Post-mount setState is the canonical "sync to external store"
+    // pattern despite react-hooks/set-state-in-effect's warning.
+    /* eslint-disable react-hooks/set-state-in-effect */
     setSearches(loadRecentSearches());
     setHydrated(true);
+    /* eslint-enable react-hooks/set-state-in-effect */
     function onStorage(e: StorageEvent) {
       if (e.key === "achordion:recent-searches") {
         setSearches(loadRecentSearches());

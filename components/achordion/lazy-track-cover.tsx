@@ -46,7 +46,12 @@ export function LazyTrackCover({
   onResolved?: (data: { url: string | null; mbid: string | null }) => void;
 }) {
   const [src, setSrc] = useState<string | null>(initialSrc ?? null);
+  // Mirror the latest callback into a ref so the effect below doesn't
+  // need it as a dep. The lint rule is conservative about ref writes
+  // during render, but this is the documented React pattern for
+  // "read current callback inside an effect."
   const onResolvedRef = useRef(onResolved);
+  // eslint-disable-next-line react-hooks/refs
   onResolvedRef.current = onResolved;
 
   useEffect(() => {

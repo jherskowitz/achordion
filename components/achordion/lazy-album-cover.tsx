@@ -57,14 +57,21 @@ export function LazyAlbumCover({
   // snapping, and re-fires when src changes (initialSrc → fetched
   // URL) so chart grids stay calm during cover-streaming.
   const [loaded, setLoaded] = useState(false);
+  // Reset fade state when src changes (initialSrc → fetched URL) —
+  // textbook prop-driven reset. Lint rule still warns.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoaded(false);
   }, [src]);
 
   // Capture the latest onResolved in a ref so it doesn't have to be
   // a useEffect dep. Callers can pass an inline callback without
-  // triggering refetches on each render.
+  // triggering refetches on each render. The ref is intentionally
+  // mutated during render — the lint rule is conservative here, but
+  // mirroring the latest callback on every render is the documented
+  // way to read "current" inside an effect that doesn't depend on it.
   const onResolvedRef = useRef(onResolved);
+  // eslint-disable-next-line react-hooks/refs
   onResolvedRef.current = onResolved;
 
   useEffect(() => {

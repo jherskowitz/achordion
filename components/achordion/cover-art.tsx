@@ -69,7 +69,10 @@ export function CoverArt({
   // Reset error + loaded state when the image source changes (user
   // switched album editions, parent revalidated cache, lazy lookup
   // returned a new URL, etc.) so the fade fires again on the new src.
+  // Setting state in response to a prop change is the textbook valid
+  // case — the lint rule still warns generically.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setErrored(false);
     setLoaded(false);
   }, [src]);

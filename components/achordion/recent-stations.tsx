@@ -60,8 +60,14 @@ export function RecentStationsRow() {
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
+    // Hydrate from localStorage post-mount — can't read during SSR,
+    // and a typeof-window guard in a useState lazy initializer would
+    // trigger a hydration mismatch. The canonical "sync to external
+    // store" pattern despite the lint rule's warning.
+    /* eslint-disable react-hooks/set-state-in-effect */
     setStations(loadRecentStations());
     setHydrated(true);
+    /* eslint-enable react-hooks/set-state-in-effect */
     // Listen for storage events so a remove/record in another tab
     // updates this list. Same-tab record() / remove() are reflected
     // by setStations directly below, so this only catches cross-tab.

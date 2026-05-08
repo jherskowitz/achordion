@@ -30,7 +30,6 @@ import { Skeleton } from "@/components/ui/skeleton";
  *   curve gives currently-active old(er) bands a chance.
  */
 const ARTIST_HALFLIFE_YEARS = 5;
-const ALBUM_HALFLIFE_YEARS = 3;
 const CURRENT_YEAR = new Date().getUTCFullYear();
 
 function recencyDecay(

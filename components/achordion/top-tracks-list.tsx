@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { CoverArt } from "./cover-art";
-import { caaReleaseGroupUrl, caaReleaseUrl } from "@/lib/clients/coverart";
+import { caaReleaseUrl } from "@/lib/clients/coverart";
 import { parachordPlayTrack } from "@/lib/parachord";
 import { InlineTrackLinks } from "./inline-track-links";
 import { PlayOverNumberCell } from "./parachord-button";

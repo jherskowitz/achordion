@@ -35,6 +35,10 @@ function parseRange(value: string | undefined): StatRange {
     : "year";
 }
 
+// Per `react-hooks/error-boundaries`: render-time errors thrown from
+// JSX inside a try/catch aren't caught by React (try/catch only sees
+// the synchronous throw of the data fetch, not subsequent rendering).
+// Resolve data inside the try, then construct JSX outside.
 async function ArtistsSection({
   name,
   range,
@@ -42,17 +46,22 @@ async function ArtistsSection({
   name: string;
   range: StatRange;
 }) {
+  let artists: Awaited<ReturnType<typeof getUserTopArtists>> | null = null;
+  let errorMessage = "";
   try {
-    const artists = await getUserTopArtists(name, range, 25);
-    return <TopArtistsList artists={artists} />;
+    artists = await getUserTopArtists(name, range, 25);
   } catch (err) {
+    errorMessage = err instanceof Error ? err.message : "";
+  }
+  if (!artists) {
     return (
       <EmptyState
         title="Couldn't load top artists"
-        description={err instanceof Error ? err.message : ""}
+        description={errorMessage}
       />
     );
   }
+  return <TopArtistsList artists={artists} />;
 }
 
 async function AlbumsSection({
@@ -62,17 +71,22 @@ async function AlbumsSection({
   name: string;
   range: StatRange;
 }) {
+  let albums: Awaited<ReturnType<typeof getUserTopReleaseGroups>> | null = null;
+  let errorMessage = "";
   try {
-    const albums = await getUserTopReleaseGroups(name, range, 24);
-    return <TopAlbumsGrid albums={albums} />;
+    albums = await getUserTopReleaseGroups(name, range, 24);
   } catch (err) {
+    errorMessage = err instanceof Error ? err.message : "";
+  }
+  if (!albums) {
     return (
       <EmptyState
         title="Couldn't load top albums"
-        description={err instanceof Error ? err.message : ""}
+        description={errorMessage}
       />
     );
   }
+  return <TopAlbumsGrid albums={albums} />;
 }
 
 async function TracksSection({
@@ -82,17 +96,22 @@ async function TracksSection({
   name: string;
   range: StatRange;
 }) {
+  let tracks: Awaited<ReturnType<typeof getUserTopRecordings>> | null = null;
+  let errorMessage = "";
   try {
-    const tracks = await getUserTopRecordings(name, range, 25);
-    return <TopTracksList tracks={tracks} />;
+    tracks = await getUserTopRecordings(name, range, 25);
   } catch (err) {
+    errorMessage = err instanceof Error ? err.message : "";
+  }
+  if (!tracks) {
     return (
       <EmptyState
         title="Couldn't load top tracks"
-        description={err instanceof Error ? err.message : ""}
+        description={errorMessage}
       />
     );
   }
+  return <TopTracksList tracks={tracks} />;
 }
 
 async function TopTracksCta({
@@ -137,12 +156,13 @@ async function ActivitySection({
   name: string;
   range: StatRange;
 }) {
+  let buckets: Awaited<ReturnType<typeof getListeningActivity>> | null = null;
   try {
-    const buckets = await getListeningActivity(name, range);
-    return <ListeningActivityChart buckets={buckets} />;
+    buckets = await getListeningActivity(name, range);
   } catch {
     return null;
   }
+  return <ListeningActivityChart buckets={buckets} />;
 }
 
 async function HeatmapSection({
@@ -152,12 +172,13 @@ async function HeatmapSection({
   name: string;
   range: StatRange;
 }) {
+  let data: Awaited<ReturnType<typeof getDailyActivity>> | null = null;
   try {
-    const data = await getDailyActivity(name, range);
-    return <DailyHeatmap data={data} />;
+    data = await getDailyActivity(name, range);
   } catch {
     return null;
   }
+  return <DailyHeatmap data={data} />;
 }
 
 function ListSkeleton({ rows = 8 }: { rows?: number }) {

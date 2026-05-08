@@ -77,6 +77,9 @@ export function PlaylistEditDialog({
     if (!open) return;
     const q = collabDraft.trim();
     if (q.length < 2) {
+      // Clear stale suggestions when query falls below threshold —
+      // an external (typing) input drives this state reset.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSuggestions([]);
       return;
     }
@@ -109,15 +112,19 @@ export function PlaylistEditDialog({
 
   // Re-seed local state when the modal opens, so reopening after a
   // server-side change (or cancel-then-reopen) reflects the latest
-  // values rather than a stale draft.
+  // values rather than a stale draft. Prop-driven state reset — the
+  // textbook valid case for setState-in-effect that the lint rule
+  // still flags.
   useEffect(() => {
     if (open) {
+      /* eslint-disable react-hooks/set-state-in-effect */
       setTitle(initial.title);
       setAnnotation(initial.annotation);
       setIsPublic(initial.isPublic);
       setCollaborators(initial.collaborators);
       setCollabDraft("");
       setError(null);
+      /* eslint-enable react-hooks/set-state-in-effect */
     }
   }, [open, initial]);
 

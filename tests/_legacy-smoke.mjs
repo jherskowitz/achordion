@@ -52,7 +52,8 @@ async function main() {
         r.status() === 200 && body.includes(s.expect) && errs.length === 0;
       console.log(`${ok ? "✓" : "✗"} ${s.name} ${s.path}`);
       if (!ok && errs.length) console.log(`    errors: ${errs.join("; ")}`);
-      ok ? pass++ : fail++;
+      if (ok) pass++;
+      else fail++;
     } catch (e) {
       console.log(`✗ ${s.name} ${s.path} threw: ${e.message}`);
       fail++;

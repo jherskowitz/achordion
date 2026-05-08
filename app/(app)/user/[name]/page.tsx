@@ -31,20 +31,23 @@ async function PinnedSection({
   name: string;
   viewer: string | null;
 }) {
+  // Resolve data inside try/catch, render outside — keeps render-time
+  // errors out of the catch (react-hooks/error-boundaries).
+  let pin: Awaited<ReturnType<typeof getCurrentPin>> | null = null;
   try {
-    const pin = await getCurrentPin(name);
-    if (!pin) return null;
-    // Thankable when the viewer isn't the profile owner. LB also
-    // requires the viewer to be following the pin owner — we don't
-    // pre-check; the button surfaces the LB error if not.
-    const thankable =
-      !!viewer && viewer.toLowerCase() !== name.toLowerCase();
-    // The card owns the MB fetch for its external-links row and
-    // streams the favicons in via Suspense — no per-page wiring needed.
-    return <PinnedTrackCard pin={pin} variant="hero" thankable={thankable} />;
+    pin = await getCurrentPin(name);
   } catch {
     return null;
   }
+  if (!pin) return null;
+  // Thankable when the viewer isn't the profile owner. LB also
+  // requires the viewer to be following the pin owner — we don't
+  // pre-check; the button surfaces the LB error if not.
+  const thankable =
+    !!viewer && viewer.toLowerCase() !== name.toLowerCase();
+  // The card owns the MB fetch for its external-links row and
+  // streams the favicons in via Suspense — no per-page wiring needed.
+  return <PinnedTrackCard pin={pin} variant="hero" thankable={thankable} />;
 }
 
 async function ActivityFeedSection({
@@ -58,6 +61,11 @@ async function ActivityFeedSection({
   // loves we should surface as a feed?" The threshold gates the
   // section visibility entirely — quiet accounts don't get a
   // half-empty Activity card eating space above the listens list.
+  //
+  // `Date.now()` is request-time in this server component — purity
+  // doesn't apply (the function runs once per request, not as part
+  // of a re-renderable client tree).
+  // eslint-disable-next-line react-hooks/purity
   const since = Math.floor(Date.now() / 1000) - 30 * 86400;
   // 5-item cap — this section is a "what they've been up to lately"
   // teaser, not a browsing surface. The personal /feed page handles
@@ -77,35 +85,40 @@ async function ActivityFeedSection({
 }
 
 async function RecentListensSection({ name }: { name: string }) {
+  // 10-item display cap — the full listen history lives at
+  // /user/<name>/listens. Keep this section compact alongside the
+  // activity feed. The Parachord-export CTA still pulls 100
+  // tracks so "Play all" has a meaningful queue.
+  let listens: Awaited<ReturnType<typeof getRecentListens>> | null = null;
+  let errorMessage = "Try again in a moment.";
   try {
-    // 10-item display cap — the full listen history lives at
-    // /user/<name>/listens. Keep this section compact alongside the
-    // activity feed. The Parachord-export CTA still pulls 100
-    // tracks so "Play all" has a meaningful queue.
-    const listens = await getRecentListens(name, { count: 10 });
-    return (
-      <>
-        <LiveScrobbleList username={name} initialListens={listens} />
-        {listens.length > 0 && (
-          <div className="mt-6 text-center">
-            <Link
-              href={`/user/${name}/listens`}
-              className="text-muted-foreground hover:text-foreground text-sm underline-offset-4 hover:underline"
-            >
-              See full listen history →
-            </Link>
-          </div>
-        )}
-      </>
-    );
+    listens = await getRecentListens(name, { count: 10 });
   } catch (err) {
+    errorMessage = err instanceof Error ? err.message : errorMessage;
+  }
+  if (!listens) {
     return (
       <EmptyState
         title="Couldn't reach ListenBrainz"
-        description={err instanceof Error ? err.message : "Try again in a moment."}
+        description={errorMessage}
       />
     );
   }
+  return (
+    <>
+      <LiveScrobbleList username={name} initialListens={listens} />
+      {listens.length > 0 && (
+        <div className="mt-6 text-center">
+          <Link
+            href={`/user/${name}/listens`}
+            className="text-muted-foreground hover:text-foreground text-sm underline-offset-4 hover:underline"
+          >
+            See full listen history →
+          </Link>
+        </div>
+      )}
+    </>
+  );
 }
 
 async function RecentListensCta({ name }: { name: string }) {

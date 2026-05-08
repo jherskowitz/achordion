@@ -2274,6 +2274,10 @@ export async function getUserLovedRecordings(
 
 // ─── User feed (events) ─────────────────────────────────────────────
 
+// Schema is value-used via z.infer<typeof ...> below to derive the
+// public FeedTrackMetadata type — the lint rule sees no value-side
+// reference and flags it as unused.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const FeedTrackMetadataSchema = z
   .object({
     track_name: z.string().optional(),

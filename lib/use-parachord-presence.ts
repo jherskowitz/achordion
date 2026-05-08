@@ -128,6 +128,10 @@ function isCoarsePointer(): boolean {
 export function useParachordPresence(): boolean {
   const [running, setRunning] = useState(false);
 
+  // Subscribes to an external (WebSocket) presence singleton — the
+  // canonical "sync to external store" shape that the lint rule
+  // flags conservatively because the touch fast-path also calls
+  // setState synchronously inside the effect.
   useEffect(() => {
     // Touch fast-path: skip the WS handshake entirely. Parachord-
     // mobile doesn't expose a localhost listener, so the WS would
@@ -135,6 +139,7 @@ export function useParachordPresence(): boolean {
     // for users who probably do have the app. Trust the OS to deal
     // with the deep-link instead.
     if (isCoarsePointer()) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setRunning(true);
       return;
     }

@@ -95,26 +95,6 @@ function TrackListSkeleton({ rows = 6 }: { rows?: number }) {
   );
 }
 
-function GridSkeleton({ cols = 4, rows = 8 }: { cols?: number; rows?: number }) {
-  const gridClass =
-    cols === 4
-      ? "grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4"
-      : "grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3";
-  return (
-    <div className={gridClass}>
-      {Array.from({ length: rows }).map((_, i) => (
-        <div
-          key={i}
-          className="border-border/60 space-y-2 rounded-xl border p-4"
-        >
-          <Skeleton className="h-4 w-2/3" />
-          <Skeleton className="h-3 w-1/2" />
-        </div>
-      ))}
-    </div>
-  );
-}
-
 /** Trailing-7-days window — releases that have *already come out* in
  *  the past week. The previous behavior (forward-looking ISO week)
  *  surfaced albums announced for later in the week, which read like

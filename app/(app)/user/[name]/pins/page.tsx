@@ -41,6 +41,10 @@ async function PinsHistory({
   // Each card streams its own external-links row in via Suspense —
   // no per-page parallel fetch needed, the React renderer fans out
   // the per-card MB requests concurrently.
+  //
+  // Server component: Date.now() is request-time, not a re-render
+  // hazard — purity rule doesn't apply.
+  // eslint-disable-next-line react-hooks/purity
   const now = Math.floor(Date.now() / 1000);
   const active = pins.filter((p) => p.pinned_until > now);
   const past = pins.filter((p) => p.pinned_until <= now);

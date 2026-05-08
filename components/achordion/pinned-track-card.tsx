@@ -136,6 +136,9 @@ export function PinnedTrackCard({
     pin.recording_mbid ??
     null;
   const isHero = variant === "hero";
+  // Server component: Date.now() is request-time, not a re-render
+  // hazard — purity rule doesn't apply here.
+  // eslint-disable-next-line react-hooks/purity
   const now = Math.floor(Date.now() / 1000);
   const isActive = pin.pinned_until > now;
 

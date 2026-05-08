@@ -86,12 +86,17 @@ export function SearchTypeahead({ initialQuery }: { initialQuery: string }) {
   const [loading, setLoading] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
 
-  // Trigger fetch + URL sync on each debounced query commit.
+  // Trigger fetch + URL sync on each debounced query commit. Setting
+  // state from this effect is the right shape — debouncedQ is the
+  // external (typing-driven) input the effect is synchronizing to —
+  // but the lint rule flags the synchronous setState branch.
   useEffect(() => {
     abortRef.current?.abort();
     if (!debouncedQ.trim()) {
+      /* eslint-disable react-hooks/set-state-in-effect */
       setResults(null);
       setLoading(false);
+      /* eslint-enable react-hooks/set-state-in-effect */
       // Clear ?q= when the box is emptied.
       router.replace("/search", { scroll: false });
       return;
