@@ -91,6 +91,13 @@ const QuerySchema = z.object({
     .min(MIN_DIMENSION)
     .max(MAX_DIMENSION)
     .optional(),
+  // Optional names — when provided, get joined into the iframe's
+  // `title` attribute as "<entityName> — <artistName>" so screen
+  // readers and host-page hover-text describe the embed by what
+  // it actually plays. Falls back to a generic "Achordion track"
+  // / "Achordion album" when both are missing.
+  entityName: z.string().min(1).max(500).optional(),
+  artistName: z.string().min(1).max(500).optional(),
 });
 
 function bearer(request: NextRequest): string | null {
@@ -146,6 +153,12 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     ...(url.searchParams.get("height")
       ? { height: url.searchParams.get("height") }
       : {}),
+    ...(url.searchParams.get("entityName")
+      ? { entityName: url.searchParams.get("entityName") }
+      : {}),
+    ...(url.searchParams.get("artistName")
+      ? { artistName: url.searchParams.get("artistName") }
+      : {}),
   });
   if (!parsed.success) {
     return NextResponse.json(
@@ -155,13 +168,19 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   }
 
   const entity = ENTITY_ALIASES[parsed.data.entity];
-  const { mbid } = parsed.data;
+  const { mbid, entityName, artistName } = parsed.data;
   const width = parsed.data.width ?? DEFAULT_WIDTH;
   const height = parsed.data.height ?? DEFAULT_HEIGHT[entity];
 
   const embedUrl = `${ACHORDION_ORIGIN}${embedPath(entity, mbid)}`;
   const pageUrl = `${ACHORDION_ORIGIN}${pagePath(entity, mbid)}`;
-  const title = `Achordion ${entity}`;
+  // Prefer "Track Name — Artist" when names are supplied; fall back
+  // to the generic "Achordion track / album" otherwise so a caller
+  // that only has an MBID still gets a working snippet.
+  const title =
+    entityName && artistName
+      ? `${entityName} — ${artistName}`
+      : entityName ?? `Achordion ${entity}`;
 
   // Style attribute matches what <EmbedShareButton> ships in-app:
   // zero border + 12px corner-radius for a clean drop-in look.

@@ -36,13 +36,35 @@ const DEFAULT_HEIGHT: Record<EmbedEntity, number> = {
   album: 260,
 };
 
+/** Minimal HTML-attribute escape for the iframe `title=` value.
+ *  Track / album names occasionally carry `"` and `&` (and rarely
+ *  `<`); breaking the snippet into invalid HTML when a user pastes
+ *  it into their site would be embarrassing. */
+function escapeAttr(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
 export function EmbedShareButton({
   entity,
   mbid,
+  entityName,
+  artistName,
   recommendedHeight,
 }: {
   entity: EmbedEntity;
   mbid: string;
+  /** Track or album title — flows into the iframe's `title` attr
+   *  alongside the artist name. Falls back to a generic
+   *  "Achordion track" / "Achordion album" when missing. */
+  entityName?: string;
+  /** Primary credited artist. Joined into the iframe title with
+   *  an em-dash. Optional for the "Various Artists" / no-credit
+   *  edge case. */
+  artistName?: string;
   recommendedHeight?: number;
 }) {
   const [copied, setCopied] = useState(false);
@@ -55,7 +77,17 @@ export function EmbedShareButton({
   const previewHref =
     typeof window !== "undefined" ? window.location.origin + path : snippetSrc;
   const height = recommendedHeight ?? DEFAULT_HEIGHT[entity];
-  const snippet = `<iframe src="${snippetSrc}" width="600" height="${height}" loading="lazy" style="border:0;border-radius:12px" title="Achordion ${entity}"></iframe>`;
+  // Prefer "Track Name — Artist" / "Album Name — Artist" so screen
+  // readers and host-page hover-text describe the embed by what it
+  // actually plays, not the generic "Achordion track" stand-in.
+  // Quote-escape because user-supplied names occasionally include
+  // double-quotes (mostly in song titles like `Q "U" E`).
+  const titleAttr = escapeAttr(
+    entityName && artistName
+      ? `${entityName} — ${artistName}`
+      : entityName ?? `Achordion ${entity}`,
+  );
+  const snippet = `<iframe src="${snippetSrc}" width="600" height="${height}" loading="lazy" style="border:0;border-radius:12px" title="${titleAttr}"></iframe>`;
 
   async function copyToClipboard() {
     try {

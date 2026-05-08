@@ -289,7 +289,12 @@ async function AlbumBody({ mbid }: { mbid: string }) {
               initialItems={initialStreamingItems}
               seedUrl={albumOdesliSeed}
             />
-            <EmbedShareButton entity="album" mbid={rg.id} />
+            <EmbedShareButton
+              entity="album"
+              mbid={rg.id}
+              entityName={rg.title}
+              artistName={credit.name}
+            />
           </div>
         }
         actions={

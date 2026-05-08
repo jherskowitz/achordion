@@ -637,6 +637,8 @@ Companion to the entity-link endpoint: returns a ready-to-paste iframe snippet f
   - `mbid`: 36-char UUID.
   - `width` (optional): override the iframe `width` attribute. Default 600. Range 200–2000.
   - `height` (optional): override the iframe `height` attribute. Defaults match what `<EmbedShareButton>` ships in-app (180 for track, 260 for album). Range 200–2000.
+  - `entityName` (optional): track or album title. Joined with `artistName` to form the iframe `title=` attribute as `"Track — Artist"`. Falls back to a generic `"Achordion track"` / `"Achordion album"` when not supplied. Encouraged: screen readers + host-page hover-text describe the embed by what it actually plays. Up to 500 chars.
+  - `artistName` (optional): primary credited artist. Same purpose as `entityName`. Up to 500 chars.
 - **Response shape:**
   ```json
   {

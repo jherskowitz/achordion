@@ -260,7 +260,12 @@ async function RecordingBody({ mbid }: { mbid: string }) {
               initialItems={initialStreamingItems}
               seedUrl={odesliSeed}
             />
-            <EmbedShareButton entity="track" mbid={recording.id} />
+            <EmbedShareButton
+              entity="track"
+              mbid={recording.id}
+              entityName={recording.title}
+              artistName={credit.name}
+            />
           </div>
         }
         actions={
