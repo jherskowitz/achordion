@@ -299,21 +299,26 @@ export default function AboutPage() {
             (Odesli) when we can spare a call, MusicBrainz&apos;s own
             URL relationships when present, and{" "}
             <strong>active playback confirmations submitted by
-            Parachord</strong> whenever a track plays successfully.
-            Parachord&apos;s submissions outrank the others because
-            they&apos;re proven matches, not inferred ones — they
-            represent &quot;a real listener pressed play on this MBID
-            via this URL and music came out.&quot;
+            Parachord</strong> whenever a track plays successfully —
+            i.e., a real listener picked the MBID, picked a service,
+            pressed play, and music came out. Parachord&apos;s
+            submissions outrank the other two because they&apos;re
+            grounded in <strong>explicit human curation</strong>: not
+            an algorithm guessing that &quot;Yesterday&quot; by The
+            Beatles on Spotify is also &quot;Yesterday&quot; by The
+            Beatles on Apple Music, but a person who actually queued it
+            and listened.
           </p>
           <p>
             The same entry serves every visitor — no per-user state.
-            Over time, as Parachord plays accumulate, the table becomes
-            a community-contributed asset useful to any client building
-            on top of MusicBrainz, not just Achordion. The eventual
-            goal is to retire the Odesli fallback entirely and rely on
-            the community-confirmed corpus, the same way MusicBrainz
-            replaced Gracenote-era proprietary fingerprint databases
-            for music identity.
+            Over time, as human-confirmed plays accumulate, the table
+            becomes a community-curated asset useful to any client
+            building on top of MusicBrainz, not just Achordion. The
+            eventual goal is to retire the Odesli fallback entirely and
+            rely on the human-curated corpus, the same way MusicBrainz
+            itself replaced algorithmically-generated, proprietary
+            fingerprint databases for music identity — by giving
+            humans the right tools to do better than software guessing.
           </p>
         </ContentSection>
 
