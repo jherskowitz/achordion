@@ -506,6 +506,33 @@ Parachord can push confirmed-on-playback recording → external-streaming-URL ma
 
 Submit only matches Parachord has actually played back successfully — that's the whole point of the source-priority. Drive-by URL matching belongs in Achordion's own Odesli/MB resolution path.
 
+### Entity-link lookup (GET `/api/entity-link`)
+
+Parachord can ask Achordion for the canonical Achordion URL for any artist / album / track MBID. Use this instead of hard-coding our URL convention — if Achordion ever moves a route (e.g. `/release-group/<mbid>` → somewhere else), the change ships through this endpoint without any client update.
+
+- **Auth:** none. Public read endpoint.
+- **Endpoint:** `GET https://achordion.xyz/api/entity-link?type=<type>&mbid=<mbid>[&include=names]`
+- **Inputs:**
+  - `type`: `artist` | `release-group` | `recording`. Aliases: `album` → release-group, `track` → recording.
+  - `mbid`: 36-char UUID for the entity.
+  - `include` (optional, comma-separated): pass `names` to enrich the response with track / artist / album names. One MB API call; skip when you only need the URL.
+- **Response shape:**
+  ```json
+  {
+    "type": "recording",
+    "mbid": "de699185-9580-4308-a45b-f9ed98c7ce23",
+    "url": "https://achordion.xyz/recording/de699185-...",
+    "embed_url": "https://achordion.xyz/embed/track/de699185-...",
+    "name": "Los Angeles",
+    "artist_name": "Big Thief",
+    "album_name": "Double Infinity"
+  }
+  ```
+  `embed_url` is only present for `recording` (Achordion's iframe-friendly track widget). `name` / `artist_name` / `album_name` only present when `?include=names`. `400` on a malformed `type` / `mbid`; the URL itself is always derivable from MBID alone, so name-enrichment failures degrade silently rather than 502'ing.
+- **Cache:** edge-cached at `s-maxage=86400, stale-while-revalidate=604800` — URLs are stable, names rarely change.
+
+Use case: every Parachord surface that wants a "View on Achordion" link (Now Playing card, library detail views, share sheet) can resolve through this endpoint without coordinating route shapes with Achordion.
+
 ---
 
 ## File map (where things live)
