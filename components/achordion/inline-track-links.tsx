@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Link2, Loader2 } from "lucide-react";
+import { ExternalLink, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /**
@@ -82,7 +82,7 @@ export function InlineTrackLinks({
         {isFetching ? (
           <Loader2 className="size-3.5 animate-spin" />
         ) : (
-          <Link2 className="size-3.5" />
+          <ExternalLink className="size-3.5" />
         )}
       </button>
       {open && (
