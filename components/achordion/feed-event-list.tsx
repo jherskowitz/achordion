@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { CoverArt } from "./cover-art";
 import { ThanksButton } from "./thanks-button";
+import { TrackActionsMenu } from "./track-actions-menu";
 import {
   caaReleaseGroupUrl,
   caaUrlFromListen,
@@ -74,6 +75,61 @@ interface TrackMetaShape {
     caa_id?: number | string | null;
     caa_release_mbid?: string | null;
   };
+}
+
+function toTrackRef(
+  meta: TrackMetaShape | null | undefined,
+  ownerUsername?: string,
+  listenedAt?: number,
+): import("./track-actions-menu").TrackRef | null {
+  if (!meta?.track_name || !meta.artist_name) return null;
+  const recordingMbid =
+    meta.additional_info?.recording_mbid ??
+    meta.mbid_mapping?.recording_mbid ??
+    null;
+  const releaseMbid =
+    meta.additional_info?.release_mbid ??
+    meta.mbid_mapping?.release_mbid ??
+    null;
+  return {
+    trackName: meta.track_name,
+    artistName: meta.artist_name,
+    recordingMbid,
+    releaseMbid,
+    ...(listenedAt ? { listenedAt } : {}),
+    ...(ownerUsername ? { ownerUsername } : {}),
+  };
+}
+
+/**
+ * Trailing slot for track-bearing event cards. Combines the existing
+ * Thanks button (when applicable) with a per-track overflow menu so
+ * viewers can love / queue / add-to-playlist / etc. straight from
+ * the feed without click-through to the track page.
+ */
+function TrackEventTrailing({
+  trackMeta,
+  viewer,
+  ownerUsername,
+  listenedAt,
+  thanks,
+}: {
+  trackMeta: TrackMetaShape | null | undefined;
+  viewer: string | null;
+  ownerUsername?: string;
+  listenedAt?: number;
+  thanks?: React.ReactNode;
+}) {
+  const ref = toTrackRef(trackMeta, ownerUsername, listenedAt);
+  const viewerObj = viewer ? { mbUsername: viewer } : null;
+  return (
+    <span className="inline-flex shrink-0 items-center gap-1">
+      {thanks}
+      {ref && viewerObj && (
+        <TrackActionsMenu track={ref} viewer={viewerObj} />
+      )}
+    </span>
+  );
 }
 
 function TrackEventBody({
@@ -227,13 +283,20 @@ function PinEvent({ event, viewer }: { event: FeedEvent; viewer: string | null }
         </>
       }
       trailing={
-        canThank ? (
-          <ThanksButton
-            originalEventType="recording_pin"
-            originalEventId={event.id as number}
-            size="compact"
-          />
-        ) : null
+        <TrackEventTrailing
+          trackMeta={tm}
+          viewer={viewer}
+          ownerUsername={event.user_name}
+          thanks={
+            canThank ? (
+              <ThanksButton
+                originalEventType="recording_pin"
+                originalEventId={event.id as number}
+                size="compact"
+              />
+            ) : null
+          }
+        />
       }
     >
       <TrackEventBody trackMeta={tm} blurb={m?.blurb_content} />
@@ -252,7 +315,13 @@ interface ListenMeta {
   listened_at?: number;
 }
 
-function ListenEvent({ event }: { event: FeedEvent }) {
+function ListenEvent({
+  event,
+  viewer,
+}: {
+  event: FeedEvent;
+  viewer: string | null;
+}) {
   const m = event.metadata as ListenMeta | undefined;
   const when = m?.listened_at ?? event.created;
   return (
@@ -267,6 +336,14 @@ function ListenEvent({ event }: { event: FeedEvent }) {
           </span>
         </>
       }
+      trailing={
+        <TrackEventTrailing
+          trackMeta={m?.track_metadata}
+          viewer={viewer}
+          ownerUsername={event.user_name}
+          listenedAt={m?.listened_at}
+        />
+      }
     >
       <TrackEventBody trackMeta={m?.track_metadata} />
     </EventShell>
@@ -280,7 +357,13 @@ interface LoveMeta {
   recording_mbid?: string | null;
 }
 
-function LovedRecordingEvent({ event }: { event: FeedEvent }) {
+function LovedRecordingEvent({
+  event,
+  viewer,
+}: {
+  event: FeedEvent;
+  viewer: string | null;
+}) {
   const m = event.metadata as LoveMeta | undefined;
   return (
     <EventShell
@@ -302,6 +385,13 @@ function LovedRecordingEvent({ event }: { event: FeedEvent }) {
             {relativeTime(event.created)}
           </span>
         </>
+      }
+      trailing={
+        <TrackEventTrailing
+          trackMeta={m?.track_metadata}
+          viewer={viewer}
+          ownerUsername={event.user_name}
+        />
       }
     >
       <TrackEventBody trackMeta={m?.track_metadata} />
@@ -339,13 +429,20 @@ function RecordingRecommendationEvent({
         </>
       }
       trailing={
-        canThank ? (
-          <ThanksButton
-            originalEventType="recording_recommendation"
-            originalEventId={event.id as number}
-            size="compact"
-          />
-        ) : null
+        <TrackEventTrailing
+          trackMeta={m?.track_metadata}
+          viewer={viewer}
+          ownerUsername={event.user_name}
+          thanks={
+            canThank ? (
+              <ThanksButton
+                originalEventType="recording_recommendation"
+                originalEventId={event.id as number}
+                size="compact"
+              />
+            ) : null
+          }
+        />
       }
     >
       <TrackEventBody trackMeta={m?.track_metadata} blurb={m?.blurb_content} />
@@ -384,13 +481,20 @@ function PersonalRecommendationEvent({
         </>
       }
       trailing={
-        canThank ? (
-          <ThanksButton
-            originalEventType="personal_recording_recommendation"
-            originalEventId={event.id as number}
-            size="compact"
-          />
-        ) : null
+        <TrackEventTrailing
+          trackMeta={m?.track_metadata}
+          viewer={viewer}
+          ownerUsername={event.user_name}
+          thanks={
+            canThank ? (
+              <ThanksButton
+                originalEventType="personal_recording_recommendation"
+                originalEventId={event.id as number}
+                size="compact"
+              />
+            ) : null
+          }
+        />
       }
     >
       <TrackEventBody trackMeta={m?.track_metadata} blurb={m?.blurb_content} />
@@ -716,9 +820,9 @@ export async function FeedEventList({
           case "recording_pin":
             return <PinEvent event={e} viewer={viewer} key={key} />;
           case "listen":
-            return <ListenEvent event={e} key={key} />;
+            return <ListenEvent event={e} viewer={viewer} key={key} />;
           case "loved_recording":
-            return <LovedRecordingEvent event={e} key={key} />;
+            return <LovedRecordingEvent event={e} viewer={viewer} key={key} />;
           case "recording_recommendation":
             return (
               <RecordingRecommendationEvent
