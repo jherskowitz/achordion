@@ -286,37 +286,47 @@ export default function AboutPage() {
             ecosystem today. There&apos;s no community-maintained,
             queryable map from MBID to Spotify / Apple Music / YouTube
             Music / Tidal / Bandcamp URLs. MusicBrainz&apos;s own URL
-            relationships are sparse and editor-dependent; Odesli is
-            commercial and rate-limited; the platforms themselves don&apos;t
-            cross-reference each other.
+            relationships need a human to manually edit each one in,
+            so coverage is sparse and lags real-world catalog. Third-
+            party cross-service resolvers are commercial and rate-
+            limited. The platforms themselves don&apos;t cross-reference
+            each other.
           </p>
           <p>
             Achordion runs a public Redis-backed table that fills that
             gap. Each entry maps one recording MBID to the streaming
             services it&apos;s known to be available on, with the URL,
             service name, and host. Entries come from three sources, in
-            increasing order of trust: cross-service link resolution
-            (Odesli) when we can spare a call, MusicBrainz&apos;s own
-            URL relationships when present, and{" "}
-            <strong>active playback confirmations submitted by
-            Parachord</strong> whenever a track plays successfully —
-            i.e., a real listener picked the MBID, picked a service,
-            pressed play, and music came out. Parachord&apos;s
-            submissions outrank the other two because they&apos;re
-            grounded in <strong>explicit human curation</strong>: not
-            an algorithm guessing that &quot;Yesterday&quot; by The
-            Beatles on Spotify is also &quot;Yesterday&quot; by The
-            Beatles on Apple Music, but a person who actually queued it
-            and listened.
+            increasing order of trust: third-party cross-service
+            resolution (used as a fallback while we bootstrap), {" "}
+            <strong>explicit</strong> human curation via MusicBrainz
+            URL relationships, and <strong>implicit</strong> human
+            curation via Parachord — every time a listener plays an
+            MBID via a streaming service and it works, Parachord
+            submits that pairing. The match is human-validated by
+            virtue of someone actually listening to it; no separate
+            editing step needed.
+          </p>
+          <p>
+            That implicit channel is the one that scales. MusicBrainz&apos;s
+            URL-rel editing is high-trust but high-friction — it takes
+            an editor sitting down and adding services one MBID at a
+            time. Parachord&apos;s submissions accumulate as a side
+            effect of listening: a listener somewhere chooses to play
+            this song, the catalog quietly grows, and every other
+            client built on the data benefits. Parachord submissions
+            therefore outrank the other two on tie-breaks; an
+            algorithmic guess gets superseded the moment a real
+            listener confirms what was actually playing.
           </p>
           <p>
             The same entry serves every visitor — no per-user state.
-            Over time, as human-confirmed plays accumulate, the table
-            becomes a community-curated asset useful to any client
-            building on top of MusicBrainz, not just Achordion. The
-            eventual goal is to retire the Odesli fallback entirely and
-            rely on the human-curated corpus, the same way MusicBrainz
-            itself replaced algorithmically-generated, proprietary
+            Over time, as plays accumulate, the table becomes a
+            community-curated asset useful to any client building on
+            top of MusicBrainz, not just Achordion. The eventual goal
+            is to retire the third-party fallback entirely and rely on
+            the human-curated corpus, the same way MusicBrainz itself
+            displaced algorithmically-generated, proprietary
             fingerprint databases for music identity — by giving
             humans the right tools to do better than software guessing.
           </p>
