@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { Download, ListPlus, MoreHorizontal } from "lucide-react";
+import { Download, ListPlus, MoreVertical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -71,7 +71,7 @@ export function TrackListActionsMenu({
             aria-label={triggerLabel}
             className={className}
           >
-            <MoreHorizontal className="size-4" />
+            <MoreVertical className="size-4" />
           </Button>
         }
       />
