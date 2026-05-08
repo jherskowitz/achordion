@@ -17,6 +17,10 @@ import {
 import { findBioSource, getBiography } from "@/lib/clients/wikipedia";
 import { PageShell } from "@/components/achordion/page-shell";
 import { PageHeader } from "@/components/achordion/page-header";
+import {
+  EntityHeaderStats,
+  EntityHeaderStatsSkeleton,
+} from "@/components/achordion/entity-header-stats";
 import { track } from "@vercel/analytics/server";
 import {
   ArtistAvatar,
@@ -211,7 +215,7 @@ async function ArtistBody({
         // we don't have an /artists directory page to crumb back to.
         // The "Artist" eyebrow already labels what kind of page this is.
         actions={
-          <Suspense fallback={<ListenerStatsSkeleton />}>
+          <Suspense fallback={<EntityHeaderStatsSkeleton />}>
             <ListenerStats promise={listenersPromise} />
           </Suspense>
         }
@@ -337,57 +341,24 @@ async function ArtistBody({
   );
 }
 
-/** Streams the listens / listeners stat block in the page header.
- *  Decoupled so the artist name + avatar can paint the moment
- *  `getArtist` resolves; the numbers fill in once the LB stats call
- *  returns. */
+/** Streams the artist's listens / listeners into the shared
+ *  EntityHeaderStats block. Decoupled so the artist name + avatar
+ *  can paint the moment `getArtist` resolves; the numbers fill in
+ *  once the LB stats call returns. */
 async function ListenerStats({
   promise,
 }: {
   promise: Promise<ArtistListeners | null>;
 }) {
   const listeners = await promise;
-  const totalListens = listeners?.total_listen_count;
-  const totalListeners = listeners?.total_user_count;
-  if (totalListens === undefined && totalListeners === undefined) return null;
   return (
-    <div className="flex items-baseline gap-6 text-right">
-      {totalListens !== undefined && (
-        <div>
-          <p className="text-foreground text-2xl font-semibold tabular-nums">
-            {totalListens.toLocaleString()}
-          </p>
-          <p className="text-muted-foreground text-xs tracking-wide uppercase">
-            listens
-          </p>
-        </div>
-      )}
-      {totalListeners !== undefined && (
-        <div>
-          <p className="text-foreground text-2xl font-semibold tabular-nums">
-            {totalListeners.toLocaleString()}
-          </p>
-          <p className="text-muted-foreground text-xs tracking-wide uppercase">
-            listeners
-          </p>
-        </div>
-      )}
-    </div>
+    <EntityHeaderStats
+      totalListens={listeners?.total_listen_count}
+      totalListeners={listeners?.total_user_count}
+    />
   );
 }
 
-function ListenerStatsSkeleton() {
-  return (
-    <div className="flex items-baseline gap-6 text-right">
-      {[0, 1].map((i) => (
-        <div key={i} className="space-y-1">
-          <Skeleton className="ml-auto h-7 w-20" />
-          <Skeleton className="ml-auto h-3 w-14" />
-        </div>
-      ))}
-    </div>
-  );
-}
 
 /** Awaits `listenersPromise` and renders the full sidebar including
  *  the top-listeners list. The Suspense fallback at the call site
