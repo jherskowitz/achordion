@@ -38,12 +38,16 @@ export function TopListenersList({
                   it above the row's vertical center and visually
                   detached it from the username. Pairing username
                   and count on the same baseline matches the stack
-                  layout below and reads cleanly. */}
+                  layout below and reads cleanly.
+
+                  Spacing tuned to match the stack layout: w-4 rank
+                  + gap-2 between flex items so the rank doesn't
+                  feel detached from the avatar. */}
               <Link
                 href={`/user/${encodeURIComponent(l.user_name)}`}
-                className="flex min-w-0 items-center gap-3"
+                className="flex min-w-0 items-center gap-2"
               >
-                <span className="text-muted-foreground/70 w-5 shrink-0 text-xs tabular-nums">
+                <span className="text-muted-foreground/70 w-4 shrink-0 text-xs tabular-nums">
                   {i + 1}
                 </span>
                 <UserAvatar
@@ -69,7 +73,14 @@ export function TopListenersList({
                 </div>
               </Link>
               <Suspense fallback={null}>
-                <OnAirIndicator username={l.user_name} />
+                {/* Indent past rank (w-4) + the link's first gap-2
+                    so the now-playing line aligns under the
+                    avatar's left edge — same anchor as the stack
+                    layout further down. */}
+                <OnAirIndicator
+                  username={l.user_name}
+                  className="ml-6"
+                />
               </Suspense>
             </li>
           );
