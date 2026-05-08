@@ -494,10 +494,13 @@ Parachord can push confirmed-on-playback recording → external-streaming-URL ma
     "links": [
       { "url": "https://open.spotify.com/track/...", "label": "Spotify", "host": "spotify.com" },
       { "url": "https://music.apple.com/...", "host": "music.apple.com" }
-    ]
+    ],
+    "trackName": "Song Title",
+    "artistName": "Artist Name",
+    "albumName": "Album Name"
   }
   ```
-  `label` and `host` are optional — Achordion derives `host` from the URL and capitalises the second-level domain when missing.
+  `label` and `host` are optional — Achordion derives `host` from the URL and capitalises the second-level domain when missing. `trackName` / `artistName` / `albumName` are also optional but encouraged: they make the stored cache entry self-describing (so admins can scan keys without an MB roundtrip to identify what each track is) and unlock future search-by-name features over the cache.
 - **Response:** `200 { ok: true, accepted: <n> }` on success; `400` for malformed payload; `401` when the bearer is missing or wrong; `503` when the env var isn't configured (Achordion's signal that submissions aren't accepted on this deploy).
 - **TTL:** 90 days per MBID. Re-submit periodically to keep the entry warm.
 

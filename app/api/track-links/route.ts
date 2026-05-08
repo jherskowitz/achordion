@@ -89,8 +89,12 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
   // Resolve MB url-rels when an mbid is on hand — gives us streaming
   // services Odesli doesn't cover (Bandcamp, Qobuz) AND a seed URL
-  // for Odesli when the caller didn't supply one.
+  // for Odesli when the caller didn't supply one. Track / artist /
+  // album names from the recording become cache metadata so the
+  // stored entry is self-describing.
   let mbStreamingUrls: { url: string; type: string }[] = [];
+  let mbNames: { trackName?: string; artistName?: string; albumName?: string } =
+    {};
   if (mbid) {
     try {
       const recording = await getRecording(mbid);
@@ -104,6 +108,22 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
           ),
         )
         .map((u) => ({ url: u.url, type: u.type }));
+      const artistName = recording["artist-credit"]
+        ?.map((c) => c.name + (c.joinphrase ?? ""))
+        .join("")
+        .trim();
+      // Pick the earliest official release as the canonical album
+      // name — matches how the recording page picks its hero album.
+      const release = (recording.releases ?? [])
+        .slice()
+        .sort((a, b) =>
+          (a.date ?? "9999").localeCompare(b.date ?? "9999"),
+        )[0];
+      mbNames = {
+        trackName: recording.title,
+        ...(artistName ? { artistName } : {}),
+        ...(release?.title ? { albumName: release.title } : {}),
+      };
     } catch {
       // MB unreachable — degrade to Odesli-only.
     }
@@ -145,7 +165,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   // Write-through to the persistent cache. We can only key by MBID
   // (the cache contract) — drop the write when the lookup was seed-
   // URL-only. Tag each link with its origin so future merges from
-  // Parachord can override appropriately.
+  // Parachord can override appropriately. Pass MB-derived names so
+  // the stored entry is self-describing on inspection.
   if (mbid && items.length > 0) {
     const tagged: CachedLink[] = [];
     for (const item of items) {
@@ -160,7 +181,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     }
     // Don't await — let the response return while the cache write
     // happens in the background. Best-effort either way.
-    void setCachedTrackLinks(mbid, tagged);
+    void setCachedTrackLinks(mbid, tagged, mbNames);
   }
 
   return NextResponse.json({ links: items }, { headers: CACHE_HEADERS });

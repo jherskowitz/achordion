@@ -52,6 +52,13 @@ const SubmitSchema = z.object({
     )
     .min(1)
     .max(50),
+  // Optional name metadata. Parachord knows the track + artist +
+  // album it just played; passing them along makes the cache entry
+  // self-describing and unlocks future "search the link cache by
+  // name" features. All optional — an MBID-only submit still works.
+  trackName: z.string().max(500).optional(),
+  artistName: z.string().max(500).optional(),
+  albumName: z.string().max(500).optional(),
 });
 
 function bearer(request: NextRequest): string | null {
@@ -111,7 +118,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     );
   }
 
-  const { mbid, links } = parsed.data;
+  const { mbid, links, trackName, artistName, albumName } = parsed.data;
 
   // Normalise + drop links we can't resolve to a host (malformed
   // URLs that snuck past the URL validator on weird inputs).
@@ -133,7 +140,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     );
   }
 
-  await setCachedTrackLinks(mbid, normalised);
+  await setCachedTrackLinks(mbid, normalised, {
+    ...(trackName ? { trackName } : {}),
+    ...(artistName ? { artistName } : {}),
+    ...(albumName ? { albumName } : {}),
+  });
 
   return NextResponse.json(
     { ok: true, accepted: normalised.length },

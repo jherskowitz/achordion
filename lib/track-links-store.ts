@@ -50,6 +50,32 @@ interface CachedEntry {
   links: CachedLink[];
   /** Unix seconds — when we resolved this entry. */
   resolved_at: number;
+  /**
+   * Track / artist / album names captured at resolve time. Optional —
+   * older cache entries (or write paths that didn't have them on
+   * hand) may omit. Used for cache introspection ("what is
+   * track-links:<mbid> actually for") and to power future features
+   * (search-by-name over the cache without an MB round-trip).
+   *
+   * These are point-in-time snapshots; MB editors can rename. The
+   * cache TTL is the staleness ceiling — re-resolution after expiry
+   * picks up any updates.
+   */
+  track_name?: string;
+  artist_name?: string;
+  album_name?: string;
+}
+
+/**
+ * Optional name metadata callers can attach when writing. The store
+ * itself doesn't enforce any of these — passing them through enriches
+ * the stored entry; omitting just means future debugging will need an
+ * MB fetch to identify the track.
+ */
+export interface TrackNames {
+  trackName?: string;
+  artistName?: string;
+  albumName?: string;
 }
 
 const TTL_SECONDS = 60 * 60 * 24 * 90; // 90 days
@@ -102,16 +128,40 @@ export async function getCachedTrackLinks(
 export async function setCachedTrackLinks(
   mbid: string,
   incoming: CachedLink[],
+  names?: TrackNames,
 ): Promise<void> {
   if (!redis) return;
   if (!mbid) return;
   try {
-    const existing = (await getCachedTrackLinks(mbid)) ?? [];
-    const merged = mergeLinks(existing, incoming);
+    // Read the prior entry (full blob, not just links) so we can
+    // preserve any name fields the caller didn't supply this time.
+    // Keeps the entry self-describing across mixed-source writes.
+    let prior: CachedEntry | null = null;
+    try {
+      const raw = await redis.get<CachedEntry | string | null>(key(mbid));
+      prior = raw
+        ? typeof raw === "string"
+          ? (JSON.parse(raw) as CachedEntry)
+          : raw
+        : null;
+    } catch {
+      prior = null;
+    }
+    const existingLinks = Array.isArray(prior?.links) ? prior.links : [];
+    const merged = mergeLinks(existingLinks, incoming);
     const entry: CachedEntry = {
       mbid: mbid.toLowerCase(),
       links: merged,
       resolved_at: Math.floor(Date.now() / 1000),
+      ...(names?.trackName ?? prior?.track_name
+        ? { track_name: names?.trackName ?? prior?.track_name }
+        : {}),
+      ...(names?.artistName ?? prior?.artist_name
+        ? { artist_name: names?.artistName ?? prior?.artist_name }
+        : {}),
+      ...(names?.albumName ?? prior?.album_name
+        ? { album_name: names?.albumName ?? prior?.album_name }
+        : {}),
     };
     await redis.set(key(mbid), JSON.stringify(entry), { ex: TTL_SECONDS });
   } catch {
