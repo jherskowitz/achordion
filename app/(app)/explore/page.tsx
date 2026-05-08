@@ -357,9 +357,11 @@ async function RecommendedTracksPlayAll({
 async function RecommendedArtistsSection({
   username,
   familiarity,
+  layout = "grid",
 }: {
   username: string;
   familiarity: number;
+  layout?: "grid" | "stack";
 }) {
   const threshold = thresholdFromFamiliarity(familiarity);
   // Fetch recommendations + build the exclude set in parallel. The
@@ -387,8 +389,9 @@ async function RecommendedArtistsSection({
     <RecommendedArtistsList
       recordings={recordings}
       metadata={metadata}
-      limit={12}
+      limit={layout === "stack" ? 10 : 12}
       excludeMbids={exclude}
+      layout={layout}
     />
   );
 }
@@ -490,31 +493,6 @@ export default async function ExploreOverviewPage({
 
           <section>
             <SectionHeader
-              title="Recommended artists"
-              seeAllHref="/explore/recommended-artists"
-            />
-            <div className="mb-3">
-              <FamiliaritySlider
-                initial={artistsFamiliarity}
-                param="artistsFamiliarity"
-              />
-            </div>
-            {/* Key the Suspense on the threshold (not the slider value)
-                so within-bucket nudges don't trigger pointless skeleton
-                flashes — same threshold = same data, no need to refetch. */}
-            <Suspense
-              key={`artists-${thresholdFromFamiliarity(artistsFamiliarity) ?? "off"}`}
-              fallback={<GridSkeleton cols={4} rows={8} />}
-            >
-              <RecommendedArtistsSection
-                username={username}
-                familiarity={artistsFamiliarity}
-              />
-            </Suspense>
-          </section>
-
-          <section>
-            <SectionHeader
               title="Recommended tracks"
               seeAllHref="/explore/recommended-tracks"
             />
@@ -546,18 +524,48 @@ export default async function ExploreOverviewPage({
           </section>
         </div>
 
-        <aside className="space-y-3">
-          <SectionHeader
-            title="Similar listeners"
-            seeAllHref="/explore/similar-users"
-          />
-          <Suspense fallback={<SidebarUserSkeleton rows={8} />}>
-            <SimilarUsersSection
-              username={username}
-              limit={10}
-              layout="stack"
+        <aside className="space-y-8">
+          {/* Recommended artists lives in the sidebar (not the main
+              column) so the page balances visually — main column was
+              all-grids, sidebar was just the similar-listeners list.
+              Stack layout = single-column compact rows that fit the
+              280px sidebar without horizontal squeeze. */}
+          <section>
+            <SectionHeader
+              title="Recommended artists"
+              seeAllHref="/explore/recommended-artists"
             />
-          </Suspense>
+            <div className="mb-3">
+              <FamiliaritySlider
+                initial={artistsFamiliarity}
+                param="artistsFamiliarity"
+              />
+            </div>
+            <Suspense
+              key={`artists-${thresholdFromFamiliarity(artistsFamiliarity) ?? "off"}`}
+              fallback={<SidebarUserSkeleton rows={8} />}
+            >
+              <RecommendedArtistsSection
+                username={username}
+                familiarity={artistsFamiliarity}
+                layout="stack"
+              />
+            </Suspense>
+          </section>
+
+          <section>
+            <SectionHeader
+              title="Similar listeners"
+              seeAllHref="/explore/similar-users"
+            />
+            <Suspense fallback={<SidebarUserSkeleton rows={8} />}>
+              <SimilarUsersSection
+                username={username}
+                limit={10}
+                layout="stack"
+              />
+            </Suspense>
+          </section>
         </aside>
       </div>
     </PageShell>

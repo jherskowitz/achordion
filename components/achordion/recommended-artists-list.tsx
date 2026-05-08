@@ -60,6 +60,12 @@ export function RecommendedArtistsList({
   metadata,
   limit = 12,
   excludeMbids,
+  /**
+   * Layout variant:
+   *   - "grid" (default) — 2/3/4-column tile grid for the main column.
+   *   - "stack" — single-column compact rows for sidebar use.
+   */
+  layout = "grid",
 }: {
   recordings: RecommendedRecordingMbid[];
   metadata: Map<string, RecordingMetadata>;
@@ -67,6 +73,7 @@ export function RecommendedArtistsList({
   /** Artist MBIDs to keep out of the result (typically top all-time
    *  artists — "recommended" should mean new, not familiar). */
   excludeMbids?: Set<string>;
+  layout?: "grid" | "stack";
 }) {
   const artists = aggregateArtists(
     recordings,
@@ -79,6 +86,33 @@ export function RecommendedArtistsList({
       <p className="text-muted-foreground py-8 text-center text-sm">
         No artist recommendations yet.
       </p>
+    );
+  }
+  if (layout === "stack") {
+    return (
+      <ul className="space-y-1">
+        {artists.map((a) => (
+          <li key={a.mbid}>
+            <Link
+              href={`/artist/${a.mbid}`}
+              className="hover:bg-muted/40 group flex min-w-0 items-center gap-2 rounded-md px-2 py-1.5"
+            >
+              <Suspense
+                fallback={<Skeleton className="size-8 shrink-0 rounded-full" />}
+              >
+                <ArtistAvatar
+                  mbid={a.mbid}
+                  name={a.name}
+                  className="size-8 shrink-0"
+                  fallbackClassName="text-[10px]"
+                  width={96}
+                />
+              </Suspense>
+              <span className="min-w-0 flex-1 truncate text-sm">{a.name}</span>
+            </Link>
+          </li>
+        ))}
+      </ul>
     );
   }
   return (
