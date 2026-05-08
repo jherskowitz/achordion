@@ -1,21 +1,13 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import {
-  getArtistsByTag,
-  getReleaseGroupsByTag,
-} from "@/lib/clients/musicbrainz";
+import { getArtistsByTag } from "@/lib/clients/musicbrainz";
 import {
   getArtistPopularityBatch,
   getLbRadio,
-  getRecordingMetadata,
-  getReleaseGroupPopularityBatch,
-  getSitewideTopReleaseGroups,
   type LbRadioTrack,
 } from "@/lib/clients/listenbrainz";
-import { caaReleaseGroupUrl } from "@/lib/clients/coverart";
 import { ArtistAvatar } from "@/components/achordion/artist-avatar";
-import { CoverArt } from "@/components/achordion/cover-art";
 import { PageShell } from "@/components/achordion/page-shell";
 import { LbRadioSection } from "@/components/achordion/lb-radio-section";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -77,7 +69,7 @@ function parseYear(value: string | null | undefined): number | null {
  * the most-prominent track for each artist/album anchors its rank.
  *
  * Returns null on bad input so callers can fall back to MB's tag-vote
- * ordering (the order `getArtistsByTag` / `getReleaseGroupsByTag`
+ * ordering (the order `getArtistsByTag`
  * return naturally).
  */
 function buildPopularityRanks(
@@ -211,226 +203,6 @@ async function ArtistsForTag({ tag }: { tag: string }) {
   );
 }
 
-async function AlbumsForTag({ tag }: { tag: string }) {
-  // "Hot albums" candidate pool comes from THREE sources, deduped
-  // by release-group MBID:
-  //
-  //   1. MusicBrainz tag search — 200 release-groups MB editors
-  //      have tagged with the genre. Editor-curated, broader pool
-  //      than what LB Radio surfaces, includes catalog records
-  //      that aren't currently in heavy rotation.
-  //   2. LB Radio for the tag — ~50 tracks people are CURRENTLY
-  //      playing in this genre. Captures recently-spiking stuff
-  //      that hasn't yet acquired enough MB tag votes to land in
-  //      the search.
-  //   3. The recording metadata for each radio track resolves to a
-  //      release-group MBID + first_release_date (see AGENTS.md
-  //      "Albums always link to release-group, never release").
-  //
-  // Score for each candidate:
-  //   listen_count_all_time * 0.5 ^ (age_years / 3)
-  // using `getReleaseGroupPopularityBatch` for the count and the
-  // album's first-release year for the age. 3-year halflife biases
-  // toward records people are actually streaming this year while
-  // keeping headroom for catalog hits.
-  //
-  // Tiebreak: sitewide past-30-day listens (top-1000), then radio
-  // track count, then radio first-seen.
-  const [radio, sitewideMonth, mbPage1, mbPage2] = await Promise.all([
-    getLbRadio(`tag:(${tag})`, "easy").catch(() => null),
-    getSitewideTopReleaseGroups("month", 1000).catch(() => []),
-    getReleaseGroupsByTag(tag, 100, 0).catch(() => []),
-    getReleaseGroupsByTag(tag, 100, 100).catch(() => []),
-  ]);
-  if (!radio || radio.length === 0) {
-    if (mbPage1.length === 0) {
-      return (
-        <p className="text-muted-foreground text-sm">
-          No hot albums for this tag right now.
-        </p>
-      );
-    }
-  }
-  const monthListensByRg = new Map<string, number>();
-  for (const r of sitewideMonth) {
-    if (r.release_group_mbid) {
-      monthListensByRg.set(r.release_group_mbid, r.listen_count);
-    }
-  }
-  const recordingMbids = (radio ?? [])
-    .map((t) => t.recordingMbid)
-    .filter((m): m is string => !!m);
-  const meta = await getRecordingMetadata(recordingMbids).catch(
-    () => new Map<string, never>(),
-  );
-  // Group by release_group_mbid (preferred) — that's what `/release-
-  // group/[mbid]` expects and the canonical album entity.
-  interface AlbumEntry {
-    releaseGroupMbid: string;
-    releaseName: string;
-    artistName: string;
-    artistMbid: string | null;
-    caaId: number | string | null;
-    caaReleaseMbid: string | null;
-    /** Earliest `first_release_date` (YYYY-MM-DD) seen across the
-     *  album's tracks in the radio. Used for recency decay. */
-    earliestReleaseDate: string | null;
-    count: number;
-    firstSeen: number;
-  }
-  const map = new Map<string, AlbumEntry>();
-  // Source 1: LB Radio. Tracks → release-group via metadata lookup,
-  // each appearance bumps `count` (radio-frequency popularity proxy).
-  (radio ?? []).forEach((t, i) => {
-    if (!t.recordingMbid) return;
-    const m = meta.get(t.recordingMbid);
-    const releaseGroupMbid = m?.release?.release_group_mbid;
-    if (!releaseGroupMbid) return;
-    const trackDate = m?.recording?.first_release_date ?? null;
-    const existing = map.get(releaseGroupMbid);
-    if (existing) {
-      existing.count += 1;
-      if (
-        trackDate &&
-        (!existing.earliestReleaseDate ||
-          trackDate < existing.earliestReleaseDate)
-      ) {
-        existing.earliestReleaseDate = trackDate;
-      }
-      return;
-    }
-    map.set(releaseGroupMbid, {
-      releaseGroupMbid,
-      releaseName: m?.release?.name ?? t.releaseName ?? "",
-      artistName: t.artistName,
-      artistMbid: t.artistMbid,
-      caaId: m?.release?.caa_id ?? t.caaId ?? null,
-      caaReleaseMbid: m?.release?.caa_release_mbid ?? t.caaReleaseMbid ?? null,
-      earliestReleaseDate: trackDate,
-      count: 1,
-      firstSeen: i,
-    });
-  });
-  // Source 2: MB tag search (200 entries, 2 paginated calls). These
-  // are editor-curated genre matches that may not currently be in
-  // heavy rotation. Items not already in the map (i.e. not in the
-  // radio) get added with count=0; their score will come purely
-  // from listen_count × decay below. Items already in the map (in
-  // both pools) keep their radio count + first_seen — being in the
-  // radio is a positive recency signal.
-  const mbAlbums = [...mbPage1, ...mbPage2];
-  for (const rg of mbAlbums) {
-    if (!rg.id) continue;
-    if (map.has(rg.id)) continue;
-    const artistName = rg["artist-credit"]?.[0]?.name ?? "";
-    const artistMbid = rg["artist-credit"]?.[0]?.artist?.id ?? null;
-    map.set(rg.id, {
-      releaseGroupMbid: rg.id,
-      releaseName: rg.title,
-      artistName,
-      artistMbid,
-      // No CAA hint from MB search — fall through to the release-
-      // group front lookup at render time.
-      caaId: null,
-      caaReleaseMbid: null,
-      earliestReleaseDate: rg["first-release-date"] ?? null,
-      count: 0,
-      // MB-only candidates land "after" radio entries in the
-      // first-seen tiebreaker — Infinity sorts them last when all
-      // higher-priority keys tie.
-      firstSeen: Number.POSITIVE_INFINITY,
-    });
-  }
-  // Pull all-time listen counts for every candidate release-group in
-  // ONE batch call. Without this, items not in the sitewide month
-  // top-1000 all scored zero and the visible order collapsed back
-  // to the radio's natural ordering — same albums in the same place
-  // regardless of what we did.
-  const candidateMbids = Array.from(map.keys());
-  const popularity = await getReleaseGroupPopularityBatch(
-    candidateMbids,
-  ).catch(() => new Map<string, number>());
-
-  // 3-year halflife: 1y album worth ~0.79×, 5y worth ~0.31×, 10y
-  // ~0.10×, 30y ~0.001×. Aggressive enough to surface 2024-2025
-  // releases above 90s catalog hits at similar popularity tiers.
-  const ALBUM_HALFLIFE_YEARS = 3;
-  const NOW_YEAR = new Date().getUTCFullYear();
-  function decay(date: string | null): number {
-    if (!date) return 0.05; // unknown date → mostly suppressed
-    const yr = Number.parseInt(date.slice(0, 4), 10);
-    if (!Number.isFinite(yr)) return 0.05;
-    const age = Math.max(0, NOW_YEAR - yr);
-    return Math.pow(0.5, age / ALBUM_HALFLIFE_YEARS);
-  }
-
-  // Sort:
-  //   1. score = listen_count * recency_decay  (primary)
-  //   2. sitewide month-listens DESC           (tiebreak when
-  //                                              currently spiking)
-  //   3. radio track-count DESC                (genre-internal pop)
-  //   4. radio first-seen                      (final tiebreak)
-  const albums = Array.from(map.values())
-    .map((a) => {
-      const allTime = popularity.get(a.releaseGroupMbid) ?? 0;
-      const score = allTime * decay(a.earliestReleaseDate);
-      const monthListens =
-        monthListensByRg.get(a.releaseGroupMbid) ?? 0;
-      return { ...a, score, monthListens };
-    })
-    .sort((a, b) => {
-      if (a.score !== b.score) return b.score - a.score;
-      if (a.monthListens !== b.monthListens) {
-        return b.monthListens - a.monthListens;
-      }
-      if (a.count !== b.count) return b.count - a.count;
-      return a.firstSeen - b.firstSeen;
-    })
-    .slice(0, 24);
-
-  if (albums.length === 0) {
-    return (
-      <p className="text-muted-foreground text-sm">
-        No hot albums for this tag right now.
-      </p>
-    );
-  }
-
-  return (
-    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
-      {albums.map((a) => {
-        // Cover-art source: prefer the LB-supplied caa fields (the
-        // edition the recording metadata pointed at). Fall back to
-        // the release-group's CAA front lookup so we never double-
-        // hit a release that doesn't itself have art.
-        const coverSrc =
-          a.caaReleaseMbid && a.caaId
-            ? `https://coverartarchive.org/release/${a.caaReleaseMbid}/${a.caaId}-250.jpg`
-            : caaReleaseGroupUrl(a.releaseGroupMbid, 250);
-        const href = `/release-group/${a.releaseGroupMbid}`;
-        return (
-          <Link
-            key={a.releaseGroupMbid}
-            href={href}
-            className="group min-w-0"
-          >
-            <CoverArt
-              src={coverSrc}
-              alt={a.releaseName}
-              size={240}
-              className="aspect-square h-auto w-full transition-opacity group-hover:opacity-90"
-              rounded="md"
-            />
-            <p className="mt-2 truncate text-sm font-medium">{a.releaseName}</p>
-            <p className="text-muted-foreground truncate text-xs">
-              {a.artistName}
-            </p>
-          </Link>
-        );
-      })}
-    </div>
-  );
-}
 
 async function TagRadioBlock({ tag }: { tag: string }) {
   // LB hiccups (429 / 5xx) shouldn't take the tag page down with
@@ -450,20 +222,6 @@ function ArtistGridSkeleton({ rows = 8 }: { rows?: number }) {
         >
           <Skeleton className="h-4 w-2/3" />
           <Skeleton className="h-3 w-full" />
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function AlbumGridSkeleton() {
-  return (
-    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
-      {Array.from({ length: 12 }).map((_, i) => (
-        <div key={i} className="space-y-2">
-          <Skeleton className="aspect-square w-full rounded-md" />
-          <Skeleton className="h-3.5 w-3/4" />
-          <Skeleton className="h-3 w-1/2" />
         </div>
       ))}
     </div>
@@ -491,7 +249,7 @@ export default async function TagPage({ params }: PageParams) {
           #{titleCase(tag)}
         </h1>
         <p className="text-muted-foreground mt-3 max-w-2xl text-sm leading-6">
-          Hot artists, hot albums, and a curated radio station for the{" "}
+          Hot artists and a curated radio station for the{" "}
           <span className="text-foreground">{tag}</span> tag.
         </p>
       </header>
@@ -511,14 +269,6 @@ export default async function TagPage({ params }: PageParams) {
             </Suspense>
           </section>
 
-          <section>
-            <h2 className="mb-4 text-sm font-semibold tracking-wide uppercase">
-              Hot albums
-            </h2>
-            <Suspense fallback={<AlbumGridSkeleton />}>
-              <AlbumsForTag tag={tag} />
-            </Suspense>
-          </section>
         </div>
       </div>
     </PageShell>
