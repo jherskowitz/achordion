@@ -3,7 +3,6 @@ import Link from "next/link";
 import { Pin } from "lucide-react";
 import { CoverArt } from "./cover-art";
 import { PlayOnHoverFab } from "./play-on-hover-fab";
-import { ParachordCtaButton } from "./parachord-button";
 import { caaUrlFromListen } from "@/lib/clients/coverart";
 import type { PinnedRecording } from "@/lib/clients/listenbrainz";
 import {
@@ -264,19 +263,9 @@ export function PinnedTrackCard({
           )}
           {isHero && (
             <div className="mt-4 flex flex-wrap items-center gap-3">
-              {/* Two play affordances on purpose: the explicit
-                  "Play in Parachord" pill is the unambiguous primary
-                  CTA, the cover-hover fab is the discoverable
-                  shortcut for users who already know the pattern.
-                  Both route to the same parachord:// URL. */}
-              <ParachordCtaButton
-                href={parachordPlayTrack({
-                  artist: meta.artist_name,
-                  title: meta.track_name,
-                })}
-                label="Play in Parachord"
-                size="sm"
-              />
+              {/* Play affordance lives on the cover (hover fab); the
+                  action row carries the overflow ⋮ + thanks +
+                  streaming-favicon row. */}
               <TrackActionsMenuSlot track={trackRef} />
               {thankable && (
                 <ThanksButton
@@ -297,14 +286,6 @@ export function PinnedTrackCard({
           )}
           {!isHero && (
             <div className="mt-3 flex flex-wrap items-center gap-3">
-              <ParachordCtaButton
-                href={parachordPlayTrack({
-                  artist: meta.artist_name,
-                  title: meta.track_name,
-                })}
-                label="Play in Parachord"
-                size="sm"
-              />
               <TrackActionsMenuSlot track={trackRef} />
               {thankable && (
                 <ThanksButton
