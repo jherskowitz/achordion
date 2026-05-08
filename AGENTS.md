@@ -510,7 +510,7 @@ Submit only matches Parachord has actually played back successfully — that's t
 
 Parachord can ask Achordion for the canonical Achordion URL for any artist / album / track MBID. Use this instead of hard-coding our URL convention — if Achordion ever moves a route (e.g. `/release-group/<mbid>` → somewhere else), the change ships through this endpoint without any client update.
 
-- **Auth:** none. Public read endpoint.
+- **Auth:** bearer token (gated on rollout). Achordion reads `ACHORDION_API_READ_TOKEN` from its env; Parachord configures the matching value and presents `Authorization: Bearer <token>` on every request. Gating is initially conservative — the data itself is non-sensitive (just URLs derivable from MBIDs), but unbounded read traffic could pile MB API calls onto the names-enrichment path. Plan to drop the gate once we understand caller volume.
 - **Endpoint:** `GET https://achordion.xyz/api/entity-link?type=<type>&mbid=<mbid>[&include=names]`
 - **Inputs:**
   - `type`: `artist` | `release-group` | `recording`. Aliases: `album` → release-group, `track` → recording.
@@ -528,8 +528,8 @@ Parachord can ask Achordion for the canonical Achordion URL for any artist / alb
     "album_name": "Double Infinity"
   }
   ```
-  `embed_url` is only present for `recording` (Achordion's iframe-friendly track widget). `name` / `artist_name` / `album_name` only present when `?include=names`. `400` on a malformed `type` / `mbid`; the URL itself is always derivable from MBID alone, so name-enrichment failures degrade silently rather than 502'ing.
-- **Cache:** edge-cached at `s-maxage=86400, stale-while-revalidate=604800` — URLs are stable, names rarely change.
+  `embed_url` is only present for `recording` (Achordion's iframe-friendly track widget). `name` / `artist_name` / `album_name` only present when `?include=names`. Status codes: `400` on malformed `type` / `mbid`, `401` on missing/wrong bearer, `503` when the env var isn't configured (this deploy doesn't accept lookups). Name-enrichment failures degrade silently rather than 502'ing — the URL is always derivable from MBID alone.
+- **Cache:** `private, no-store`. Auth'd responses aren't safely edge-cacheable without `Vary: Authorization`, and at current volume the function-per-request cost is negligible. Revisit if usage grows.
 
 Use case: every Parachord surface that wants a "View on Achordion" link (Now Playing card, library detail views, share sheet) can resolve through this endpoint without coordinating route shapes with Achordion.
 

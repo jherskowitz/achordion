@@ -8,11 +8,11 @@ import {
 } from "@/lib/clients/musicbrainz";
 
 /**
- * Public read-only lookup that turns a `(type, mbid)` pair into the
+ * Read-only lookup that turns a `(type, mbid)` pair into the
  * canonical Achordion URL for that entity. Built for Parachord (and
- * any other client) that wants to render "View on Achordion" links
- * without hard-coding our URL conventions — keeps them stable as the
- * single source of truth on Achordion's side.
+ * any other client we authorize) that wants to render "View on
+ * Achordion" links without hard-coding our URL conventions — keeps
+ * them stable as the single source of truth on Achordion's side.
  *
  * Inputs:
  *   - `type`: artist | release-group | recording. Aliases:
@@ -22,10 +22,13 @@ import {
  *     response with track / artist / album names (one MB API call;
  *     skipped by default to keep the lookup cheap).
  *
- * Why no auth: this is a string-formatting API (mbid + type → URL).
- * The names enrichment hits MusicBrainz, but MB itself is public and
- * we already cache/rate-limit at lib/clients/musicbrainz.ts. Public
- * read fits the rest of Achordion's API surface.
+ * **Auth: bearer token, gated.** Initially behind a shared secret
+ * (`ACHORDION_API_READ_TOKEN`) so we can observe usage shape before
+ * opening to the public web. The data itself is non-sensitive — it's
+ * just URLs derivable from MBIDs — but unbounded read traffic could
+ * pile MB API calls onto the names-enrichment path and mask cost
+ * patterns we want to understand first. Plan to drop the gate once
+ * we have a feel for caller volume.
  *
  * Why not just hard-code the URL on the caller's side: we want to
  * change the convention in one place. Today `/release-group/<mbid>`
@@ -33,19 +36,14 @@ import {
  * doing string concatenation breaks. Routing through this endpoint
  * means changing it server-side once.
  *
- * Cache: long s-maxage (URLs are stable; names rarely change).
+ * Cache: `private, no-store`. Auth'd responses can't be safely
+ * shared at the edge without `Vary: Authorization` (and the
+ * cardinality of distinct auth-keys defeats most of the cache benefit
+ * anyway at our current volume). Each request runs the function and
+ * the auth check.
  */
 
 export const dynamic = "force-dynamic";
-
-// Use CDN-Cache-Control (not plain Cache-Control) so Vercel's edge
-// caches the response. Next overrides plain Cache-Control to
-// `private, no-store` for any dynamic route, which this is by virtue
-// of reading searchParams. See next.config.ts for the full rationale.
-const CACHE_HEADERS: Record<string, string> = {
-  "CDN-Cache-Control":
-    "public, s-maxage=86400, stale-while-revalidate=604800",
-};
 
 const NO_STORE: Record<string, string> = {
   "Cache-Control": "private, no-store",
@@ -79,6 +77,12 @@ const QuerySchema = z.object({
   mbid: z.string().uuid(),
   include: z.string().optional(),
 });
+
+function bearer(request: NextRequest): string | null {
+  const header = request.headers.get("authorization") ?? "";
+  const m = header.match(/^Bearer\s+(.+)$/i);
+  return m?.[1].trim() ?? null;
+}
 
 interface EntityLinkResponse {
   type: EntityType;
@@ -114,6 +118,25 @@ function embedUrl(type: EntityType, mbid: string): string | undefined {
 }
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
+  // Bearer-token gate. 503 when env not configured (signals to the
+  // caller that this deploy doesn't accept lookups), 401 otherwise.
+  // Same shape as the existing /api/track-links/submit endpoint so
+  // Parachord can share auth-error handling between them.
+  const expected = process.env.ACHORDION_API_READ_TOKEN;
+  if (!expected) {
+    return NextResponse.json(
+      { error: "lookup endpoint not configured" },
+      { status: 503, headers: NO_STORE },
+    );
+  }
+  const presented = bearer(request);
+  if (!presented || presented !== expected) {
+    return NextResponse.json(
+      { error: "unauthorized" },
+      { status: 401, headers: NO_STORE },
+    );
+  }
+
   const url = new URL(request.url);
   const parsed = QuerySchema.safeParse({
     type: url.searchParams.get("type") ?? "",
@@ -176,5 +199,5 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     }
   }
 
-  return NextResponse.json(response, { headers: CACHE_HEADERS });
+  return NextResponse.json(response, { headers: NO_STORE });
 }
