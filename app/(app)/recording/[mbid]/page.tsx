@@ -22,8 +22,10 @@ import { ReleaseTypeChip } from "@/components/achordion/release-type-chip";
 import {
   ExternalLinks,
   categoriseLinks,
+  normalizeStreamingUrl,
+  tooltipLabel,
 } from "@/components/achordion/external-links";
-import { OdesliLinks } from "@/components/achordion/odesli-links";
+import { StreamingLinksRow } from "@/components/achordion/streaming-links-row";
 import { PageHeader } from "@/components/achordion/page-header";
 import { PageShell } from "@/components/achordion/page-shell";
 import { TopListenersList } from "@/components/achordion/top-listeners-list";
@@ -86,17 +88,35 @@ async function RecordingBody({ mbid }: { mbid: string }) {
   const { urls } = partitionArtistRelations({
     relations: recording.relations,
   });
-  // Use the first MB streaming url-rel (Spotify / Apple / etc.) as the
-  // seed for Odesli's cross-service lookup. Sidebar "Other Links" gets
+  // Use the first MB streaming url-rel (Spotify / Apple / etc.) as
+  // the seed for the cross-service lookup. Sidebar "Other Links" gets
   // everything that isn't a streaming service so we don't double-show
   // Spotify both there and in the favicon row. The full MB streaming
-  // list is also handed to OdesliLinks so it can surface MB-only
-  // services Odesli doesn't return (Bandcamp, Qobuz, etc.) at the end
-  // of the row, and fall back gracefully when Odesli is empty —
-  // dedupe-by-hostname on the OdesliLinks side keeps Spotify et al.
-  // from rendering twice.
+  // list is pre-rendered as the favicon row's initial paint (see
+  // `<StreamingLinksRow>` below) and the client island enriches it
+  // with cache-resolved / Odesli-discovered platforms after mount —
+  // dedupe-by-canonical-host on the row side keeps Spotify et al.
+  // from rendering twice when both MB and Odesli have it.
   const { streaming: streamingUrls, other: otherUrls } = categoriseLinks(urls);
   const odesliSeed = streamingUrls[0]?.url ?? null;
+  // Pre-render the MB streaming url-rels as clickable favicons on
+  // first paint, so a friend who lands here from a Parachord-shared
+  // link can play immediately even on a cold MBID. The
+  // <StreamingLinksRow> client island upgrades this set with the
+  // full Odesli-enriched / cache-resolved list once it mounts.
+  const initialStreamingItems = streamingUrls
+    .map((link) => {
+      const normalised = normalizeStreamingUrl(link.url);
+      if (!normalised) return null;
+      let host: string;
+      try {
+        host = new URL(normalised).hostname.toLowerCase();
+      } catch {
+        return null;
+      }
+      return { url: normalised, label: tooltipLabel(link), host };
+    })
+    .filter((x): x is { url: string; label: string; host: string } => x !== null);
   const tags = (recording.genres?.length
     ? recording.genres
     : recording.tags ?? []
@@ -217,8 +237,10 @@ async function RecordingBody({ mbid }: { mbid: string }) {
           // artist · album · year · length byline, with the per-track
           // ⋮ menu inline at the start so it lives in the same row as
           // the external links rather than over in the actions slot.
-          // Suspense lets the Odesli call (cached 24h per seed URL)
-          // stream in without blocking the rest of the header.
+          // <StreamingLinksRow> renders the MB url-rels we already
+          // have on first paint (clickable immediately for a friend
+          // landing on a shared link), then upgrades to the full
+          // cache-resolved / Odesli-enriched set client-side.
           <div className="flex flex-wrap items-center gap-2">
             <TrackActionsMenuSlot
               track={{
@@ -228,13 +250,11 @@ async function RecordingBody({ mbid }: { mbid: string }) {
                 releaseMbid: heroRelease?.id ?? null,
               }}
             />
-            <Suspense fallback={null}>
-              <OdesliLinks
-                seedUrl={odesliSeed}
-                mbStreamingLinks={streamingUrls}
-                recordingMbid={recording.id}
-              />
-            </Suspense>
+            <StreamingLinksRow
+              recordingMbid={recording.id}
+              initialItems={initialStreamingItems}
+              seedUrl={odesliSeed}
+            />
           </div>
         }
         actions={
