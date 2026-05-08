@@ -783,18 +783,23 @@ export async function getArtistsByTag(tag: string, limit = 24) {
   return result.artists;
 }
 
-export async function getReleaseGroupsByTag(tag: string, limit = 24) {
+export async function getReleaseGroupsByTag(
+  tag: string,
+  limit = 24,
+  offset = 0,
+) {
   if (!tag.trim()) return [];
   const params = new URLSearchParams({
     query: `tag:${quoteTag(tag)} AND primarytype:Album`,
     limit: String(limit),
   });
+  if (offset > 0) params.set("offset", String(offset));
   const result = await mbFetch(
     `/release-group?${params}`,
     ReleaseGroupSearchSchema,
     {
       revalidate: 60 * 60 * 24,
-      tags: [`mb:tag:${tag.toLowerCase()}:release-groups`],
+      tags: [`mb:tag:${tag.toLowerCase()}:release-groups${offset ? `:${offset}` : ""}`],
     },
   );
   return result["release-groups"];

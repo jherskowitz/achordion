@@ -1,7 +1,10 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getArtistsByTag } from "@/lib/clients/musicbrainz";
+import {
+  getArtistsByTag,
+  getReleaseGroupsByTag,
+} from "@/lib/clients/musicbrainz";
 import {
   getArtistPopularityBatch,
   getLbRadio,
@@ -209,34 +212,44 @@ async function ArtistsForTag({ tag }: { tag: string }) {
 }
 
 async function AlbumsForTag({ tag }: { tag: string }) {
-  // "Hot albums" pipeline:
+  // "Hot albums" candidate pool comes from THREE sources, deduped
+  // by release-group MBID:
   //
-  //   1. LB Radio for the tag — gives us the *candidate set*: ~50
-  //      tracks people are currently playing in this genre.
-  //   2. Resolve each track's recording_mbid → release_group_mbid +
-  //      first_release_date via LB recording metadata so we can
-  //      dedupe at the canonical album level (see AGENTS.md
+  //   1. MusicBrainz tag search — 200 release-groups MB editors
+  //      have tagged with the genre. Editor-curated, broader pool
+  //      than what LB Radio surfaces, includes catalog records
+  //      that aren't currently in heavy rotation.
+  //   2. LB Radio for the tag — ~50 tracks people are CURRENTLY
+  //      playing in this genre. Captures recently-spiking stuff
+  //      that hasn't yet acquired enough MB tag votes to land in
+  //      the search.
+  //   3. The recording metadata for each radio track resolves to a
+  //      release-group MBID + first_release_date (see AGENTS.md
   //      "Albums always link to release-group, never release").
-  //   3. Score each release-group by:
-  //        listen_count_all_time * 0.5^(age_years / 3)
-  //      using `getReleaseGroupPopularityBatch` for the count and
-  //      the earliest first_release_date seen across the album's
-  //      tracks for `age_years`. 3-year halflife biases toward
-  //      records people are actually streaming this year while
-  //      keeping enough headroom for genuine catalog hits.
-  //   4. Tiebreak by sitewide past-30-day listens (when present
-  //      in the global top-1000) for things currently spiking,
-  //      then by radio track count, then by radio first-seen.
-  const [radio, sitewideMonth] = await Promise.all([
+  //
+  // Score for each candidate:
+  //   listen_count_all_time * 0.5 ^ (age_years / 3)
+  // using `getReleaseGroupPopularityBatch` for the count and the
+  // album's first-release year for the age. 3-year halflife biases
+  // toward records people are actually streaming this year while
+  // keeping headroom for catalog hits.
+  //
+  // Tiebreak: sitewide past-30-day listens (top-1000), then radio
+  // track count, then radio first-seen.
+  const [radio, sitewideMonth, mbPage1, mbPage2] = await Promise.all([
     getLbRadio(`tag:(${tag})`, "easy").catch(() => null),
     getSitewideTopReleaseGroups("month", 1000).catch(() => []),
+    getReleaseGroupsByTag(tag, 100, 0).catch(() => []),
+    getReleaseGroupsByTag(tag, 100, 100).catch(() => []),
   ]);
   if (!radio || radio.length === 0) {
-    return (
-      <p className="text-muted-foreground text-sm">
-        No hot albums for this tag right now.
-      </p>
-    );
+    if (mbPage1.length === 0) {
+      return (
+        <p className="text-muted-foreground text-sm">
+          No hot albums for this tag right now.
+        </p>
+      );
+    }
   }
   const monthListensByRg = new Map<string, number>();
   for (const r of sitewideMonth) {
@@ -244,7 +257,7 @@ async function AlbumsForTag({ tag }: { tag: string }) {
       monthListensByRg.set(r.release_group_mbid, r.listen_count);
     }
   }
-  const recordingMbids = radio
+  const recordingMbids = (radio ?? [])
     .map((t) => t.recordingMbid)
     .filter((m): m is string => !!m);
   const meta = await getRecordingMetadata(recordingMbids).catch(
@@ -266,7 +279,9 @@ async function AlbumsForTag({ tag }: { tag: string }) {
     firstSeen: number;
   }
   const map = new Map<string, AlbumEntry>();
-  radio.forEach((t, i) => {
+  // Source 1: LB Radio. Tracks → release-group via metadata lookup,
+  // each appearance bumps `count` (radio-frequency popularity proxy).
+  (radio ?? []).forEach((t, i) => {
     if (!t.recordingMbid) return;
     const m = meta.get(t.recordingMbid);
     const releaseGroupMbid = m?.release?.release_group_mbid;
@@ -275,8 +290,6 @@ async function AlbumsForTag({ tag }: { tag: string }) {
     const existing = map.get(releaseGroupMbid);
     if (existing) {
       existing.count += 1;
-      // Keep the earliest first_release_date we've seen across the
-      // album's tracks — closer to "when did this album drop".
       if (
         trackDate &&
         (!existing.earliestReleaseDate ||
@@ -298,6 +311,36 @@ async function AlbumsForTag({ tag }: { tag: string }) {
       firstSeen: i,
     });
   });
+  // Source 2: MB tag search (200 entries, 2 paginated calls). These
+  // are editor-curated genre matches that may not currently be in
+  // heavy rotation. Items not already in the map (i.e. not in the
+  // radio) get added with count=0; their score will come purely
+  // from listen_count × decay below. Items already in the map (in
+  // both pools) keep their radio count + first_seen — being in the
+  // radio is a positive recency signal.
+  const mbAlbums = [...mbPage1, ...mbPage2];
+  for (const rg of mbAlbums) {
+    if (!rg.id) continue;
+    if (map.has(rg.id)) continue;
+    const artistName = rg["artist-credit"]?.[0]?.name ?? "";
+    const artistMbid = rg["artist-credit"]?.[0]?.artist?.id ?? null;
+    map.set(rg.id, {
+      releaseGroupMbid: rg.id,
+      releaseName: rg.title,
+      artistName,
+      artistMbid,
+      // No CAA hint from MB search — fall through to the release-
+      // group front lookup at render time.
+      caaId: null,
+      caaReleaseMbid: null,
+      earliestReleaseDate: rg["first-release-date"] ?? null,
+      count: 0,
+      // MB-only candidates land "after" radio entries in the
+      // first-seen tiebreaker — Infinity sorts them last when all
+      // higher-priority keys tie.
+      firstSeen: Number.POSITIVE_INFINITY,
+    });
+  }
   // Pull all-time listen counts for every candidate release-group in
   // ONE batch call. Without this, items not in the sitewide month
   // top-1000 all scored zero and the visible order collapsed back
