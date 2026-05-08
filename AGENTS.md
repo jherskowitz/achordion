@@ -34,6 +34,8 @@ When an MBID is on hand → direct link. When it isn't → the helper falls thro
 
 **Never render a name as plain text.** Don't write `recordingMbid ? <Link>…</Link> : t.title` — use the helper. The whole codebase has been swept for this; if you add a new surface, follow the pattern.
 
+**Albums always link to release-GROUP, never to a release.** A release group is the abstract album entity ("Sgt. Pepper's"); a release is one specific edition (mono UK '67, stereo Japan '92, 50th-anniversary deluxe '17 — different MBIDs). Catalog data sources hand back both: MusicBrainz returns release-group MBIDs alongside release MBIDs, ListenBrainz feeds + LB Radio return release MBIDs only. Always group/normalize at the release-group level for click targets. When a data source only gives you a release MBID, look up the release group via `getRecordingMetadata` (LB) or `getRelease` (MB) — don't link to `/release/<mbid>` and "let the page resolve it." The only place `/release/<mbid>` is acceptable is the genuine fallback when the source has truly no release-group MBID even after lookup, which should be vanishingly rare. The release page itself exists for completeness and is reachable via "Other editions" lists.
+
 ### 2. Lookup-at-click *or* piggyback on the cover-art lookup — never N synchronous MB calls per render
 
 MusicBrainz allows ≤ 1 request/second. **Never do N MB lookups per render** — that's how the Apple Music chart used to wedge for ~50s of streaming RSC. Two acceptable patterns:

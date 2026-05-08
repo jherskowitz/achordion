@@ -5,8 +5,10 @@ import { getArtistsByTag } from "@/lib/clients/musicbrainz";
 import {
   getArtistPopularityBatch,
   getLbRadio,
+  getRecordingMetadata,
   type LbRadioTrack,
 } from "@/lib/clients/listenbrainz";
+import { caaReleaseGroupUrl } from "@/lib/clients/coverart";
 import { ArtistAvatar } from "@/components/achordion/artist-avatar";
 import { CoverArt } from "@/components/achordion/cover-art";
 import { PageShell } from "@/components/achordion/page-shell";
@@ -205,20 +207,18 @@ async function ArtistsForTag({ tag }: { tag: string }) {
 }
 
 async function AlbumsForTag({ tag }: { tag: string }) {
-  // Pull "hot albums" directly from LB Radio's track list rather than
-  // re-ranking the MB tag pool. The earlier MB-tag-pool approach
-  // didn't work because most editor-tagged release-groups for genres
-  // like "indie rock" have ~zero LB listen data — every item scored
-  // the same regardless of recency-decay tuning, and the visible
-  // result was just MB's natural tag-vote order (mid-2000s editorial
-  // bias).
+  // "Hot albums" are derived from LB Radio's track list — the radio
+  // is "tracks people are currently playing for this tag", so the
+  // unique RELEASE-GROUPS behind those tracks are the hot albums by
+  // construction.
   //
-  // LB Radio is "tracks people are currently playing for this tag",
-  // so the unique releases behind those tracks ARE the hot albums by
-  // construction. We dedupe by `releaseMbid`, count track occurrences
-  // per release as a within-radio popularity signal, and render the
-  // top 24. No MB roundtrip, no popularity batch, no decay math —
-  // the radio already encodes recency.
+  // LB Radio hands us per-track release MBIDs (specific editions),
+  // not release-group MBIDs (the abstract "this album"). Achordion's
+  // album navigation is canonical at the release-group level — see
+  // AGENTS.md "Albums always link to release-group, never release"
+  // — so we resolve recording → release_group via batched recording
+  // metadata. One extra LB call (50 mbids per chunk), no per-release
+  // MB roundtrips.
   const radio = await getLbRadio(`tag:(${tag})`, "easy").catch(() => null);
   if (!radio || radio.length === 0) {
     return (
@@ -227,12 +227,16 @@ async function AlbumsForTag({ tag }: { tag: string }) {
       </p>
     );
   }
-  // Group by releaseMbid; fall back to (releaseName + artistName) as
-  // a synthetic key when the release MBID is missing so we still
-  // surface the album once rather than splitting it across rows.
+  const recordingMbids = radio
+    .map((t) => t.recordingMbid)
+    .filter((m): m is string => !!m);
+  const meta = await getRecordingMetadata(recordingMbids).catch(
+    () => new Map<string, never>(),
+  );
+  // Group by release_group_mbid (preferred) — that's what `/release-
+  // group/[mbid]` expects and the canonical album entity.
   interface AlbumEntry {
-    key: string;
-    releaseMbid: string | null;
+    releaseGroupMbid: string;
     releaseName: string;
     artistName: string;
     artistMbid: string | null;
@@ -243,23 +247,25 @@ async function AlbumsForTag({ tag }: { tag: string }) {
   }
   const map = new Map<string, AlbumEntry>();
   radio.forEach((t, i) => {
-    if (!t.releaseName) return;
-    const key =
-      t.releaseMbid ??
-      `${t.releaseName.toLowerCase()}|${(t.artistName ?? "").toLowerCase()}`;
-    const existing = map.get(key);
+    if (!t.recordingMbid) return;
+    const m = meta.get(t.recordingMbid);
+    const releaseGroupMbid = m?.release?.release_group_mbid;
+    if (!releaseGroupMbid) return;
+    const existing = map.get(releaseGroupMbid);
     if (existing) {
       existing.count += 1;
       return;
     }
-    map.set(key, {
-      key,
-      releaseMbid: t.releaseMbid,
-      releaseName: t.releaseName,
+    map.set(releaseGroupMbid, {
+      releaseGroupMbid,
+      releaseName: m?.release?.name ?? t.releaseName ?? "",
       artistName: t.artistName,
       artistMbid: t.artistMbid,
-      caaId: t.caaId,
-      caaReleaseMbid: t.caaReleaseMbid,
+      // Prefer the metadata's CAA fields (linked to the canonical
+      // release for the recording); fall back to whatever the radio
+      // track carried directly.
+      caaId: m?.release?.caa_id ?? t.caaId ?? null,
+      caaReleaseMbid: m?.release?.caa_release_mbid ?? t.caaReleaseMbid ?? null,
       count: 1,
       firstSeen: i,
     });
@@ -285,48 +291,33 @@ async function AlbumsForTag({ tag }: { tag: string }) {
   return (
     <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
       {albums.map((a) => {
-        // Cover-art source: prefer caa fields LB hands us (more
-        // accurate edition for the played track), fall back to
-        // building a release-group URL when only releaseMbid is
-        // available.
+        // Cover-art source: prefer the LB-supplied caa fields (the
+        // edition the recording metadata pointed at). Fall back to
+        // the release-group's CAA front lookup so we never double-
+        // hit a release that doesn't itself have art.
         const coverSrc =
           a.caaReleaseMbid && a.caaId
             ? `https://coverartarchive.org/release/${a.caaReleaseMbid}/${a.caaId}-250.jpg`
-            : a.releaseMbid
-              ? `https://coverartarchive.org/release/${a.releaseMbid}/front-250`
-              : null;
-        // Click target: prefer /release/[mbid] since LB Radio gives
-        // us release MBIDs (not release-group). Achordion's
-        // /release/[mbid] route resolves through to the release-group
-        // page. Static text when we don't have an MBID at all.
-        const href = a.releaseMbid ? `/release/${a.releaseMbid}` : null;
-        const card = (
-          <>
-            {coverSrc ? (
-              <CoverArt
-                src={coverSrc}
-                alt={a.releaseName}
-                size={240}
-                className="aspect-square h-auto w-full transition-opacity group-hover:opacity-90"
-                rounded="md"
-              />
-            ) : (
-              <div className="bg-muted aspect-square w-full rounded-md" />
-            )}
+            : caaReleaseGroupUrl(a.releaseGroupMbid, 250);
+        const href = `/release-group/${a.releaseGroupMbid}`;
+        return (
+          <Link
+            key={a.releaseGroupMbid}
+            href={href}
+            className="group min-w-0"
+          >
+            <CoverArt
+              src={coverSrc}
+              alt={a.releaseName}
+              size={240}
+              className="aspect-square h-auto w-full transition-opacity group-hover:opacity-90"
+              rounded="md"
+            />
             <p className="mt-2 truncate text-sm font-medium">{a.releaseName}</p>
             <p className="text-muted-foreground truncate text-xs">
               {a.artistName}
             </p>
-          </>
-        );
-        return href ? (
-          <Link key={a.key} href={href} className="group min-w-0">
-            {card}
           </Link>
-        ) : (
-          <div key={a.key} className="min-w-0">
-            {card}
-          </div>
         );
       })}
     </div>
