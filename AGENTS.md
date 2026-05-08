@@ -501,9 +501,14 @@ Parachord can push confirmed-on-playback MBID → external-streaming-URL matches
     "albumName": "Album Name"
   }
   ```
-  - `entity` (optional, default `recording`) — `recording` for per-track URLs (Spotify track links etc.), `release-group` for per-album URLs (Spotify album links etc.). Aliases: `track` → recording, `album` → release-group. The two entity types use separate cache namespaces so a recording MBID and a release-group MBID can't collide.
+  - `entity` (optional, default `recording`):
+    - `recording` (alias `track`) — per-track URLs (Spotify track links etc.). Cached under recording.
+    - `release-group` (alias `album`) — per-album URLs. Cached under release-group.
+    - `release` — per-album URLs against a *specific edition* MBID. Achordion looks up the release in MB and redirects the cache write to its parent release-group; the response's `stored_as` field surfaces the resolved release-group MBID so Parachord can update its own mapping if useful.
+
+    The two storage entity types (`recording` and `release-group`) use separate cache namespaces so MBIDs can't collide.
   - `label` and `host` are optional — Achordion derives `host` from the URL and capitalises the second-level domain when missing. `trackName` / `artistName` / `albumName` are also optional but encouraged: they make the stored cache entry self-describing (so admins can scan keys without an MB roundtrip to identify what each entry is) and unlock future search-by-name features over the cache.
-- **Response:** `200 { ok: true, accepted: <n> }` on success; `400` for malformed payload; `401` when the bearer is missing or wrong; `503` when the env var isn't configured (Achordion's signal that submissions aren't accepted on this deploy).
+- **Response:** `200 { ok: true, accepted: <n>, stored_as: { entity, mbid } }` on success — `stored_as` echoes the storage key Achordion actually used (matters when `entity: "release"` was redirected to a release-group). `400` for malformed payload or an unresolvable release MBID; `401` when the bearer is missing or wrong; `503` when the env var isn't configured (Achordion's signal that submissions aren't accepted on this deploy).
 - **TTL:** 90 days per MBID per entity. Re-submit periodically to keep the entry warm.
 - **Cache busting:** the submit endpoint calls `revalidatePath` for the entity's user-facing route (`/recording/<mbid>` + `/embed/track/<mbid>` for recordings, `/release-group/<mbid>` for release-groups) so the new links appear immediately without waiting out the page-level edge cache.
 

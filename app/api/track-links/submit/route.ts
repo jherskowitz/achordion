@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { getRelease } from "@/lib/clients/musicbrainz";
 import {
   setCachedTrackLinks,
   type CachedLink,
@@ -46,9 +47,23 @@ const SubmitSchema = z.object({
   mbid: z.string().min(1).max(100),
   // Which MB entity the MBID refers to. Defaults to recording for
   // back-compat with the existing track-only submission shape.
-  // Aliases: `track` → recording, `album` → release-group.
+  //
+  // Accepted:
+  //   - `recording` (alias `track`) → cached under recording.
+  //   - `release-group` (alias `album`) → cached under release-group.
+  //   - `release` → resolved server-side to its parent
+  //     release-group, then cached under release-group. Lets
+  //     Parachord submit the specific edition it played without
+  //     having to look up the rg itself; the abstract album is the
+  //     right cache key since that's what the album page reads.
   entity: z
-    .enum(["recording", "release-group", "track", "album"])
+    .enum([
+      "recording",
+      "release-group",
+      "track",
+      "album",
+      "release",
+    ])
     .optional(),
   links: z
     .array(
@@ -69,9 +84,35 @@ const SubmitSchema = z.object({
   albumName: z.string().max(500).optional(),
 });
 
-function normaliseEntity(raw?: string): LinkEntity {
-  if (raw === "release-group" || raw === "album") return "release-group";
-  return "recording";
+/**
+ * Coerce the raw `entity` field into a storage-side entity
+ * (`recording` | `release-group`) and the MBID we should actually
+ * key on. For `release`, we look up the release in MB to get its
+ * parent release-group MBID — Parachord doesn't have to know that
+ * the abstract album is the right cache key.
+ *
+ * Returns `null` when a release lookup is requested but the MB
+ * fetch fails (the caller should 400 since the submission can't be
+ * stored against any meaningful key).
+ */
+async function resolveStorageKey(
+  rawEntity: string | undefined,
+  rawMbid: string,
+): Promise<{ entity: LinkEntity; mbid: string } | null> {
+  if (rawEntity === "release-group" || rawEntity === "album") {
+    return { entity: "release-group", mbid: rawMbid };
+  }
+  if (rawEntity === "release") {
+    try {
+      const release = await getRelease(rawMbid);
+      const rgMbid = release["release-group"]?.id;
+      if (!rgMbid) return null;
+      return { entity: "release-group", mbid: rgMbid };
+    } catch {
+      return null;
+    }
+  }
+  return { entity: "recording", mbid: rawMbid };
 }
 
 function bearer(request: NextRequest): string | null {
@@ -131,8 +172,23 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     );
   }
 
-  const { mbid, links, trackName, artistName, albumName } = parsed.data;
-  const entity = normaliseEntity(parsed.data.entity);
+  const { mbid: rawMbid, links, trackName, artistName, albumName } =
+    parsed.data;
+
+  // Resolve the storage key. Releases get redirected to their parent
+  // release-group server-side so Parachord can submit whichever
+  // entity it played and we cache against the abstract album.
+  const stored = await resolveStorageKey(parsed.data.entity, rawMbid);
+  if (!stored) {
+    return NextResponse.json(
+      {
+        error:
+          "could not resolve release MBID to a release-group (release not found or has no parent)",
+      },
+      { status: 400, headers: NO_STORE },
+    );
+  }
+  const { entity, mbid } = stored;
 
   // Normalise + drop links we can't resolve to a host (malformed
   // URLs that snuck past the URL validator on weird inputs).
@@ -182,7 +238,15 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 
   return NextResponse.json(
-    { ok: true, accepted: normalised.length },
+    {
+      ok: true,
+      accepted: normalised.length,
+      // Echo back the storage key we actually used. When Parachord
+      // submitted a `release` MBID, this surfaces the resolved
+      // release-group MBID so they can update their own cache
+      // mapping if useful.
+      stored_as: { entity, mbid },
+    },
     { headers: NO_STORE },
   );
 }
