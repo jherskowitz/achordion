@@ -80,7 +80,9 @@ export function TopTracksList({ tracks }: { tracks: TrackEntry[] }) {
               </p>
             </div>
             <InlineTrackLinks recordingMbid={t.recording_mbid} />
-            <span className="text-muted-foreground shrink-0 tabular-nums text-xs">
+            {/* Fixed-width count column so the link icon doesn't
+                shift between rows when counts vary in digit length. */}
+            <span className="text-muted-foreground shrink-0 tabular-nums text-right text-xs min-w-[7ch]">
               {t.listen_count.toLocaleString()}
             </span>
             <TrackActionsMenuSlot
