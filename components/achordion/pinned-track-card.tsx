@@ -10,7 +10,12 @@ import {
 } from "@/lib/clients/musicbrainz";
 import { parachordPlayTrack } from "@/lib/parachord";
 import { ParachordCtaButton } from "./parachord-button";
-import { ExternalLinks, categoriseLinks } from "./external-links";
+import {
+  categoriseLinks,
+  normalizeStreamingUrl,
+  tooltipLabel,
+} from "./external-links";
+import { StreamingLinksRow } from "./streaming-links-row";
 import { TrackActionsMenuSlot } from "./track-actions-menu-slot";
 import { ThanksButton } from "./thanks-button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -18,9 +23,12 @@ import { artistHref, releaseGroupHref } from "@/lib/entity-links";
 import { cn } from "@/lib/utils";
 
 /**
- * Async server component that fetches a recording from MusicBrainz and
- * renders the streaming-favicon row. Wrapped in <Suspense> by the card
- * so the rest of the pin paints immediately while MB resolves.
+ * Async server component that pre-renders whatever streaming URLs MB
+ * has on hand for the recording, then hands off to <StreamingLinksRow>
+ * so the row reloads with the full Parachord-fed / Odesli-enriched
+ * set (and any ISRC-alias hits) post-mount. Wrapped in <Suspense> by
+ * the card so the rest of the pin paints immediately while MB
+ * resolves.
  */
 async function PinnedExternalLinks({
   recordingMbid,
@@ -33,10 +41,25 @@ async function PinnedExternalLinks({
         partitionArtistRelations({ relations: recording.relations }).urls,
       ).streaming
     : [];
+  const initialItems = streaming
+    .map((link) => {
+      const normalised = normalizeStreamingUrl(link.url);
+      if (!normalised) return null;
+      let host: string;
+      try {
+        host = new URL(normalised).hostname.toLowerCase();
+      } catch {
+        return null;
+      }
+      return { url: normalised, label: tooltipLabel(link), host };
+    })
+    .filter((x): x is { url: string; label: string; host: string } => x !== null);
   return (
-    <ExternalLinks
-      links={streaming}
-      addSources={{ mbEntity: "recording", mbid: recordingMbid }}
+    <StreamingLinksRow
+      entity="recording"
+      mbid={recordingMbid}
+      initialItems={initialItems}
+      seedUrl={streaming[0]?.url ?? null}
     />
   );
 }
