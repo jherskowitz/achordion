@@ -59,11 +59,10 @@ async function ActivityFeedSection({
   // section visibility entirely — quiet accounts don't get a
   // half-empty Activity card eating space above the listens list.
   const since = Math.floor(Date.now() / 1000) - 30 * 86400;
-  // 10-item cap keeps the section compact above the listens list —
-  // the personal /feed page is the right surface for browsing the
-  // full timeline; this section is a "what they've been up to lately"
-  // teaser.
-  const events = await getUserActivityFeed(name, { since, limit: 10 }).catch(
+  // 5-item cap — this section is a "what they've been up to lately"
+  // teaser, not a browsing surface. The personal /feed page handles
+  // the full timeline.
+  const events = await getUserActivityFeed(name, { since, limit: 5 }).catch(
     () => [],
   );
   if (events.length === 0) return null;
