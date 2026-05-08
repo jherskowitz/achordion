@@ -48,16 +48,23 @@ async function FeedBody({
   }
   // Fetch native feed + the love-events fan-out in parallel. LB's
   // feed endpoint doesn't emit loves natively, so we splice them in
-  // by walking the viewer's following list and pulling each user's
-  // recent feedback. Cached at the LB-client layer; steady-state
-  // cost is mostly cache hits.
+  // by walking the viewer's following list AND the viewer themself,
+  // then pulling each user's recent feedback. The viewer's own loves
+  // matter for "did the love I just sent land in the feed" parity
+  // with the rest of the activity (pins, recommendations, etc.).
+  // The page's `excludeSelf` filter still hides own activity when
+  // requested. Cached at the LB-client layer; steady-state cost is
+  // mostly cache hits.
   const [events, lovedEvents] = await Promise.all([
     getUserFeed(name, token, { count: 50 }),
     getFollowing(name)
       .catch(() => [] as string[])
-      .then((following) =>
-        getLovedRecordingEvents(following).catch(() => [] as FeedEvent[]),
-      ),
+      .then((following) => {
+        const targets = [name, ...following.filter((u) => u !== name)];
+        return getLovedRecordingEvents(targets).catch(
+          () => [] as FeedEvent[],
+        );
+      }),
   ]);
   if (events === null) {
     return (

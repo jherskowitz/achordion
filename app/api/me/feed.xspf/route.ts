@@ -36,9 +36,12 @@ export async function GET(request: Request) {
     getUserFeed(viewer, token, { count }),
     getFollowing(viewer)
       .catch(() => [] as string[])
-      .then((following) =>
-        getLovedRecordingEvents(following).catch(() => [] as FeedEvent[]),
-      ),
+      .then((following) => {
+        const targets = [viewer, ...following.filter((u) => u !== viewer)];
+        return getLovedRecordingEvents(targets).catch(
+          () => [] as FeedEvent[],
+        );
+      }),
   ]);
   if (events === null) {
     return new Response("Couldn't load feed", { status: 502 });
