@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import { getRecentListens } from "@/lib/clients/listenbrainz";
-import { ScrobbleList } from "@/components/achordion/scrobble-list";
+import { ScrobbleListWithActions } from "@/components/achordion/scrobble-list-with-actions";
 import { TrackListActionsMenu } from "@/components/achordion/track-list-actions-menu";
 import { OpenInParachordButton } from "@/components/achordion/open-in-parachord-button";
 import { PageShell } from "@/components/achordion/page-shell";
@@ -20,20 +20,32 @@ async function ListensSection({
   name: string;
   before?: number;
 }) {
+  // Resolve the data inside try/catch, then render outside — keeping
+  // JSX construction out of the try block so React render-time
+  // errors aren't swallowed silently (react-hooks/error-boundaries).
+  let listens: Awaited<ReturnType<typeof getRecentListens>> | null = null;
+  let errorMessage: string | null = null;
   try {
-    const listens = await getRecentListens(name, {
+    listens = await getRecentListens(name, {
       count: 100,
       ...(before ? { maxTs: before } : {}),
     });
-    return <ScrobbleList listens={listens} />;
   } catch (err) {
+    errorMessage = err instanceof Error ? err.message : "Try again in a moment.";
+  }
+  if (!listens) {
     return (
       <EmptyState
         title="Couldn't load listens"
-        description={err instanceof Error ? err.message : "Try again in a moment."}
+        description={errorMessage ?? "Try again in a moment."}
       />
     );
   }
+  // Client wrapper so signed-in viewers get the per-row ⋮ menu
+  // (love / queue / delete / etc.) without losing the page's
+  // edge-cacheability — the auth check happens client-side via
+  // useSession, so the SSR HTML stays identical for everyone.
+  return <ScrobbleListWithActions username={name} initialListens={listens} />;
 }
 
 async function ListensCta({ name }: { name: string }) {
