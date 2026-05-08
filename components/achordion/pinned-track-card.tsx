@@ -2,7 +2,6 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { Pin } from "lucide-react";
 import { CoverArt } from "./cover-art";
-import { PlayOnHoverFab } from "./play-on-hover-fab";
 import { caaUrlFromListen } from "@/lib/clients/coverart";
 import type { PinnedRecording } from "@/lib/clients/listenbrainz";
 import {
@@ -10,6 +9,7 @@ import {
   partitionArtistRelations,
 } from "@/lib/clients/musicbrainz";
 import { parachordPlayTrack } from "@/lib/parachord";
+import { ParachordCtaButton } from "./parachord-button";
 import {
   categoriseLinks,
   normalizeStreamingUrl,
@@ -188,30 +188,16 @@ export function PinnedTrackCard({
           isHero ? "sm:gap-6" : "sm:gap-5",
         )}
       >
-        {/* Same cover-art-with-hover-play treatment as the recording
-            and album page headers — playback affordance lives on the
-            artwork, not as a separate pill below the byline. */}
-        <div
+        <CoverArt
+          src={cover}
+          alt={meta.release_name ?? meta.track_name}
+          size={isHero ? 500 : 250}
           className={cn(
-            "group relative aspect-square h-auto shrink-0 overflow-hidden rounded-md",
+            "aspect-square h-auto shrink-0",
             isHero ? "w-32 sm:w-40" : "w-20 sm:w-24",
           )}
-        >
-          <CoverArt
-            src={cover}
-            alt={meta.release_name ?? meta.track_name}
-            size={isHero ? 500 : 250}
-            className="aspect-square w-full"
-            rounded="none"
-          />
-          <PlayOnHoverFab
-            href={parachordPlayTrack({
-              artist: meta.artist_name,
-              title: meta.track_name,
-            })}
-            label={`Play "${meta.track_name}" by ${meta.artist_name} in Parachord`}
-          />
-        </div>
+          rounded="md"
+        />
         <div className="flex min-w-0 flex-1 flex-col">
           <p className="text-muted-foreground inline-flex items-center gap-1.5 text-xs tracking-wide uppercase">
             <Pin className="size-3" />
@@ -263,9 +249,14 @@ export function PinnedTrackCard({
           )}
           {isHero && (
             <div className="mt-4 flex flex-wrap items-center gap-3">
-              {/* Play affordance moved to the cover (hover fab); the
-                  action row is now just overflow + thanks +
-                  streaming-favicon row. */}
+              <ParachordCtaButton
+                href={parachordPlayTrack({
+                  artist: meta.artist_name,
+                  title: meta.track_name,
+                })}
+                label="Play in Parachord"
+                size="sm"
+              />
               <TrackActionsMenuSlot track={trackRef} />
               {thankable && (
                 <ThanksButton
@@ -286,6 +277,14 @@ export function PinnedTrackCard({
           )}
           {!isHero && (
             <div className="mt-3 flex flex-wrap items-center gap-3">
+              <ParachordCtaButton
+                href={parachordPlayTrack({
+                  artist: meta.artist_name,
+                  title: meta.track_name,
+                })}
+                label="Play in Parachord"
+                size="sm"
+              />
               <TrackActionsMenuSlot track={trackRef} />
               {thankable && (
                 <ThanksButton
