@@ -40,7 +40,11 @@ export function SiteFooter() {
             .
           </span>
         </p>
-        <nav className="flex items-center justify-center gap-4 sm:justify-end">
+        {/* Mobile: 2-column grid so the seven links don't crush into
+            a single horizontally-scrolling row. Each cell is its own
+            tap target with breathing room. At sm+ we go back to the
+            single-row flex with right-justified alignment. */}
+        <nav className="grid grid-cols-2 gap-x-6 gap-y-2 justify-items-center sm:flex sm:items-center sm:justify-end sm:gap-4">
           <Link href="/about" className="hover:text-foreground">
             About
           </Link>
