@@ -189,3 +189,18 @@
     animation: none;
   }
 }
+
+/* Similar-user card single-info-slot rule. The card's info slot
+   holds either the streamed "Currently into" artists line
+   (.currently-into-line) or the on-air widget (.on-air-pill) — but
+   not both. When the on-air widget appears as a following sibling,
+   hide the artist line so the slot becomes the on-air signal
+   exclusively. When on-air is absent (the listener isn't playing),
+   the artist line uses the reserved space.
+   Pure CSS swap so neither component needs to know about the
+   other; both just stream into the same slot via Suspense. See
+   components/achordion/similar-users-list.tsx for the structure
+   that maps to these markers. */
+.currently-into-line:has(~ .on-air-pill) {
+  display: none;
+}

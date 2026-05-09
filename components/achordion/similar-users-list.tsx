@@ -1,15 +1,43 @@
-import { Suspense } from "react";
-import Link from "next/link";
 import type { SimilarUser } from "@/lib/clients/listenbrainz";
-import { OnAirIndicator } from "./on-air-indicator";
-import { UserAvatar } from "./user-avatar";
-import { cn } from "@/lib/utils";
+import { UserCard } from "./user-card";
 
 interface SimilarUsersListProps {
   users: SimilarUser[];
   /** "grid" — multi-column responsive cards (full page).
    *  "stack" — vertical list (sidebar). */
   layout?: "grid" | "stack";
+}
+
+/** Bucket users into three qualitative tiers based on their rank
+ *  within the visible cohort. Avoids the "we only share 36% of our
+ *  taste" misread that comes from displaying LB's raw similarity
+ *  field as a percentage — that field is a 0-1 relative ranking
+ *  score that even for the most similar listener typically caps
+ *  around 0.3-0.4. Tier label + colour is the honest unit. */
+function tierFor(index: number, total: number): {
+  label: string;
+  chipClass: string;
+} {
+  // 0 (most similar) → 1 (least similar) within the cohort.
+  // Even thirds: top 1/3 highly, middle 1/3 similar, bottom 1/3
+  // somewhat. Single-element edge case lands in the highly bucket.
+  const rank = total <= 1 ? 0 : index / (total - 1);
+  if (rank < 1 / 3) {
+    return {
+      label: "Highly similar",
+      chipClass: "bg-primary/15 text-primary",
+    };
+  }
+  if (rank < 2 / 3) {
+    return {
+      label: "Similar",
+      chipClass: "bg-foreground/10 text-foreground",
+    };
+  }
+  return {
+    label: "Somewhat similar",
+    chipClass: "bg-muted text-muted-foreground",
+  };
 }
 
 export function SimilarUsersList({
@@ -23,53 +51,29 @@ export function SimilarUsersList({
       </p>
     );
   }
+  // Grid: stay 2-up at lg so the longer tier chip
+  // ("Somewhat similar") doesn't squeeze the username column at
+  // narrow grid breakpoints. Bumps to 3-up at xl where there's
+  // genuinely room. Stack stays vertical for sidebar use.
   const wrapperClass =
     layout === "stack"
       ? "space-y-1.5"
-      : "grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3";
+      : "grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3";
   return (
     <ul className={wrapperClass}>
-      {users.map((u) => {
-        const pct = Math.round(u.similarity * 100);
-        return (
-          <li
-            key={u.user_name}
-            className={cn(
-              "border-border/60 hover:border-foreground/30 hover:bg-muted/30 group flex items-center gap-3 rounded-xl border transition-colors",
-              layout === "stack" ? "px-2.5 py-1.5" : "px-3 py-2.5",
-            )}
-          >
-            <UserAvatar
-              username={u.user_name}
-              className={layout === "stack" ? "size-7" : "size-9"}
-              fallbackClassName={layout === "stack" ? "text-xs" : "text-sm"}
-            />
-            <div className="min-w-0 flex-1">
-              <Link
-                href={`/user/${encodeURIComponent(u.user_name)}`}
-                className="block min-w-0"
-              >
-                <p className="truncate text-sm font-medium">{u.user_name}</p>
-                <div className="bg-muted mt-1 h-0.5 w-full overflow-hidden rounded-full">
-                  <div
-                    className="bg-foreground/60 h-full"
-                    style={{ width: `${pct}%` }}
-                  />
-                </div>
-              </Link>
-              <Suspense fallback={null}>
-                <OnAirIndicator
-                  username={u.user_name}
-                  className="mt-1.5"
-                />
-              </Suspense>
-            </div>
-            <span className="text-muted-foreground/70 shrink-0 self-start tabular-nums text-xs">
-              {pct}%
-            </span>
-          </li>
-        );
-      })}
+      {users.map((u, i) => (
+        <UserCard
+          key={u.user_name}
+          username={u.user_name}
+          // Deep-link to stats — when scanning similar listeners the
+          // question is "how do their top artists / albums / tracks
+          // compare to mine?", not "what's their profile overview
+          // look like?".
+          href={`/user/${encodeURIComponent(u.user_name)}/stats`}
+          tier={tierFor(i, users.length)}
+          layout={layout}
+        />
+      ))}
     </ul>
   );
 }

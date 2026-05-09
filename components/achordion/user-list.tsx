@@ -1,8 +1,12 @@
-import { Suspense } from "react";
-import Link from "next/link";
-import { OnAirIndicator } from "./on-air-indicator";
-import { UserAvatar } from "./user-avatar";
+import { UserCard } from "./user-card";
 
+/**
+ * Generic user-grid for followers / following lists. Wraps the
+ * shared `<UserCard>` so cards look identical to the explore
+ * similar-users variant — same avatar, "Currently into" line,
+ * on-air slot, touch sizing — minus the tier chip (similarity
+ * isn't a meaningful concept in a follower / following context).
+ */
 export function UserList({
   users,
   emptyMessage = "Nothing here yet.",
@@ -18,25 +22,9 @@ export function UserList({
     );
   }
   return (
-    <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+    <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
       {users.map((name) => (
-        <li
-          key={name}
-          className="border-border/60 hover:border-foreground/30 hover:bg-muted/30 flex items-center gap-3 rounded-xl border px-3 py-2.5 transition-colors"
-        >
-          <UserAvatar username={name} className="size-9" fallbackClassName="text-sm" />
-          <div className="min-w-0 flex-1">
-            <Link
-              href={`/user/${encodeURIComponent(name)}`}
-              className="block truncate text-sm font-medium"
-            >
-              {name}
-            </Link>
-            <Suspense fallback={null}>
-              <OnAirIndicator username={name} className="mt-1" />
-            </Suspense>
-          </div>
-        </li>
+        <UserCard key={name} username={name} layout="grid" />
       ))}
     </ul>
   );
