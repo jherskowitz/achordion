@@ -151,11 +151,12 @@ export function UserStatsRadioWidget({ username }: { username: string }) {
       {open && (
         <div
           id={`stats-radio-range-${username}`}
-          // Popover anchored to the chevron — fixed-width card with
-          // the same look as the LB Radio cards on /radio so the
-          // visual identity carries through even though the trigger
-          // has been collapsed to an icon.
-          className="border-border/60 bg-background absolute left-0 top-full z-40 mt-2 w-72 max-w-[80vw] rounded-2xl border p-3 shadow-lg"
+          // Popover anchored to the chevron's right edge so the
+          // 288px card grows LEFT — same look as the LB Radio cards
+          // on /radio. Anchoring left-0 was overflowing the viewport
+          // on mobile because the trigger sits on the right side of
+          // the user header.
+          className="border-border/60 bg-background absolute right-0 top-full z-40 mt-2 w-72 max-w-[calc(100vw-1rem)] rounded-2xl border p-3 shadow-lg"
         >
           <h2 className="text-sm font-semibold tracking-wide uppercase">
             {radioName}

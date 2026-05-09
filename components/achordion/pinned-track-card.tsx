@@ -211,7 +211,13 @@ export function PinnedTrackCard({
     >
       <div
         className={cn(
-          "flex items-start gap-4",
+          // Stack cover above content on mobile so the action row
+          // (kebab + streaming favicons + AddSources tile) gets the
+          // card's full width — at narrow viewports there isn't
+          // room beside the cover for those 7 size-9 elements
+          // without wrapping the favicon row off to its own line.
+          // Side-by-side returns at sm+ where it has room.
+          "flex flex-col items-start gap-4 sm:flex-row sm:items-start",
           isHero ? "sm:gap-6" : "sm:gap-5",
         )}
       >

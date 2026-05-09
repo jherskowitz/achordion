@@ -7,28 +7,38 @@ export function SiteFooter() {
           Stacks centered on mobile. */}
       <div className="text-muted-foreground mx-auto flex max-w-7xl flex-col gap-3 px-4 py-8 text-center text-xs sm:flex-row sm:items-center sm:justify-between sm:gap-6 sm:px-6 sm:text-left">
         <p>
-          Built on{" "}
-          <Link
-            href="https://listenbrainz.org"
-            className="hover:text-foreground underline-offset-4 hover:underline"
-          >
-            ListenBrainz
-          </Link>{" "}
-          and{" "}
-          <Link
-            href="https://musicbrainz.org"
-            className="hover:text-foreground underline-offset-4 hover:underline"
-          >
-            MusicBrainz
-          </Link>
-          . Made with ❤️ by{" "}
-          <a
-            href="mailto:j@parachord.com"
-            className="hover:text-foreground underline-offset-4 hover:underline"
-          >
-            J Herskowitz
-          </a>
-          .
+          <span className="block sm:inline">
+            Built on{" "}
+            <Link
+              href="https://listenbrainz.org"
+              className="hover:text-foreground underline-offset-4 hover:underline"
+            >
+              ListenBrainz
+            </Link>{" "}
+            and{" "}
+            <Link
+              href="https://musicbrainz.org"
+              className="hover:text-foreground underline-offset-4 hover:underline"
+            >
+              MusicBrainz
+            </Link>
+            .
+          </span>{" "}
+          {/* `block sm:inline` so on mobile this byline drops to its
+              own line instead of running on at the end of the
+              "Built on…" sentence — at narrow widths the run-on
+              wraps awkwardly mid-sentence. Desktop reads as one
+              continuous line. */}
+          <span className="block sm:inline">
+            Made with ❤️ by{" "}
+            <a
+              href="mailto:j@parachord.com"
+              className="hover:text-foreground underline-offset-4 hover:underline"
+            >
+              J Herskowitz
+            </a>
+            .
+          </span>
         </p>
         <nav className="flex items-center justify-center gap-4 sm:justify-end">
           <Link href="/about" className="hover:text-foreground">
