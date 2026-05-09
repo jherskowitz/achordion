@@ -13,8 +13,12 @@ export function StatRangePicker({ active }: { active: StatRange }) {
 
   function makeHref(range: StatRange) {
     const params = new URLSearchParams(searchParams.toString());
-    if (range === "all_time") params.delete("range");
-    else params.set("range", range);
+    // Always set the range param explicitly (including all_time)
+    // so the link works against the page's current default. We
+    // used to delete the param on all_time when "all_time" was
+    // the default; the page now defaults to "year", so deleting
+    // would land on year instead. Explicit is correct here.
+    params.set("range", range);
     const qs = params.toString();
     return `${pathname}${qs ? `?${qs}` : ""}`;
   }
