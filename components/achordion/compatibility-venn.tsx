@@ -1,5 +1,3 @@
-"use client";
-
 /**
  * Two-set compatibility visualization — viewer vs profile-owner —
  * for the followers / following pages. Shows a Jaccard-index
@@ -7,27 +5,14 @@
  * sizes the overlap region against the union, so the visual area
  * tracks the number.
  *
- * Caller (the page) computes the three counts (viewer-only, both,
- * owner-only) and passes them in.
+ * Pure presentational component. Caller (the page) computes the
+ * three counts (viewer-only, both, owner-only) and passes them in.
  *
  * Accessibility: the SVG is `aria-hidden`; an inline summary
  * sentence below the chart is the screen-reader source of truth.
- * Hover-tooltips (Radix-driven) on each region give the exact
- * count in styled context, replacing the native browser-yellow
- * `<title>` we used to ship.
- *
- * Why a client component: Radix Tooltip needs a client boundary,
- * and the SVG triggers benefit from the same hover delay /
- * positioning logic the rest of the app uses. The component does
- * no async work itself — it's just rendering arithmetic.
+ * Hover-tooltips on each region show their exact count.
  */
 
-import { Info } from "lucide-react";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
 interface CompatibilityVennProps {
@@ -107,41 +92,28 @@ export function CompatibilityVenn({
           className="h-32 w-full max-w-[280px] shrink-0 sm:w-[280px]"
           aria-hidden
         >
-          {/* Each circle is a Radix Tooltip trigger so hover gives
-              the styled popover we use elsewhere on the site,
-              instead of the native yellow <title> tooltip. asChild
-              clones the SVG element rather than wrapping it in a
-              span — preserves the SVG hierarchy. */}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <circle
-                cx={cxViewer}
-                cy={cy}
-                r={rViewer}
-                className="fill-foreground/15 stroke-foreground/40 cursor-help"
-                strokeWidth={1}
-              />
-            </TooltipTrigger>
-            <TooltipContent>
-              {viewerLabel}: {(viewerOnly + both).toLocaleString()}{" "}
-              {metricLabel.toLowerCase()}
-            </TooltipContent>
-          </Tooltip>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <circle
-                cx={cxOwner}
-                cy={cy}
-                r={rOwner}
-                className="fill-primary/30 stroke-primary/60 cursor-help"
-                strokeWidth={1}
-              />
-            </TooltipTrigger>
-            <TooltipContent>
-              {ownerLabel}: {(ownerOnly + both).toLocaleString()}{" "}
-              {metricLabel.toLowerCase()}
-            </TooltipContent>
-          </Tooltip>
+          <circle
+            cx={cxViewer}
+            cy={cy}
+            r={rViewer}
+            className="fill-foreground/15 stroke-foreground/40"
+            strokeWidth={1}
+          >
+            <title>
+              {viewerLabel}: {viewerOnly + both} {metricLabel.toLowerCase()}
+            </title>
+          </circle>
+          <circle
+            cx={cxOwner}
+            cy={cy}
+            r={rOwner}
+            className="fill-primary/30 stroke-primary/60"
+            strokeWidth={1}
+          >
+            <title>
+              {ownerLabel}: {ownerOnly + both} {metricLabel.toLowerCase()}
+            </title>
+          </circle>
           {/* Labels positioned at each circle's "exclusive" side so
               they don't overlap the intersection region. */}
           <text
@@ -179,25 +151,8 @@ export function CompatibilityVenn({
           <p className="text-foreground text-3xl font-semibold tabular-nums">
             {pct}%
           </p>
-          <p className="text-muted-foreground mt-0.5 inline-flex items-center gap-1 text-xs tracking-wide uppercase">
+          <p className="text-muted-foreground mt-0.5 text-xs tracking-wide uppercase">
             {metricLabel} compatibility
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  type="button"
-                  aria-label="How is compatibility calculated?"
-                  className="text-muted-foreground/70 hover:text-foreground inline-flex cursor-help items-center"
-                >
-                  <Info className="size-3.5" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent className="max-w-[260px] text-center">
-                Share of the combined unique{" "}
-                {metricLabel.toLowerCase()} across both of you that
-                you have in common — {both.toLocaleString()} mutual
-                ÷ {union.toLocaleString()} total unique = {pct}%.
-              </TooltipContent>
-            </Tooltip>
           </p>
           <p className="text-muted-foreground mt-3 text-sm">
             <span className="text-foreground font-medium tabular-nums">
