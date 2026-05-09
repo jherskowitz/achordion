@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ExternalLink, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -8,14 +8,22 @@ import { faviconUrl } from "@/lib/favicon";
 
 /**
  * Per-row affordance that lazy-loads a track's external streaming
- * links on click and reveals them inline as a favicon row beneath
- * the track. Zero up-front cost — the API call only fires the first
- * time a user expands a given track row.
+ * links on click and reveals them as a floating popover anchored to
+ * the trigger. Zero up-front cost — the API call only fires the
+ * first time a user expands a given track row.
+ *
+ * **Why a popover, not an inline expansion.** Earlier versions slid
+ * a wide pill open horizontally between the title and the duration
+ * column, which worked on desktop but pushed siblings around on
+ * mobile (duration column off-screen, row wraps). The popover
+ * leaves the row layout untouched: the trigger is always one small
+ * button; the favicon row floats *above* adjacent content (right-
+ * anchored, growing leftward) and is dismissed on click-outside.
  *
  * Mounted on track-row primitives (TrackList, LiveScrobbleList,
- * TopTracksList, etc.) as a small icon button next to the track
- * title. State is per-row local: collapsed by default, expands on
- * click, never auto-collapses.
+ * TopTracksList, etc.) as a small icon button next to the duration
+ * column. State is per-row local: collapsed by default, expands on
+ * click, closes on click-outside or Escape.
  *
  * Server-side resolution lives in `/api/track-links` — calls Odesli
  * with an MB streaming-rel seed (or an explicit seedUrl) and merges
@@ -44,6 +52,7 @@ export function InlineTrackLinks({
   seedUrl,
 }: InlineTrackLinksProps) {
   const [open, setOpen] = useState(false);
+  const wrapperRef = useRef<HTMLSpanElement | null>(null);
   const enabled = open && !!(recordingMbid || seedUrl);
   const queryKey = ["track-links", recordingMbid ?? null, seedUrl ?? null];
   const { data, isFetching, error } = useQuery<{ links: ResolvedLink[] }>({
@@ -63,32 +72,48 @@ export function InlineTrackLinks({
     refetchOnWindowFocus: false,
   });
 
+  // Click-outside + Escape to close. Standard popover behaviour —
+  // without it, a row's open popover stays mounted indefinitely
+  // and obscures adjacent content. Listener is only attached while
+  // open so the no-op case stays cheap.
+  useEffect(() => {
+    if (!open) return;
+    function onMouseDown(e: MouseEvent) {
+      const node = wrapperRef.current;
+      if (!node) return;
+      if (e.target instanceof Node && !node.contains(e.target)) {
+        setOpen(false);
+      }
+    }
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setOpen(false);
+    }
+    document.addEventListener("mousedown", onMouseDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onMouseDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [open]);
+
   // Don't render the trigger at all when we have nothing to seed
   // the lookup with — the row's title link still goes to the
   // recording page where the full external-links block lives.
   if (!recordingMbid && !seedUrl) return null;
 
-  const hasLinks = data && data.links.length > 0;
   return (
-    // Single pill: trigger icon + favicon row sliding open inside
-    // a shared rounded border. Pill height bumps slightly on
-    // expand for breathing room.
-    <span
-      className={cn(
-        "border-border/60 inline-flex shrink-0 items-center overflow-hidden rounded-full border bg-transparent transition-[background-color,border-color,height] duration-200 ease-out pointer-coarse:h-9",
-        open
-          ? "h-7 border-primary/30 bg-primary/10 pointer-coarse:h-9"
-          : "h-6",
-      )}
-    >
+    <span ref={wrapperRef} className="relative inline-flex shrink-0">
       <button
         type="button"
         onClick={() => setOpen((x) => !x)}
         aria-expanded={open}
+        aria-haspopup="menu"
         aria-label={open ? "Hide streaming links" : "Show streaming links"}
         className={cn(
-          "inline-flex size-6 items-center justify-center rounded-full transition-colors pointer-coarse:size-9",
-          open ? "size-7 text-primary pointer-coarse:size-9" : "text-muted-foreground hover:text-foreground",
+          "inline-flex size-6 items-center justify-center rounded-full border transition-colors pointer-coarse:size-9",
+          open
+            ? "border-primary/40 text-primary bg-primary/10"
+            : "border-border/60 text-muted-foreground hover:text-foreground",
         )}
       >
         {isFetching ? (
@@ -97,32 +122,35 @@ export function InlineTrackLinks({
           <ExternalLink className="size-3.5" />
         )}
       </button>
-      {/* Slide-out region: collapsed to zero width when closed.
-          A vertical hairline separates the trigger from the
-          favicon row when there's content to show — gives the
-          pill a "two-zone" structure (action / results). */}
-      <span
-        aria-hidden={!open}
-        className={cn(
-          "flex max-w-0 items-center overflow-hidden whitespace-nowrap transition-[max-width] duration-200 ease-out",
-          open && "max-w-[40rem]",
-        )}
-      >
-        {hasLinks && (
-          <span
-            aria-hidden
-            className="bg-primary/20 mx-0.5 my-1 h-4 w-px shrink-0"
-          />
-        )}
-        <span className="flex items-center gap-0.5 px-1">
+
+      {/* Floating favicon row. Right-anchored to the trigger and
+          positioned vertically centered against it so it doesn't
+          shift the row when it opens. z-20 keeps it above any
+          neighbouring content; the solid background + border give
+          enough contrast for readability over a busy row. */}
+      {open && (
+        <span
+          role="menu"
+          className={cn(
+            "border-border/60 bg-background absolute top-1/2 right-0 z-20",
+            "-translate-y-1/2 rounded-full border shadow-md",
+            "flex items-center gap-0.5 px-1 py-1 whitespace-nowrap",
+            "animate-in fade-in zoom-in-95 duration-150",
+          )}
+        >
           {error && (
-            <span className="text-muted-foreground px-1 text-xs">
+            <span className="text-muted-foreground px-2 text-xs">
               Couldn&apos;t load links
             </span>
           )}
           {data && data.links.length === 0 && !isFetching && (
-            <span className="text-muted-foreground px-1 text-xs">
+            <span className="text-muted-foreground px-2 text-xs">
               No streaming links found
+            </span>
+          )}
+          {!data && isFetching && (
+            <span className="text-muted-foreground px-2 text-xs">
+              Loading…
             </span>
           )}
           {data?.links.map((link) => (
@@ -133,8 +161,8 @@ export function InlineTrackLinks({
               rel="noopener noreferrer"
               aria-label={link.label}
               title={link.label}
-              tabIndex={open ? 0 : -1}
-              className="hover:bg-foreground/10 inline-flex size-6 items-center justify-center rounded-full transition-colors pointer-coarse:size-7"
+              role="menuitem"
+              className="hover:bg-foreground/10 inline-flex size-7 items-center justify-center rounded-full transition-colors pointer-coarse:size-9"
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
@@ -148,7 +176,7 @@ export function InlineTrackLinks({
             </a>
           ))}
         </span>
-      </span>
+      )}
     </span>
   );
 }
