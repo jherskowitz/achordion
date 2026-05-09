@@ -36,6 +36,11 @@ function makeLimiter(prefix: string, limit: number, window: `${number} ${"s" | "
 
 const coverLimiter = makeLimiter("ip:cover", 60, "60 s");
 const imageLimiter = makeLimiter("ip:image", 60, "60 s");
+// Announcement event ingestion. Real users emit at most a handful per
+// banner shown (view + maybe dismiss + maybe cta-click). 60/min/IP is
+// far more than any legitimate client should need but blocks a script
+// that tries to inflate counters.
+const announcementEventLimiter = makeLimiter("ip:announcement-event", 60, "60 s");
 // Page-route limiter has to be generous: a real user opening a tab
 // triggers the page request itself + N RSC prefetches for hovered
 // links + N async API XHRs (reviews, social-proof, tags, etc.), so
@@ -77,7 +82,7 @@ export function getClientIp(request: Request): string {
  * when the IP is over its budget.
  */
 export async function checkRateLimit(
-  kind: "cover" | "image" | "page",
+  kind: "cover" | "image" | "page" | "announcement-event",
   request: Request,
 ): Promise<{ ok: boolean }> {
   const limiter =
@@ -85,7 +90,9 @@ export async function checkRateLimit(
       ? coverLimiter
       : kind === "image"
         ? imageLimiter
-        : pageLimiter;
+        : kind === "announcement-event"
+          ? announcementEventLimiter
+          : pageLimiter;
   if (!limiter) return { ok: true };
   const ip = getClientIp(request);
   const result = await limiter.limit(ip);
