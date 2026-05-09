@@ -66,7 +66,7 @@ Achordion's track and album pages *are* multi-service smart links. Every recordi
 And every page has an embed widget. Drop something like this into your own site:
 
 ```html
-<iframe src="https://achordion.xyz/embed/album/efa54250-c7ba-47aa-9761-9a56aaf06887" width="600" height="260" loading="lazy" style="border:0;border-radius:12px" title="Achordion album"></iframe>
+<iframe src="https://achordion.xyz/embed/album/efa54250-c7ba-47aa-9761-9a56aaf06887" width="600" height="260" loading="lazy" style="border:0;border-radius:12px" title="Post-Pardon — Quarantine Angst"></iframe>
 ```
 
 …and visitors get a clean cover-art card with the streaming services available, branded as part of *your* page rather than someone else's. Tracks get the same treatment in a more compact card; albums add an expandable tracklist with per-track service rows.
