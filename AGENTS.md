@@ -552,6 +552,17 @@ For that trust to be earned, **Parachord-mobile needs to register Universal Link
   - Same idea, different ceremony. Add `<intent-filter android:autoVerify="true">` for each Universal-Link path host on the activity that handles the deep link. Host the matching `assetlinks.json` at `https://parachord.com/.well-known/assetlinks.json` with the app's package name + signing-cert SHA-256 fingerprint.
   - Verified App Links open the app directly without the OS chooser; an unverified or unmatched path opens the URL in the user's default browser, again landing on the install pitch.
 
+- **Android — `parachord://listen-along` doesn't launch the app (likely host-scoped intent filter)**
+  - Symptom: `parachord://play/album|playlist|radio|...` URLs from Achordion's hover-Play FABs and "Play in Parachord" buttons launch the Android app correctly. `parachord://listen-along?service=...&user=...` from the user-card listen-along buttons does **not** — Chrome falls through (or our `intent://` form lands on the `S.browser_fallback_url`).
+  - Cause is almost certainly that Parachord-Android's `<intent-filter>` declares `<data android:scheme="parachord" android:host="play" />` (and probably `host="import"`, `host="queue"`) but no host entry for `listen-along`. Filters with a `host=` attribute only match URLs whose host segment equals that value, so `parachord://listen-along?...` finds no claimant and the OS treats it as un-handleable.
+  - Quick diagnostic — this should error with "Activity not started, unable to resolve Intent" if the host scoping is the cause:
+    ```
+    adb shell am start -W -a android.intent.action.VIEW \
+      -d "parachord://listen-along?service=listenbrainz&user=kutx"
+    ```
+  - **Fix on the Android side**: either add a sibling `<data android:host="listen-along" />` entry to the existing filter, drop the `host=` attribute entirely so every `parachord://*` URL matches (simplest), or split into one `<intent-filter>` per protocol verb. The complete protocol surface Achordion ships today is `play/album`, `play/playlist`, `play/radio`, `import`, `queue/add`, and **`listen-along`** — make sure every host shown in [`lib/parachord.ts`](./lib/parachord.ts) is reachable.
+  - After the Android fix lands, raw `parachord://listen-along?...` from a regular anchor click will launch the app the same way Play does today. No Achordion-side change needed.
+
 - **Custom-scheme fallback** (`parachord://...`) should keep working as today — it's still useful from contexts that don't go through a browser (in-app webviews, share sheets). On iOS in particular, `parachord://` URLs invoked from within Safari are subject to the same OS dialog ("Cannot Open Page") when the app isn't installed; that's why the Universal-Link form is preferred from web pages and we keep `parachord://` for app-to-app deep linking.
 
 If those pieces are in place, Achordion's mobile UX needs **no further changes** — every play surface taps a `parachord://` URL, the OS routes it to the app or the web fallback, and the user either plays the track or gets pitched on installing.

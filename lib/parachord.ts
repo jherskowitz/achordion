@@ -126,8 +126,35 @@ export function parachordPlayPlaylist(input: {
  *  - Mode C: pass `url` — Parachord uses the URL as the initial pool
  *    AND auto-refills from the same URL when the queue runs low.
  *  - Mode C-inline: pass `tracks` (initial pool) plus `refill` (URL to
- *    fetch more from when low).
+ *    fetch more from when low). The inline pool is intentionally
+ *    capped (see `INLINE_RADIO_POOL_CAP` below) — Parachord's
+ *    `PoolRefiller` fetches more from `refill` as the queue drains,
+ *    so callers should pass the full upstream tracklist and trust
+ *    the cap to keep the URL under Chrome-on-Android's intent-
+ *    dispatch byte ceiling.
  */
+/**
+ * Cap on the inline initial pool when `refill` is also set.
+ *
+ * Chrome on Android downgrades intent dispatch to a launcher intent
+ * (no `data` URI, app receives a vanilla launch with nothing to act
+ * on) once the URL exceeds ~7-8KB. Without a cap, the LB-Radio
+ * caller in particular inlines all 50 tracks (~7.5KB encoded), which
+ * trips the threshold and breaks Radio playback on Android Chrome —
+ * see Achordion issue #54.
+ *
+ * 5 is large enough to cover the first ~15 minutes of listening
+ * without the refill having to land instantly, and small enough that
+ * the encoded payload stays around ~750 bytes. Parachord-Android's
+ * `PoolRefiller` triggers when pool size drops below 3, so by the
+ * time the second track plays we've already kicked off the next
+ * refill batch.
+ *
+ * Mode B (tracks only, no refill) deliberately doesn't cap — those
+ * callers genuinely need the full pool because nothing's going to
+ * top it up. Their byte budget is the caller's responsibility.
+ */
+const INLINE_RADIO_POOL_CAP = 5;
 export function parachordPlayRadio(input: {
   artist?: string;
   tag?: string;
@@ -143,7 +170,12 @@ export function parachordPlayRadio(input: {
   if (input.tag) params.set("tag", input.tag);
   if (input.prompt) params.set("prompt", input.prompt);
   if (input.url) params.set("url", input.url);
-  if (input.tracks?.length) params.set("tracks", encodeTracks(input.tracks));
+  if (input.tracks?.length) {
+    const slice = input.refill
+      ? input.tracks.slice(0, INLINE_RADIO_POOL_CAP)
+      : input.tracks;
+    params.set("tracks", encodeTracks(slice));
+  }
   if (input.refill) params.set("refill", input.refill);
   if (input.displayName) params.set("name", input.displayName);
   if (input.shuffle) params.set("shuffle", "1");
