@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Radio } from "lucide-react";
 import type { PlayingNowListen } from "@/lib/clients/listenbrainz";
 import { parachordListenAlong } from "@/lib/parachord";
+import { launchParachord } from "@/lib/parachord-launch";
 import { artistHref, recordingHref } from "@/lib/entity-links";
 import { cn } from "@/lib/utils";
 import { OnAirText } from "./on-air-text";
@@ -228,6 +229,7 @@ export function LiveOnAirIndicator({
           // behavior, which makes tapping look broken to users.
           <a
             href={listenAlongHref}
+            onClick={launchParachord(listenAlongHref)}
             aria-label={`Listen along with ${username} in Parachord`}
             className="bg-primary text-primary-foreground inline-flex h-6 shrink-0 items-center gap-1 rounded-full px-2 text-[10px] font-medium transition-opacity hover:opacity-90"
           >
@@ -265,6 +267,7 @@ export function LiveOnAirIndicator({
         // affordance is self-explanatory without any tooltip.
         <a
           href={listenAlongHref}
+          onClick={launchParachord(listenAlongHref)}
           title={`Listen along with ${username} in Parachord`}
           aria-label={`Listen along with ${username} in Parachord`}
           className="bg-primary/90 text-primary-foreground hover:bg-primary inline-flex size-4 shrink-0 items-center justify-center gap-1 rounded-full transition-colors pointer-coarse:h-6 pointer-coarse:w-auto pointer-coarse:px-2 pointer-coarse:text-[10px] pointer-coarse:font-medium"
