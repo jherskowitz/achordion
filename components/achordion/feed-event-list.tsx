@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import {
   Pin,
@@ -29,8 +30,10 @@ import {
 } from "@/lib/entity-links";
 import {
   getRecordingMetadata,
+  getUserPins,
   type FeedEvent,
 } from "@/lib/clients/listenbrainz";
+import { PinnedTrackCard } from "./pinned-track-card";
 
 function stripHtml(s: string): string {
   return s.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
@@ -615,6 +618,10 @@ interface ThanksMeta {
   thankee_username?: string;
   blurb_content?: string | null;
   original_event_type?: string;
+  /** Row ID of the thanked event (for thanks-on-pin, this is the
+   *  thankee's pin row_id). Lets us look up the actual track that
+   *  was thanked so it can be shown + played in this event row. */
+  original_event_id?: number;
 }
 
 const ORIGINAL_LABEL: Record<string, string> = {
@@ -622,6 +629,42 @@ const ORIGINAL_LABEL: Record<string, string> = {
   recording_recommendation: "recommendation",
   personal_recording_recommendation: "personal recommendation",
 };
+
+/**
+ * Async server component that fetches the thankee's pin history
+ * and renders the pinned track that was thanked. Wrapped in
+ * <Suspense fallback={null}> by the caller — the rest of the
+ * thanks event paints immediately and this preview streams in
+ * when LB resolves.
+ *
+ * Pin lookup: scans up to 25 of the thankee's most recent pins
+ * for one whose `row_id` matches the thanks event's
+ * `original_event_id`. Most pins remain reachable for this
+ * window; older / expired pins outside it gracefully fall back
+ * to the text-only event display.
+ */
+async function ThankedPinPreview({
+  thankee,
+  originalEventId,
+}: {
+  thankee: string | undefined;
+  originalEventId: number | undefined;
+}) {
+  if (!thankee || !originalEventId) return null;
+  const pins = await getUserPins(thankee, 25).catch(() => []);
+  const pin = pins.find((p) => p.row_id === originalEventId);
+  if (!pin) return null;
+  // Compact PinnedTrackCard inside the event row gives the
+  // followed listener cover art + title + artist + play affordance
+  // + the streaming-favicon row, so a thanks event becomes a
+  // playable signal that propagates the recommendation rather
+  // than a flat string.
+  return (
+    <div className="mt-3">
+      <PinnedTrackCard pin={pin} variant="row" />
+    </div>
+  );
+}
 
 function ThanksEvent({ event }: { event: FeedEvent }) {
   const m = event.metadata as ThanksMeta | undefined;
@@ -648,6 +691,14 @@ function ThanksEvent({ event }: { event: FeedEvent }) {
         <p className="text-foreground/80 mt-1.5 text-sm leading-5 italic">
           “{m.blurb_content}”
         </p>
+      )}
+      {m?.original_event_type === "recording_pin" && (
+        <Suspense fallback={null}>
+          <ThankedPinPreview
+            thankee={thankee}
+            originalEventId={m?.original_event_id}
+          />
+        </Suspense>
       )}
     </EventShell>
   );
