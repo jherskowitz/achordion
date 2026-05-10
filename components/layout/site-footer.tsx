@@ -63,20 +63,12 @@ export function SiteFooter() {
           {/* External — explicit anchors so prefetch / Link doesn't
               try to hit external hosts as Next routes. */}
           <a
-            href="https://parachord.com"
+            href="https://feedback.achordion.xyz/"
             target="_blank"
             rel="noopener noreferrer"
             className="hover:text-foreground"
           >
-            Parachord
-          </a>
-          <a
-            href="https://github.com/jherskowitz/achordion/discussions"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="hover:text-foreground"
-          >
-            Discussions
+            Feedback
           </a>
           <a
             href="https://github.com/jherskowitz/achordion"
@@ -85,6 +77,14 @@ export function SiteFooter() {
             className="hover:text-foreground"
           >
             Source Code
+          </a>
+          <a
+            href="https://parachord.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:text-foreground"
+          >
+            Parachord
           </a>
         </nav>
       </div>
