@@ -3,7 +3,13 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { ThemeRadio } from "@/components/achordion/theme-radio";
 import { UserAvatar } from "@/components/achordion/user-avatar";
-import { signOutAction } from "./actions";
+import { BlueskyLinkForm } from "@/components/achordion/bluesky-link-form";
+import { isFeatureEnabled } from "@/lib/flags";
+import { getBskyLink } from "@/lib/bsky-link";
+import { signOutAction, unlinkBlueskyAction } from "./actions";
+
+const SITE_URL =
+  process.env.NEXT_PUBLIC_SITE_URL ?? "https://achordion.xyz";
 
 export const metadata = { title: "Profile" };
 
@@ -14,6 +20,10 @@ export default async function SettingsProfilePage() {
   const username = session.user.mbUsername;
   const displayName = session.user.name ?? username;
   const avatarUrl = session.user.image ?? undefined;
+
+  const bskyEnabled = await isFeatureEnabled("bsky-link", username);
+  const bskyLink = bskyEnabled ? await getBskyLink(username) : null;
+  const expectedBskyBioUrl = `${SITE_URL}/user/${username}`;
 
   return (
     <div className="space-y-10">
@@ -45,6 +55,67 @@ export default async function SettingsProfilePage() {
           </div>
         </div>
       </section>
+
+      {bskyEnabled && (
+        <section className="space-y-3">
+          <header className="flex items-center justify-between gap-2">
+            <h3 className="text-sm font-medium">Bluesky</h3>
+            <span className="text-muted-foreground/80 text-xs">
+              Optional
+            </span>
+          </header>
+          <p className="text-muted-foreground text-sm leading-6">
+            Link your Bluesky account so your Achordion profile shows your
+            face, display name, and bio — pulled live from Bluesky, never
+            stored here. Don&apos;t link one and nothing changes; you stay
+            as anonymous as you were yesterday. This is the only
+            user-keyed thing Achordion stores about you, and you can
+            remove it any time.
+          </p>
+          {bskyLink ? (
+            <div className="border-border/60 bg-card/30 flex flex-col gap-3 rounded-lg border p-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0 text-sm">
+                <p className="font-medium">
+                  <Link
+                    href={`https://bsky.app/profile/${bskyLink.handle}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="hover:text-foreground underline-offset-4 hover:underline"
+                  >
+                    @{bskyLink.handle}
+                  </Link>
+                </p>
+                <p className="text-muted-foreground text-xs">
+                  Verified{" "}
+                  {new Date(bskyLink.verified_at).toLocaleDateString(
+                    undefined,
+                    { month: "short", day: "numeric", year: "numeric" },
+                  )}
+                </p>
+              </div>
+              <form action={unlinkBlueskyAction}>
+                <button
+                  type="submit"
+                  className="border-border/60 hover:bg-muted/40 inline-flex h-9 items-center rounded-lg border px-4 text-sm"
+                >
+                  Unlink
+                </button>
+              </form>
+            </div>
+          ) : null}
+          {bskyLink && (
+            <p className="text-muted-foreground/80 text-xs leading-5">
+              You can remove the Achordion link from your Bluesky bio
+              now if you&apos;d like — your link here stays active, and
+              future bio edits will show up on your profile within a
+              few minutes.
+            </p>
+          )}
+          {!bskyLink ? (
+            <BlueskyLinkForm expectedUrl={expectedBskyBioUrl} />
+          ) : null}
+        </section>
+      )}
 
       <section className="space-y-3">
         <h3 className="text-sm font-medium">Theme</h3>

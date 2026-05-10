@@ -1,7 +1,10 @@
+import { Suspense } from "react";
 import { UserAvatar } from "./user-avatar";
 import { auth } from "@/auth";
 import { getFollowing, getPlayingNow } from "@/lib/clients/listenbrainz";
 import { getLbTokenForRequest } from "@/lib/lb-token";
+import { getBskyDisplayProfile } from "@/lib/bsky-display";
+import { BlueskyStrip } from "./bluesky-strip";
 import { FollowToggle } from "./follow-toggle";
 import { LiveOnAirIndicator } from "./live-on-air-indicator";
 import { SectionTabs, type SectionTab } from "./section-tabs";
@@ -55,13 +58,26 @@ export async function UserPageHeader({ name }: { name: string }) {
 
   const initialPlaying = await initialPlayingPromise;
 
+  // Bluesky avatar override — when the profile owner has linked a
+  // Bluesky account and the viewer's flag is on, render their
+  // Bluesky avatar in place of the DiceBear default. Falls back
+  // silently when any precondition fails. The same fetch is reused
+  // by <BlueskyStrip> below via unstable_cache.
+  const bskyDisplay = await getBskyDisplayProfile(name, viewer ?? null);
+  const avatarOverride = bskyDisplay?.avatar ?? undefined;
+
   return (
     <header className="border-border/60 border-b">
       <div className="mx-auto max-w-7xl px-4 pt-10 pb-0 sm:px-6">
-        <div className="flex flex-col items-start gap-4 pb-6 sm:flex-row sm:items-center sm:gap-6">
+        <div className="flex flex-col items-start gap-4 pb-6 sm:flex-row sm:items-start sm:gap-6">
+          {/* Avatar offset down on sm+ so its centre aligns with the
+              username row rather than the "LISTENBRAINZ USER" eyebrow
+              above it. The offset roughly matches the eyebrow's
+              line-height + gap. */}
           <UserAvatar
             username={name}
-            className="size-16 sm:size-20"
+            imageUrl={avatarOverride}
+            className="size-16 sm:mt-5 sm:size-20"
             fallbackClassName="text-xl"
           />
           <div className="min-w-0 flex-1">
@@ -78,6 +94,15 @@ export async function UserPageHeader({ name }: { name: string }) {
               </h1>
               <UserStatsRadioWidget username={name} />
             </div>
+            {/* Optional Bluesky-identity row — Bluesky favicon (handle
+                in tooltip) followed by the linked account's bio
+                rendered inline. Renders null when the viewer's flag
+                is off, when the profile owner hasn't linked, or when
+                Bluesky is unreachable. Suspended so a slow AppView
+                call doesn't block the header. */}
+            <Suspense fallback={null}>
+              <BlueskyStrip name={name} />
+            </Suspense>
             <LiveOnAirIndicator
               username={name}
               initialListen={initialPlaying}

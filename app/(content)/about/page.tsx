@@ -216,6 +216,23 @@ export default function AboutPage() {
             none of them store anything you&apos;d consider yours.
           </p>
           <p>
+            <strong>One optional exception: a Bluesky link.</strong>{" "}
+            If you want your Achordion presence to feel less anonymous,
+            you can paste your Bluesky handle into{" "}
+            <Link href="/settings" className={LINK_CLASS}>
+              your settings
+            </Link>{" "}
+            and verify it (we check that your Bluesky bio links back to
+            your Achordion profile — a two-way handshake, no OAuth, no
+            permissions granted). When you do, your profile page renders
+            your Bluesky avatar, display name, and bio inline — pulled
+            live from Bluesky, never stored here. That&apos;s the only
+            user-keyed thing we keep, and it&apos;s a single field.
+            Delete it any time and we drop the row. Don&apos;t add it
+            and nothing changes — you stay as anonymous as you were
+            yesterday.
+          </p>
+          <p>
             Your listens, loves, pins, follows, playlists, and stats all
             live in your ListenBrainz account, run by the MetaBrainz
             Foundation. Your identity lives at MusicBrainz. If Achordion

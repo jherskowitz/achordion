@@ -31,6 +31,7 @@ const TOC: Array<{ id: string; label: string }> = [
   { id: "playback", label: "How do I actually play music from Achordion?" },
   { id: "data-sources", label: "Where does the data on Achordion come from?" },
   { id: "data-ownership", label: "What does Achordion store about me?" },
+  { id: "bluesky", label: "Do I have to link a Bluesky account?" },
   { id: "edit-delete", label: "How do I edit or delete my listening history?" },
   { id: "privacy", label: "Who can see my listens?" },
   { id: "missing-data", label: "An artist or album is missing — how do I fix it?" },
@@ -304,6 +305,19 @@ export default function FaqPage() {
               for aggregate page-view counts. No cookies, no per-user
               tracking, no profile of you.
             </li>
+            <li>
+              <strong>Optional Bluesky link</strong> (only if you opted
+              in via{" "}
+              <Link href="/settings" className={LINK_CLASS}>
+                Settings
+              </Link>
+              ): a single row keyed to your MusicBrainz username with
+              three fields — your Bluesky handle, the DID it resolved
+              to, and a verification timestamp. Your Bluesky avatar,
+              display name, and bio are fetched live from Bluesky each
+              render — never copied or cached here. Delete the link
+              from Settings any time and we drop the row.
+            </li>
           </ul>
           <p>
             Sign-in is OAuth against MusicBrainz, the same way logging into
@@ -311,6 +325,37 @@ export default function FaqPage() {
             your data would go with it — you&apos;d point a different
             ListenBrainz client at the same account and pick up where you left
             off.
+          </p>
+        </ContentSection>
+
+        <ContentSection
+          id="bluesky"
+          title="Do I have to link a Bluesky account?"
+        >
+          <p>
+            <strong>No.</strong> Achordion works exactly the same without
+            one. The Bluesky link is purely cosmetic — it lets your
+            profile show your Bluesky avatar, display name, and bio so
+            people who follow you across services can find you. If you
+            don&apos;t link one, your profile shows your MusicBrainz
+            username and that&apos;s it, same as before.
+          </p>
+          <p>
+            If you do want to link, paste your Bluesky handle (any
+            handle works — <code>jane.bsky.social</code>,{" "}
+            <code>jane.com</code>, anything Bluesky resolves) into{" "}
+            <Link href="/settings" className={LINK_CLASS}>
+              Settings
+            </Link>
+            . Before you click Verify, drop your Achordion profile URL
+            anywhere in your Bluesky bio so we can confirm both sides
+            own the link. Once verified, you can remove the URL from
+            your Bluesky bio — your link on Achordion stays active, and
+            future bio edits show up here within a few minutes.
+          </p>
+          <p>
+            Unlinking is one click in Settings; we drop the row and
+            your profile is back to anonymous.
           </p>
         </ContentSection>
 

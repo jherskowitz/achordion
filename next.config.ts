@@ -42,7 +42,7 @@ const CSP = [
   // DiceBear avatars + Apple Music cover art (is1-ssl.mzstatic.com,
   // surfaced from /charts/apple-music) + Spinbin station logos.
   // data: + blob: cover dynamic SVG / canvas-derived URLs.
-  "img-src 'self' data: blob: https://archive.org https://*.archive.org https://coverartarchive.org https://musicbrainz.org https://gravatar.com https://api.dicebear.com https://upload.wikimedia.org https://commons.wikimedia.org https://www.google.com https://*.gstatic.com https://is1-ssl.mzstatic.com https://jherskowitz.github.io https://assets.fanart.tv",
+  "img-src 'self' data: blob: https://archive.org https://*.archive.org https://coverartarchive.org https://musicbrainz.org https://gravatar.com https://api.dicebear.com https://upload.wikimedia.org https://commons.wikimedia.org https://www.google.com https://*.gstatic.com https://is1-ssl.mzstatic.com https://jherskowitz.github.io https://assets.fanart.tv https://cdn.bsky.app",
   // Same-origin XHR / fetch / WS plus every external API the
   // server-side code reaches through the browser at any point. The
   // bulk are server-only (LB, MB, Wikidata, Odesli, RSS feeds, Earshot)
