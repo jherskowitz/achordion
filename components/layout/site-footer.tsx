@@ -63,7 +63,7 @@ export function SiteFooter() {
           {/* External — explicit anchors so prefetch / Link doesn't
               try to hit external hosts as Next routes. */}
           <a
-            href="https://feedback.achordion.xyz/"
+            href="https://achordion.fider.io/"
             target="_blank"
             rel="noopener noreferrer"
             className="hover:text-foreground"

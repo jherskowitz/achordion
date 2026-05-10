@@ -67,7 +67,18 @@ export function OnAirText({
   const animating = shiftPx < 0;
 
   return (
-    <span ref={containerRef} className="min-w-0 flex-1 overflow-hidden">
+    // `min-w-0 shrink overflow-hidden` (no `flex-1`) so the text
+    // sizes to its actual content rather than grabbing all available
+    // flex space. Without this, a sibling Listen-along pill in the
+    // parent flex row gets pushed to the far right edge of the
+    // header. `min-w-0` + `shrink` still allow the span to compress
+    // below its intrinsic content width on narrow viewports, so the
+    // overflow-hidden + marquee animation continues to clip long
+    // titles the way the wider variant needs.
+    <span
+      ref={containerRef}
+      className="min-w-0 shrink overflow-hidden"
+    >
       <span
         ref={innerRef}
         className={cn(

@@ -69,7 +69,7 @@ export async function UserPageHeader({ name }: { name: string }) {
   return (
     <header className="border-border/60 border-b">
       <div className="mx-auto max-w-7xl px-4 pt-10 pb-0 sm:px-6">
-        <div className="flex flex-col items-start gap-4 pb-6 sm:flex-row sm:items-start sm:gap-6">
+        <div className="relative flex flex-col items-start gap-4 pb-6 sm:flex-row sm:items-start sm:gap-6">
           {/* Avatar offset down on sm+ so its centre aligns with the
               username row rather than the "LISTENBRAINZ USER" eyebrow
               above it. The offset roughly matches the eyebrow's
@@ -112,11 +112,18 @@ export async function UserPageHeader({ name }: { name: string }) {
             />
           </div>
           {viewer && !isOwnProfile && (
-            <FollowToggle
-              target={name}
-              initiallyFollowing={followInitial}
-              disabledReason={disabledReason}
-            />
+            // Mobile: pin to the top-right corner of the header so
+            // the affordance is reachable without scrolling past the
+            // username + bsky bio + on-air rows. Desktop (sm+):
+            // revert to the natural in-flow position — the flex row
+            // already puts the button on the right edge.
+            <div className="absolute top-0 right-0 sm:static">
+              <FollowToggle
+                target={name}
+                initiallyFollowing={followInitial}
+                disabledReason={disabledReason}
+              />
+            </div>
           )}
         </div>
         <SectionTabs tabs={userTabs(name)} />
