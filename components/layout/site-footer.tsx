@@ -60,8 +60,16 @@ export function SiteFooter() {
           <Link href="/donate" className="hover:text-foreground">
             Donate
           </Link>
-          {/* External — explicit anchor so prefetch / Link doesn't try
-              to hit the GitHub host as a Next route. */}
+          {/* External — explicit anchors so prefetch / Link doesn't
+              try to hit external hosts as Next routes. */}
+          <a
+            href="https://parachord.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:text-foreground"
+          >
+            Parachord
+          </a>
           <a
             href="https://github.com/jherskowitz/achordion/discussions"
             target="_blank"
