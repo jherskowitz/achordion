@@ -6,7 +6,6 @@ import type { PlayingNowListen } from "@/lib/clients/listenbrainz";
 import { parachordListenAlong } from "@/lib/parachord";
 import { artistHref, recordingHref } from "@/lib/entity-links";
 import { cn } from "@/lib/utils";
-import { IconTooltip } from "@/components/ui/icon-tooltip";
 import { OnAirText } from "./on-air-text";
 
 // Adaptive polling: when the user is actively on-air, run fast (track
@@ -222,17 +221,19 @@ export function LiveOnAirIndicator({
         {dot}
         {trackText}
         {!hideListenAlong && (
-          <IconTooltip
-            label={`Listen along with ${username} in Parachord`}
+          // No IconTooltip wrap — the visible "Listen along" label
+          // already self-explains, and the wrapper's
+          // group-hover/focus-within style changes on touch trigger
+          // iOS Safari's "first tap = hover, second tap = click"
+          // behavior, which makes tapping look broken to users.
+          <a
+            href={listenAlongHref}
+            aria-label={`Listen along with ${username} in Parachord`}
+            className="bg-primary text-primary-foreground inline-flex h-6 shrink-0 items-center gap-1 rounded-full px-2 text-[10px] font-medium transition-opacity hover:opacity-90"
           >
-            <a
-              href={listenAlongHref}
-              className="bg-primary text-primary-foreground inline-flex h-6 shrink-0 items-center gap-1 rounded-full px-2 text-[10px] font-medium transition-opacity hover:opacity-90"
-            >
-              <Radio className="size-2.5" />
-              Listen along
-            </a>
-          </IconTooltip>
+            <Radio className="size-2.5" />
+            Listen along
+          </a>
         )}
       </div>
     );
@@ -254,20 +255,23 @@ export function LiveOnAirIndicator({
       {dot}
       {trackText}
       {!hideListenAlong && (
-        <IconTooltip label={`Listen along with ${username} in Parachord`}>
-          <a
-            href={listenAlongHref}
-            aria-label={`Listen along with ${username} in Parachord`}
-            // Cursor: tiny round icon (tooltip carries the label).
-            // Touch: grow to a labeled pill so the affordance is
-            // self-explanatory without the (never-firing) tooltip
-            // and the hit area clears the 44px tap-target floor.
-            className="bg-primary/90 text-primary-foreground hover:bg-primary inline-flex size-4 shrink-0 items-center justify-center gap-1 rounded-full transition-colors pointer-coarse:h-6 pointer-coarse:w-auto pointer-coarse:px-2 pointer-coarse:text-[10px] pointer-coarse:font-medium"
-          >
-            <Radio className="size-2.5" />
-            <span className="hidden pointer-coarse:inline">Listen along</span>
-          </a>
-        </IconTooltip>
+        // No IconTooltip wrap — the wrapper's group-hover /
+        // group-focus-within style changes trigger iOS Safari's
+        // "first tap = hover, second tap = click" behavior, so
+        // mobile users can never reach the parachord:// navigation.
+        // The native `title` attribute carries the hover hint for
+        // desktop (free, no double-tap problem). Touch (pointer-
+        // coarse) grows the trigger into a labeled pill so the
+        // affordance is self-explanatory without any tooltip.
+        <a
+          href={listenAlongHref}
+          title={`Listen along with ${username} in Parachord`}
+          aria-label={`Listen along with ${username} in Parachord`}
+          className="bg-primary/90 text-primary-foreground hover:bg-primary inline-flex size-4 shrink-0 items-center justify-center gap-1 rounded-full transition-colors pointer-coarse:h-6 pointer-coarse:w-auto pointer-coarse:px-2 pointer-coarse:text-[10px] pointer-coarse:font-medium"
+        >
+          <Radio className="size-2.5" />
+          <span className="hidden pointer-coarse:inline">Listen along</span>
+        </a>
       )}
     </div>
   );

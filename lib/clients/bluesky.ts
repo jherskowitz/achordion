@@ -47,6 +47,20 @@ const ProfileSchema = z.object({
 
 export type BskyProfile = z.infer<typeof ProfileSchema>;
 
+const FollowProfileSchema = z.object({
+  did: z.string().min(1),
+  handle: z.string().min(1),
+  displayName: z.string().optional(),
+  avatar: z.string().url().optional(),
+});
+
+export type BskyFollowProfile = z.infer<typeof FollowProfileSchema>;
+
+const FollowsResponseSchema = z.object({
+  follows: z.array(FollowProfileSchema),
+  cursor: z.string().optional(),
+});
+
 /**
  * Strip @-prefix, scheme, and trailing slashes off whatever the user
  * pasted. Bluesky handles are bare domains, so everything else is noise.
@@ -134,4 +148,56 @@ export async function getProfile(actor: string): Promise<BskyProfile | null> {
   } catch {
     return null;
   }
+}
+
+/**
+ * Walk a user's Bluesky follow graph. Returns up to `maxFollows`
+ * profiles (default 1000 — covers ~99% of accounts; the long tail
+ * with bigger graphs trades some completeness for not slamming the
+ * AppView with 50+ paginated calls per page render).
+ *
+ * The returned profiles include avatar URLs already normalised via
+ * the same `@jpeg` blob-format suffix as `getProfile`. Each call
+ * fetches one page of 100 follows; we accumulate until cursor is
+ * empty or we hit the cap. On any error mid-walk, returns whatever
+ * was collected so far rather than throwing — partial results are
+ * better than nothing for "find friends" surfaces.
+ */
+export async function getFollows(
+  actor: string,
+  maxFollows = 1000,
+): Promise<BskyFollowProfile[]> {
+  const out: BskyFollowProfile[] = [];
+  let cursor: string | undefined;
+  while (out.length < maxFollows) {
+    const params = new URLSearchParams({ actor, limit: "100" });
+    if (cursor) params.set("cursor", cursor);
+    const url = `${PUBLIC_APPVIEW}/app.bsky.graph.getFollows?${params}`;
+    let json: unknown;
+    try {
+      const res = await fetch(url, {
+        headers: { accept: "application/json" },
+        // Per-page cache for 10 min — follow graph changes slowly
+        // enough that this trades acceptable staleness for far
+        // fewer AppView calls under repeat page loads.
+        next: { revalidate: 600 },
+      });
+      if (!res.ok) break;
+      json = await res.json();
+    } catch {
+      break;
+    }
+    const parsed = FollowsResponseSchema.safeParse(json);
+    if (!parsed.success) break;
+    for (const p of parsed.data.follows) {
+      out.push({
+        ...p,
+        avatar: p.avatar ? ensureBskyBlobFormat(p.avatar) : undefined,
+      });
+      if (out.length >= maxFollows) break;
+    }
+    cursor = parsed.data.cursor;
+    if (!cursor) break;
+  }
+  return out;
 }

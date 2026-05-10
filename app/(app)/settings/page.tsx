@@ -4,6 +4,8 @@ import { auth } from "@/auth";
 import { ThemeRadio } from "@/components/achordion/theme-radio";
 import { UserAvatar } from "@/components/achordion/user-avatar";
 import { BlueskyLinkForm } from "@/components/achordion/bluesky-link-form";
+import { BlueskyFriendsSection } from "@/components/achordion/bluesky-friends-section";
+import { Suspense } from "react";
 import { isFeatureEnabled } from "@/lib/flags";
 import { getBskyLink } from "@/lib/bsky-link";
 import { signOutAction, unlinkBlueskyAction } from "./actions";
@@ -30,7 +32,16 @@ export default async function SettingsProfilePage() {
       <header>
         <h2 className="text-lg font-semibold tracking-tight">Profile</h2>
         <p className="text-muted-foreground mt-1 text-sm leading-6">
-          Your MusicBrainz account is the identity behind Achordion.
+          Your{" "}
+          <a
+            href={`https://musicbrainz.org/user/${username}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:text-foreground underline-offset-4 hover:underline"
+          >
+            MusicBrainz account
+          </a>{" "}
+          is the identity behind Achordion.
         </p>
       </header>
 
@@ -115,6 +126,16 @@ export default async function SettingsProfilePage() {
             <BlueskyLinkForm expectedUrl={expectedBskyBioUrl} />
           ) : null}
         </section>
+      )}
+
+      {bskyEnabled && bskyLink && (
+        // Walk the viewer's bsky follow graph to surface anyone
+        // they follow there who's also linked to Achordion.
+        // Suspended so a slow Bluesky AppView doesn't block the
+        // rest of the page; renders null when there are no matches.
+        <Suspense fallback={null}>
+          <BlueskyFriendsSection viewer={username} />
+        </Suspense>
       )}
 
       <section className="space-y-3">

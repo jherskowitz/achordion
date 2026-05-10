@@ -112,3 +112,31 @@ export async function lbUsernameForDid(did: string): Promise<string | null> {
     return null;
   }
 }
+
+/**
+ * Batch reverse lookup. Given many DIDs, returns a map from DID to
+ * the linked MusicBrainz username for the ones that match (DIDs
+ * with no Achordion linkage are absent from the result).
+ *
+ * Single Redis MGET round-trip regardless of input size, so safe to
+ * call with hundreds of DIDs (e.g. a viewer's full Bluesky follow
+ * list). Returns an empty map when Redis isn't configured.
+ */
+export async function lbUsernamesForDids(
+  dids: string[],
+): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  if (!redis || dids.length === 0) return out;
+  try {
+    const keys = dids.map(reverseKey);
+    const values = await redis.mget<(string | null)[]>(...keys);
+    dids.forEach((did, i) => {
+      const v = values[i];
+      if (typeof v === "string" && v.length > 0) out.set(did, v);
+    });
+  } catch {
+    // empty map — caller treats that as "no matches" which is the
+    // right degraded behaviour for a "find friends" surface.
+  }
+  return out;
+}
