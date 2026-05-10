@@ -79,7 +79,14 @@ export default function RootLayout({
       suppressHydrationWarning
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="bg-background text-foreground flex min-h-full flex-col">
+      {/* Body uses natural document flow — no sticky-footer pattern.
+          Content-shorter-than-viewport pages would otherwise inflate
+          the main column with `flex-1` to push the footer to the
+          bottom, creating an awkward dead-zone between content and
+          footer (e.g. followers lists with three entries). The
+          footer flowing right after content reads cleaner across the
+          range of page lengths we have. */}
+      <body className="bg-background text-foreground">
         <Providers>{children}</Providers>
         {/* Vercel Web Analytics — privacy-focused (no cookies, no
             individual tracking, IP-derived geo discarded after

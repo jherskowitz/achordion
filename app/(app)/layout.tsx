@@ -23,7 +23,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   const body = (
     <>
       <SiteHeader />
-      <main className="flex-1">{children}</main>
+      <main>{children}</main>
       <SiteFooter />
     </>
   );
