@@ -41,13 +41,31 @@ import { LiveOnAirIndicator } from "@/components/achordion/live-on-air-indicator
 export function SiteHeader() {
   const { data: session, status } = useSession();
   const username = session?.user?.mbUsername;
-  const avatarUrl = session?.user?.image ?? undefined;
+  const sessionAvatarUrl = session?.user?.image ?? undefined;
   const displayName = session?.user?.name ?? username ?? "";
 
   // While auth state is loading post-hydration, render the anonymous
   // variant. Same shape as the SSR output, so there's no layout
   // shift when useSession resolves.
   const showAuthed = status === "authenticated" && !!username;
+
+  // Bluesky avatar override — only fetch when we know there's a
+  // signed-in user to look up. The endpoint is cheap (cached behind
+  // the same `getBskyDisplayProfile` slot the profile-page header
+  // already populates) but skipping it for logged-out users avoids
+  // a no-op round-trip on every page load. 60s staleTime keeps SPA
+  // navigations from re-fetching on every header re-mount.
+  const { data: bskyAvatar } = useQuery<{ avatar: string | null }>({
+    queryKey: ["me-bsky-avatar"],
+    enabled: showAuthed,
+    staleTime: 60_000,
+    queryFn: async () => {
+      const r = await fetch("/api/me/bsky-avatar");
+      if (!r.ok) return { avatar: null };
+      return r.json();
+    },
+  });
+  const avatarUrl = bskyAvatar?.avatar ?? sessionAvatarUrl;
 
   // Unread feed count — only fetched once we know the viewer is
   // signed in, polled lightly in the background while a tab is open.

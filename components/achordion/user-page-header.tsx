@@ -94,6 +94,17 @@ export async function UserPageHeader({ name }: { name: string }) {
               </h1>
               <UserStatsRadioWidget username={name} />
             </div>
+            {/* On-air widget sits directly under the username so a
+                currently-playing track reads as part of the user's
+                identity (right next to the radio-station icon).
+                Bluesky bio drops below it. */}
+            <LiveOnAirIndicator
+              username={name}
+              initialListen={initialPlaying}
+              hideListenAlong={isOwnProfile}
+              size="default"
+              className="mt-2"
+            />
             {/* Optional Bluesky-identity row — Bluesky favicon (handle
                 in tooltip) followed by the linked account's bio
                 rendered inline. Renders null when the viewer's flag
@@ -103,13 +114,6 @@ export async function UserPageHeader({ name }: { name: string }) {
             <Suspense fallback={null}>
               <BlueskyStrip name={name} />
             </Suspense>
-            <LiveOnAirIndicator
-              username={name}
-              initialListen={initialPlaying}
-              hideListenAlong={isOwnProfile}
-              size="default"
-              className="mt-2"
-            />
           </div>
           {viewer && !isOwnProfile && (
             // Mobile: pin to the top-right corner of the header so
