@@ -331,6 +331,60 @@ The helper is per-request memoized via React `cache()` (so multiple checks on on
 
 ---
 
+## Site-wide announcement banner
+
+`lib/announcements.ts` + `components/layout/announcement-banner.tsx` drive a site-wide banner you can update *without* a redeploy. Storage is a single Upstash row at `announcements:json` holding a JSON array — same row that backs Parachord-desktop's in-app banner, so admin edits propagate to both surfaces from one place.
+
+**Admin workflow** — Upstash CLI / console / REST. Schema:
+
+```json
+[
+  {
+    "id": "downtime-2026-05-12",
+    "title": "Scheduled maintenance Tuesday 2am UTC",
+    "severity": "warn",
+    "body": "Listening data may be unavailable for ~10 minutes.",
+    "icon": "🛠️",
+    "cta": { "label": "Status", "url": "https://status.example.com/" },
+    "surfaces": ["achordion"],
+    "expiresAt": "2026-05-13T00:00:00Z"
+  }
+]
+```
+
+```redis
+SET announcements:json '[…]'   # publish (replaces every banner — see "one slot" below)
+DEL announcements:json         # clear every banner
+```
+
+**Fields:**
+
+- `id` (req, stable) — dismissals key off this. To force users who already dismissed to see a re-published banner, bump the id (`downtime-…-v2`).
+- `title` (req) — main line.
+- `severity` — `info` | `success` | `warn` | `error`. Drives the tint. Defaults to `info`.
+- `body` (opt) — second line, smaller. Plain text.
+- `icon` (opt) — short glyph / emoji, ≤4 chars. Rendered in the leading slot.
+- `iconUrl` (opt) — https-only image URL (≤20×20 visible) for when an emoji won't do. Honored only if `icon` is absent.
+- `cta` (opt) — `{ label, url }`. Renders as an inline link at the right edge.
+- `surfaces` (opt) — `("achordion" | "parachord")[]`. **Omit to show on every surface** (back-compat default for entries written before the field existed). Scope to `["achordion"]` for Achordion-only notices (typical for site downtime); scope to `["parachord"]` to avoid leaking desktop-app-specific banners into the web.
+- `minVersion` / `maxVersion` (opt) — Parachord-desktop applies these; Achordion ignores them.
+- `expiresAt` (opt, ISO-8601) — Achordion drops expired items server-side so they vanish automatically with no follow-up `DEL`.
+
+**Resolution & caching:**
+
+1. `lib/announcements.ts` loads the array (Upstash, falling back to `ANNOUNCEMENTS_JSON` env var for local dev).
+2. `loadAllAnnouncements` is `unstable_cache`-wrapped (60s revalidate, tagged `announcements`) — server-component mounts in the `(content)` layout don't flip those static-rendered pages dynamic.
+3. `getActiveAnnouncementsFor("achordion")` filters surface + drops expired.
+4. `<AnnouncementBanner>` (server) hands the filtered list to `<AnnouncementBannerClient>` (client island), which picks the **first non-dismissed item** (one banner slot — admin controls priority by array order) and remembers dismissals in `localStorage` keyed by `id`.
+
+**Where it's mounted:** above `<SiteHeader>` in both `app/(app)/layout.tsx` and `app/(content)/layout.tsx`, each Suspense-wrapped so a cold cache doesn't block first paint.
+
+**`/api/announcements` route** is the public, unauthenticated feed Parachord-desktop polls — it hands back the full validated list (no surface or expiry filtering, since the desktop client does its own `minVersion`/`maxVersion`/expiry pass). Don't add Achordion-specific server-side filtering there; use the helpers in `lib/announcements.ts` for Achordion surfaces instead.
+
+**When to use:** scheduled downtime (MB / LB / Parachord), partial outages, feature launches worth a one-line "hey, this is new" callout, urgent-but-not-disruptive notices. **When not to:** marketing copy ("check out X this week"), evergreen promos, anything that should live in a real surface (changelog / about / feed). Banners interrupt; treat the slot as expensive.
+
+---
+
 ## Tag-voting blocklist
 
 Tag voting + add-tag is OPEN to every signed-in user — this is community-driven classification, gating it behind allowlists defeats the purpose. But every open vote system attracts the occasional bad actor (spammy tags, downvote campaigns, slurs in custom tag names). The blocklist at `lib/tag-blocklist.ts` is the moderation lever.
