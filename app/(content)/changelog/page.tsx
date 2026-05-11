@@ -27,6 +27,23 @@ interface ChangelogEntry {
 
 const ENTRIES: ChangelogEntry[] = [
   {
+    date: "2026-05-10",
+    intro:
+      "Optional Bluesky cross-platform identity, browser notifications for feed updates, richer Followers / Following / Similar Users cards, and a swath of mobile polish.",
+    highlights: [
+      "Optional Bluesky link. Paste your Bluesky handle into Settings (any handle — bsky.social or a custom domain like jherskowitz.com), drop your Achordion profile URL anywhere in your Bluesky bio for a one-time two-way handshake, and your Achordion profile renders your Bluesky avatar, display name, and bio inline. Same avatar swaps into the small pip in the top-right of every page. Pulled live from Bluesky, never copied here — edit your bio over there and it updates here within minutes. Single field, deletable any time, no OAuth, no permissions granted. Completely optional; profiles that don't link change nothing.",
+      "Find your Bluesky friends on Achordion. Once you link, a new section in Settings surfaces the people you follow on Bluesky who've also linked their Achordion profile. Click through to their listening.",
+      "Opt-in browser notifications when there's new activity on your feed. Toggle on under Settings → Feed notifications; pings only while an Achordion tab is open in your browser, never asks for permission unprompted, single-slot so a quiet stretch doesn't pile up a stack.",
+      "Followers, Following, and Similar Users now use the same richer card: avatar, username, a “Currently into: artist 1, artist 2 & artist 3” line pulled from their last month of listening, plus their live on-air widget when they're playing. Similar Users gets tier chips (Highly / Similar / Somewhat similar) instead of a raw percentage, and the card click-target deep-links to their stats tab.",
+      "Profile header reorganised so the currently-playing track sits right under the username — reads as part of the user's identity, not as a trailing footnote. Listen-along pill hugs the song info instead of floating to the right edge.",
+      "Activity feed thanks now embed the playable thanked track inline, so a thanked pin spreads to your followers with the song intact.",
+      "Stats page: All-time filter wired up correctly. The “All time” tab now actually loads all-time data (was silently falling back to last year).",
+      "Mobile layout pass: profile-header Follow button stays pinned to the top-right corner so it's reachable without scrolling, radio-station popover no longer flows off the screen, pin-card kebab + favicons share a row, footer byline wraps cleanly into two lines and the link nav stacks into a tidy 2-column grid.",
+      "Footer: new Parachord link, and the old “Discussions” entry is now “Feedback,” pointing at a public feedback board where you can request features and vote on others'.",
+      "Dropped the sticky-footer pattern across the site — short pages (small followers lists, etc.) no longer have a dead-zone of empty grey between the content and the footer.",
+    ],
+  },
+  {
     date: "2026-05-08",
     intro:
       "Embeddable widgets, instantly-clickable streaming links, and album-page parity with the track page.",
