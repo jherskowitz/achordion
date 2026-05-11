@@ -8,11 +8,7 @@ import {
   partitionArtistRelations,
   type RecordingRelease,
 } from "@/lib/clients/musicbrainz";
-import {
-  getRecordingPopularity,
-  getReleaseGroupListeners,
-  type ReleaseGroupListeners,
-} from "@/lib/clients/listenbrainz";
+import { getRecordingPopularity } from "@/lib/clients/listenbrainz";
 import { caaReleaseUrl } from "@/lib/clients/coverart";
 import { parachordPlayAlbum, parachordPlayTrack } from "@/lib/parachord";
 import { CoverArt } from "@/components/achordion/cover-art";
@@ -32,7 +28,6 @@ import {
   EntityHeaderStatsSkeleton,
 } from "@/components/achordion/entity-header-stats";
 import { PageShell } from "@/components/achordion/page-shell";
-import { TopListenersList } from "@/components/achordion/top-listeners-list";
 import { EmbedShareButton } from "@/components/achordion/embed-share-button";
 import { TagChips } from "@/components/achordion/tag-chips";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -84,10 +79,6 @@ async function RecordingBody({ mbid }: { mbid: string }) {
   // "Also appears on" grid can paint immediately on getRecording's
   // return.
   const popularityPromise = getRecordingPopularity(mbid).catch(() => null);
-  const albumListenersPromise: Promise<ReleaseGroupListeners | null> =
-    heroReleaseGroup
-      ? getReleaseGroupListeners(heroReleaseGroup.id).catch(() => null)
-      : Promise.resolve(null);
   const cover = heroRelease ? caaReleaseUrl(heroRelease.id, 500) : null;
   const { urls } = partitionArtistRelations({
     relations: recording.relations,
@@ -354,20 +345,12 @@ async function RecordingBody({ mbid }: { mbid: string }) {
         </aside>
       </div>
 
-      {/* Top Listeners — full page width below the two-column grid.
-          Sourced from the hero album's listeners (LB has no per-
-          recording listeners endpoint). Cards layout breathes 3-up
-          at lg, falling back to 2 / 1 at sm / xs. mt-12 matches
-          the inner space-y-12 cadence the rest of the page uses
-          between sibling sections. */}
-      <div className="mt-12">
-        <Suspense fallback={null}>
-          <AlbumTopListenersStream
-            promise={albumListenersPromise}
-            layout="cards"
-          />
-        </Suspense>
-      </div>
+      {/* No "Top listeners" section on the recording page —
+          ListenBrainz has no per-recording top-listeners endpoint,
+          and surfacing the parent album's listeners under a track
+          page misled viewers into reading album playcounts as per-
+          track counts. Top Listeners stays on the album page where
+          the data is honest. */}
     </>
   );
 }
@@ -387,35 +370,6 @@ async function RecordingHeaderStats({
       totalListens={popularity.totalListenCount}
       totalListeners={popularity.totalUserCount}
     />
-  );
-}
-
-/** Streams the Top Listeners section (sourced from the hero
- *  album's listeners — LB has no per-recording listeners endpoint).
- *  `layout="cards"` renders multi-column cards in the main column;
- *  `layout="stack"` (default) renders a compact sidebar list. */
-async function AlbumTopListenersStream({
-  promise,
-  layout = "stack",
-}: {
-  promise: Promise<ReleaseGroupListeners | null>;
-  layout?: "stack" | "cards";
-}) {
-  const listeners = await promise;
-  if (!listeners?.listeners || listeners.listeners.length === 0) return null;
-  return (
-    <section>
-      <h2
-        className={
-          layout === "cards"
-            ? "mb-4 text-sm font-semibold tracking-wide uppercase"
-            : "mb-3 text-xs tracking-wide uppercase text-muted-foreground"
-        }
-      >
-        Top listeners
-      </h2>
-      <TopListenersList listeners={listeners.listeners} layout={layout} />
-    </section>
   );
 }
 

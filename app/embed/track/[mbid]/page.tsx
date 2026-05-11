@@ -141,7 +141,30 @@ export default async function EmbedTrackPage({ params }: PageProps) {
               </a>
             </h1>
             <p className="text-muted-foreground mt-1 truncate text-xs">
-              <span className="text-foreground">{credit.name}</span>
+              {/* Each credit part is its own link to the artist page —
+                  same convention as the canonical recording page. The
+                  joinphrase (" feat. ", " & ", etc.) is rendered as
+                  plain text between links. Iframe-safe: target="_top"
+                  breaks out so clicks land on Achordion proper. Falls
+                  back to a non-linked span when MB doesn't have an
+                  artist MBID on that part. */}
+              {credit.parts.map((p, i) => (
+                <span key={`${p.id ?? p.name}-${i}`}>
+                  {p.id ? (
+                    <a
+                      href={`https://achordion.xyz/artist/${p.id}`}
+                      target="_top"
+                      rel="noopener"
+                      className="text-foreground hover:underline"
+                    >
+                      {p.name}
+                    </a>
+                  ) : (
+                    <span className="text-foreground">{p.name}</span>
+                  )}
+                  {p.join}
+                </span>
+              ))}
               {heroReleaseGroup && (
                 <>
                   <span className="mx-1.5 opacity-50">·</span>

@@ -139,7 +139,25 @@ export default async function EmbedAlbumPage({ params }: PageProps) {
                 </a>
               </h1>
               <p className="text-muted-foreground mt-1 truncate text-xs">
-                <span className="text-foreground">{credit.name}</span>
+                {/* Per-part artist linking — see embed/track for the
+                    full rationale. Iframe-safe via target="_top". */}
+                {credit.parts.map((p, i) => (
+                  <span key={`${p.id ?? p.name}-${i}`}>
+                    {p.id ? (
+                      <a
+                        href={`https://achordion.xyz/artist/${p.id}`}
+                        target="_top"
+                        rel="noopener"
+                        className="text-foreground hover:underline"
+                      >
+                        {p.name}
+                      </a>
+                    ) : (
+                      <span className="text-foreground">{p.name}</span>
+                    )}
+                    {p.join}
+                  </span>
+                ))}
                 {year && (
                   <>
                     <span className="mx-1.5 opacity-50">·</span>
