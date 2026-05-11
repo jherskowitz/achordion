@@ -125,9 +125,24 @@ export default async function EmbedAlbumPage({ params }: PageProps) {
           </div>
           <div className="flex min-w-0 flex-1 flex-col justify-between p-3">
             <div className="min-w-0">
-              <p className="text-muted-foreground text-[10px] tracking-wide uppercase">
-                {rg["primary-type"] ?? "Album"}
-              </p>
+              {/* "Open in Achordion" pinned to the upper-right of
+                  the text column so it doesn't sit between the
+                  favicon row and the expandable tracklist below,
+                  where it visually fragments the icon strip on
+                  taller embed heights. */}
+              <div className="flex items-baseline justify-between gap-2">
+                <p className="text-muted-foreground text-[10px] tracking-wide uppercase">
+                  {rg["primary-type"] ?? "Album"}
+                </p>
+                <Link
+                  href={canonicalHref}
+                  target="_top"
+                  rel="noopener"
+                  className="text-muted-foreground hover:text-foreground inline-flex shrink-0 items-center gap-1 text-[11px] underline-offset-4 hover:underline"
+                >
+                  Open in Achordion →
+                </Link>
+              </div>
               <h1 className="mt-0.5 truncate text-lg font-semibold tracking-tight sm:text-xl">
                 <a
                   href={canonicalHref}
@@ -213,14 +228,6 @@ export default async function EmbedAlbumPage({ params }: PageProps) {
                   ))}
                 </ul>
               )}
-              <Link
-                href={canonicalHref}
-                target="_top"
-                rel="noopener"
-                className="text-muted-foreground hover:text-foreground ml-auto inline-flex shrink-0 items-center gap-1 text-[11px] underline-offset-4 hover:underline"
-              >
-                Open in Achordion →
-              </Link>
             </div>
           </div>
         </div>

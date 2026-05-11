@@ -125,9 +125,26 @@ export default async function EmbedTrackPage({ params }: PageProps) {
         </div>
         <div className="flex min-w-0 flex-1 flex-col justify-between p-3">
           <div className="min-w-0">
-            <p className="text-muted-foreground text-[10px] tracking-wide uppercase">
-              Track
-            </p>
+            {/* "Open in Achordion" rides on the eyebrow row in the
+                upper-right corner. Previous placement (trailing the
+                favicon row) put it between two rows of service icons
+                on widget heights where favicons wrapped, which made
+                the layout look broken. Pinning it to the corner
+                keeps the affordance discoverable without crowding
+                the icon strip. */}
+            <div className="flex items-baseline justify-between gap-2">
+              <p className="text-muted-foreground text-[10px] tracking-wide uppercase">
+                Track
+              </p>
+              <Link
+                href={canonicalHref}
+                target="_top"
+                rel="noopener"
+                className="text-muted-foreground hover:text-foreground inline-flex shrink-0 items-center gap-1 text-[11px] underline-offset-4 hover:underline"
+              >
+                Open in Achordion →
+              </Link>
+            </div>
             <h1 className="mt-0.5 truncate text-lg font-semibold tracking-tight sm:text-xl">
               {/* Title links break out of the iframe to the
                   canonical Achordion page (see `target="_top"`). */}
@@ -245,14 +262,6 @@ export default async function EmbedTrackPage({ params }: PageProps) {
                 ))}
               </ul>
             )}
-            <Link
-              href={canonicalHref}
-              target="_top"
-              rel="noopener"
-              className="text-muted-foreground hover:text-foreground ml-auto inline-flex shrink-0 items-center gap-1 text-[11px] underline-offset-4 hover:underline"
-            >
-              Open in Achordion →
-            </Link>
           </div>
         </div>
       </article>
