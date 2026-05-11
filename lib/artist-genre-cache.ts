@@ -26,6 +26,29 @@ import { getArtist } from "@/lib/clients/musicbrainz";
 
 export const ARTIST_GENRE_TTL_SECONDS = 90 * 24 * 60 * 60;
 
+/**
+ * Sentinel written when MB returns an artist with no usable genre /
+ * tag data. Without this, the next backfill request for the same
+ * MBID re-issues the MB call and we re-pay the rate-limit cost on
+ * every profile-page render for that artist forever. Reads filter
+ * the sentinel out so callers see it as "no cached genre" — but
+ * subsequent backfill scans see the key as present and skip it.
+ */
+const UNKNOWN_GENRE_SENTINEL = "__none__";
+
+/**
+ * Cap on how many missing MBIDs `backfillArtistGenres` will fetch
+ * in one call. The fetch is serialised through MB's 1 req/sec
+ * rate limit, so an unbounded backfill of 24 artists per
+ * fingerprint compute could sit on the in-process MB queue for
+ * 24 seconds — blocking unrelated MB-dependent renders that
+ * happen to share the same Node.js invocation. 3 keeps the worst-
+ * case backfill below 3 seconds; combined with the 24h
+ * `unstable_cache` on the fingerprint, a user's full 24-artist
+ * top list fully backfills in 8 days of normal traffic.
+ */
+const BACKFILL_MAX_PER_CALL = 3;
+
 const redis = (() => {
   const url =
     process.env.UPSTASH_REDIS_REST_URL ?? process.env.KV_REST_API_URL;
@@ -56,12 +79,45 @@ export async function getArtistTopGenres(
     const values = await redis.mget<(string | null)[]>(...keys);
     mbids.forEach((mbid, i) => {
       const v = values[i];
-      if (typeof v === "string" && v.length > 0) {
+      // Sentinel ("__none__") means MB returned no genre data for
+      // this artist — leave the map entry absent so the caller
+      // colour-falls-back to the artist-identity hash, but DO NOT
+      // treat the missing key as "should be backfilled" (the
+      // sentinel is exactly what blocks that re-fetch).
+      if (typeof v === "string" && v.length > 0 && v !== UNKNOWN_GENRE_SENTINEL) {
         out.set(mbid, v);
       }
     });
   } catch {
     // empty map — caller treats absent entries as fallback path
+  }
+  return out;
+}
+
+/**
+ * Surface which MBIDs have ANY cached entry (genre OR sentinel),
+ * so callers can pick the "should I trigger a backfill?" subset
+ * correctly: backfill only the MBIDs that are absent from this
+ * set, not the ones that returned the sentinel.
+ *
+ * Read shape is the same single MGET as `getArtistTopGenres`;
+ * caller often wants both maps and calls them together — Next's
+ * dedupe-per-request cache means the second MGET is free.
+ */
+export async function getArtistGenreCachedSet(
+  mbids: string[],
+): Promise<Set<string>> {
+  const out = new Set<string>();
+  if (!redis || mbids.length === 0) return out;
+  try {
+    const keys = mbids.map(key);
+    const values = await redis.mget<(string | null)[]>(...keys);
+    mbids.forEach((mbid, i) => {
+      if (typeof values[i] === "string") out.add(mbid);
+    });
+  } catch {
+    // empty set — caller falls back to full backfill, which is
+    // safe even if slow
   }
   return out;
 }
@@ -96,16 +152,23 @@ function pickTopGenreName(
  */
 export async function backfillArtistGenres(mbids: string[]): Promise<void> {
   if (!redis || mbids.length === 0) return;
-  for (const mbid of mbids) {
+  // Cap the per-call batch so a single fingerprint compute can't
+  // monopolise the 1 req/sec MB rate-limit queue. The remaining
+  // MBIDs will be picked up on subsequent renders.
+  const slice = mbids.slice(0, BACKFILL_MAX_PER_CALL);
+  for (const mbid of slice) {
     try {
       const artist = await getArtist(mbid);
       // Prefer `.genres` (MB's curated genre tags) over `.tags`
-      // (free-form user tags). Falls back when MB has no genre
-      // data on this artist.
+      // (free-form user tags). Falls back to the sentinel when
+      // MB has no genre data on this artist — without the
+      // sentinel, every subsequent render of any user who has
+      // this artist in their top-N would re-pay the MB call.
       const genre =
         pickTopGenreName(artist.genres) ?? pickTopGenreName(artist.tags);
-      if (!genre) continue;
-      await redis.set(key(mbid), genre, { ex: ARTIST_GENRE_TTL_SECONDS });
+      await redis.set(key(mbid), genre ?? UNKNOWN_GENRE_SENTINEL, {
+        ex: ARTIST_GENRE_TTL_SECONDS,
+      });
     } catch {
       // continue — single-artist failures shouldn't stop the batch
     }

@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
-import Link from "next/link";
 import { getAdminSession } from "@/lib/admin";
 import { PageShell } from "@/components/achordion/page-shell";
+import { AdminNavLink } from "./admin-nav-link";
 
 export const metadata = {
   title: "Admin",
@@ -55,19 +55,3 @@ export default async function AdminLayout({
   );
 }
 
-function AdminNavLink({
-  href,
-  children,
-}: {
-  href: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <Link
-      href={href}
-      className="text-muted-foreground hover:bg-muted/50 hover:text-foreground rounded-md px-3 py-1.5 transition-colors"
-    >
-      {children}
-    </Link>
-  );
-}

@@ -4,6 +4,7 @@ import { unstable_cache } from "next/cache";
 import { getUserTopArtists } from "@/lib/clients/listenbrainz";
 import {
   backfillArtistGenres,
+  getArtistGenreCachedSet,
   getArtistTopGenres,
 } from "@/lib/artist-genre-cache";
 
@@ -142,14 +143,20 @@ async function computeFingerprint(
   if (maxCount === 0) return null;
 
   // Pull the cached top genre per artist (one Upstash MGET) for
-  // genre-coloured wedges. The MB lookup that populates a missing
-  // entry happens fire-and-forget below — this render uses
-  // whatever's already in cache, future renders pick up newly-
-  // backfilled entries.
+  // genre-coloured wedges. We ALSO check which MBIDs have any
+  // cached entry at all (genre OR "no-genre" sentinel) — the
+  // distinction matters for backfill: we want to backfill only
+  // the MBIDs we've never looked up before, not the ones we've
+  // looked up and confirmed have no MB genre data. Without that
+  // distinction, every render re-queued the no-genre artists
+  // through MB's 1 req/sec rate limit forever.
   const mbids = artists
     .map((a) => a.artist_mbid)
     .filter((m): m is string => !!m);
-  const genres = await getArtistTopGenres(mbids);
+  const [genres, cachedSet] = await Promise.all([
+    getArtistTopGenres(mbids),
+    getArtistGenreCachedSet(mbids),
+  ]);
 
   // sqrt-compression keeps the long-tail visible. Without it, a user
   // whose top artist is 10× their #5 ends up with bars #5-24 reading
@@ -171,14 +178,13 @@ async function computeFingerprint(
     };
   });
 
-  // Backfill: kick off MB lookups for the artists whose genre we
-  // don't have cached yet. Don't await — this render returns with
-  // hash-fallback colours for the missing artists, and the
-  // subsequent render (after 24h `unstable_cache` revalidate)
-  // picks up the newly-cached genres. The backfill itself is
-  // serialised through the existing MB rate-limit queue so it
-  // doesn't burst against MusicBrainz.
-  const missingMbids = mbids.filter((m) => !genres.has(m));
+  // Backfill: kick off MB lookups ONLY for MBIDs we've never
+  // looked up (no entry in `cachedSet`). MBIDs that returned the
+  // "no genre" sentinel are skipped — they're already as cached
+  // as they're going to be. The helper itself caps per-call at
+  // BACKFILL_MAX_PER_CALL (currently 3) to keep the MB rate-limit
+  // queue from being monopolised by a single fingerprint compute.
+  const missingMbids = mbids.filter((m) => !cachedSet.has(m));
   if (missingMbids.length > 0) {
     void backfillArtistGenres(missingMbids);
   }

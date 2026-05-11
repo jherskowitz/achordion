@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ExternalLink, Star } from "lucide-react";
 import type { CritiqueBrainzReview } from "@/lib/clients/critiquebrainz";
 import type { WikipediaCriticalReception } from "@/lib/clients/wikipedia";
-import { stripHtml } from "@/lib/strip-html";
+import { renderReviewMarkdown } from "@/lib/render-markdown";
 import { safeHttpUrl } from "./external-links";
 import { WriteReviewForm } from "./write-review-form";
 
@@ -23,8 +23,6 @@ import { WriteReviewForm } from "./write-review-form";
  * paint), drop a client island where personalized content goes,
  * fetch from a `Cache-Control: private, no-store` JSON endpoint.
  */
-
-const SNIPPET_CHARS = 480;
 
 interface ReviewsPayload {
   canRead: boolean;
@@ -108,9 +106,16 @@ function CritiqueBrainzReviews({
               <time dateTime={r.publishedOn}>{formatDate(r.publishedOn)}</time>
             )}
           </div>
-          <p className="text-foreground max-w-3xl text-sm leading-7">
-            {snippet(r.text)}
-          </p>
+          {/* Render the CritiqueBrainz markdown body (links, bold,
+              italic, paragraphs) rather than stripping it to plain
+              text — the inline citations the reviewers add via
+              [text](url) syntax are part of what reviews are FOR.
+              `line-clamp-6` keeps long reviews from blowing out
+              the card height; the "Read on CritiqueBrainz" link
+              below carries the full text. */}
+          <div className="text-foreground max-w-3xl line-clamp-6 text-sm leading-7">
+            {renderReviewMarkdown(r.text)}
+          </div>
           <a
             href={`https://critiquebrainz.org/review/${r.id}`}
             target="_blank"
@@ -180,12 +185,6 @@ function RatingStars({ value }: { value: number }) {
       ))}
     </span>
   );
-}
-
-function snippet(text: string): string {
-  const plain = stripHtml(text);
-  if (plain.length <= SNIPPET_CHARS) return plain;
-  return plain.slice(0, SNIPPET_CHARS).replace(/\s+\S*$/, "") + "…";
 }
 
 function formatDate(iso: string): string {
