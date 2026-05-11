@@ -163,6 +163,69 @@
   }
 }
 
+/* Embed-widget theme overrides.
+ *
+ * Achordion's normal theme system (next-themes) sets `class="dark"`
+ * on <html> based on the visitor's preference. For embed iframes
+ * pasted into third-party sites, the EMBEDDER picks the theme via
+ * a `?theme=` URL param — visitors of the host page shouldn't see
+ * the embed in their own OS theme.
+ *
+ * These classes re-declare the full CSS var set on a wrapper inside
+ * the embed page, overriding any ancestor `.dark` for the embed's
+ * subtree. `.embed-theme-dark` mirrors the existing `.dark` rule
+ * (kept independent so a future tweak to `.dark` doesn't have to
+ * thread through the embed surface). `.embed-theme-light` mirrors
+ * the `:root` declarations so the wrapper can force light even when
+ * `<html>` is dark.
+ *
+ * The embed pages don't use any `dark:` Tailwind variants (verified
+ * with grep), so overriding the CSS vars alone is sufficient. If
+ * a future embed feature needs `dark:` utilities, switch to also
+ * conditionally applying the `dark` class itself on the wrapper.
+ */
+.embed-theme-light {
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+}
+
+.embed-theme-dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+}
+
 /* On-air pill marquee — used by <LiveOnAirIndicator>'s <OnAirText>
    when the track/artist string overflows its container. The component
    sets --marquee-shift inline to the negative pixel offset that puts

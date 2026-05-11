@@ -47,6 +47,15 @@ export const revalidate = 3600;
 
 interface PageProps {
   params: Promise<{ mbid: string }>;
+  searchParams: Promise<{ theme?: string | string[] }>;
+}
+
+/** Mirrors `resolveTheme` in `embed/track`. Kept inline (rather than
+ *  factored to a shared util) because there are only two embed pages
+ *  and the helper is six lines. */
+function resolveTheme(raw: string | string[] | undefined): "light" | "dark" {
+  const v = Array.isArray(raw) ? raw[0] : raw;
+  return v === "light" ? "light" : "dark";
 }
 
 function formatLength(ms: number | null | undefined): string | null {
@@ -57,7 +66,11 @@ function formatLength(ms: number | null | undefined): string | null {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
-export default async function EmbedAlbumPage({ params }: PageProps) {
+export default async function EmbedAlbumPage({
+  params,
+  searchParams,
+}: PageProps) {
+  const theme = resolveTheme((await searchParams).theme);
   const { mbid } = await params;
   let rg: Awaited<ReturnType<typeof getReleaseGroup>>;
   try {
@@ -107,7 +120,9 @@ export default async function EmbedAlbumPage({ params }: PageProps) {
   const canonicalHref = `https://achordion.xyz/release-group/${mbid}`;
 
   return (
-    <main className="bg-background min-h-screen p-3">
+    <main
+      className={`${theme === "light" ? "embed-theme-light" : "embed-theme-dark"} bg-background min-h-screen p-3`}
+    >
       <article className="border-border/60 max-w-2xl overflow-hidden rounded-xl border">
         <div className="flex items-stretch gap-3">
           <div className="group relative aspect-square w-32 shrink-0 overflow-hidden sm:w-36">

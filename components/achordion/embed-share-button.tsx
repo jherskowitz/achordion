@@ -68,14 +68,22 @@ export function EmbedShareButton({
   recommendedHeight?: number;
 }) {
   const [copied, setCopied] = useState(false);
+  // Embedder picks the theme up-front; the iframe URL carries it
+  // and the embed page reads it server-side. Default mirrors the
+  // dark-by-default look the embed has shipped with so existing
+  // snippets render identically without a theme param.
+  const [theme, setTheme] = useState<"dark" | "light">("dark");
   // The snippet ALWAYS hard-codes achordion.xyz — users copy it
   // for external pages, so it shouldn't reflect the dev origin.
   // The Preview link below uses the CURRENT origin so dev works
   // without a deploy.
-  const path = `/embed/${entity}/${mbid}`;
-  const snippetSrc = `https://achordion.xyz${path}`;
+  const pathBase = `/embed/${entity}/${mbid}`;
+  const pathWithTheme = `${pathBase}?theme=${theme}`;
+  const snippetSrc = `https://achordion.xyz${pathWithTheme}`;
   const previewHref =
-    typeof window !== "undefined" ? window.location.origin + path : snippetSrc;
+    typeof window !== "undefined"
+      ? window.location.origin + pathWithTheme
+      : snippetSrc;
   const height = recommendedHeight ?? DEFAULT_HEIGHT[entity];
   // Prefer "Track Name — Artist" / "Album Name — Artist" so screen
   // readers and host-page hover-text describe the embed by what it
@@ -124,6 +132,30 @@ export function EmbedShareButton({
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
+          {/* Theme radio. Two-pill toggle so the choice is visible
+              at a glance rather than tucked into a select. Updates
+              the iframe `src` immediately — preview link + clipboard
+              snippet both reflect whatever's selected. */}
+          <div className="space-y-1.5">
+            <p className="text-muted-foreground text-xs">Background</p>
+            <div className="bg-muted/40 inline-flex rounded-md p-0.5 text-xs">
+              {(["dark", "light"] as const).map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => setTheme(t)}
+                  className={cn(
+                    "inline-flex h-7 items-center rounded px-3 capitalize transition-colors",
+                    theme === t
+                      ? "bg-background text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  {t}
+                </button>
+              ))}
+            </div>
+          </div>
           <textarea
             readOnly
             value={snippet}

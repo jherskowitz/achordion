@@ -39,6 +39,16 @@ export const revalidate = 3600;
 
 interface PageProps {
   params: Promise<{ mbid: string }>;
+  searchParams: Promise<{ theme?: string | string[] }>;
+}
+
+/** Read the `?theme=` URL param and normalise to a known token.
+ *  Anything other than the explicit literals collapses to "dark" so
+ *  malformed input fails closed to the same default the embed has
+ *  shipped with. */
+function resolveTheme(raw: string | string[] | undefined): "light" | "dark" {
+  const v = Array.isArray(raw) ? raw[0] : raw;
+  return v === "light" ? "light" : "dark";
 }
 
 function pickHeroRelease(
@@ -60,8 +70,12 @@ function formatLength(ms: number | null | undefined): string | null {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
-export default async function EmbedTrackPage({ params }: PageProps) {
+export default async function EmbedTrackPage({
+  params,
+  searchParams,
+}: PageProps) {
   const { mbid } = await params;
+  const theme = resolveTheme((await searchParams).theme);
   let recording;
   try {
     recording = await getRecording(mbid);
@@ -100,7 +114,14 @@ export default async function EmbedTrackPage({ params }: PageProps) {
   });
 
   return (
-    <main className="bg-background min-h-screen p-3">
+    // `embed-theme-*` re-declares the CSS-var palette on this
+    // subtree so the embedder's chosen theme wins over whatever
+    // theme the visitor's browser is in (next-themes' `<html
+    // class="dark">` toggling does not leak into the embed
+    // because the wrapper redeclares the relevant vars).
+    <main
+      className={`${theme === "light" ? "embed-theme-light" : "embed-theme-dark"} bg-background min-h-screen p-3`}
+    >
       {/* `overflow-visible` on the article — was `overflow-hidden`,
           but that clipped the favicon hover-tooltips at the article's
           rounded edge. The cover-art wrapper still clips itself
