@@ -150,13 +150,15 @@ export async function UserPageHeader({ name }: { name: string }) {
               </Suspense>
             </ul>
           </div>
-          {/* Listener-fingerprint glyph. On desktop (sm+) it sits
-              on the right edge of the header, vertically centered
-              against the text column. On mobile the outer flex
-              wraps to a column, so the fingerprint stacks below
-              the username + bio + chips, centered with a top
-              margin to separate it from the bio strip. */}
-          <div className="mt-4 flex shrink-0 self-center sm:mt-0 sm:ml-auto">
+          {/* Listener-fingerprint glyph sits on the right edge of
+              the header at the same vertical band as the username,
+              providing a data-driven visual identity next to the
+              text. Hidden on mobile — the chart's 140px footprint
+              + caption + label slot adds ~200px of vertical real
+              estate that crowds the username + avatar + chips
+              stack on narrow viewports. Surfaces only at sm+ where
+              the header has room for it. */}
+          <div className="ml-auto hidden shrink-0 self-center sm:flex">
             <Suspense fallback={null}>
               <ListenerFingerprint name={name} size="lg" />
             </Suspense>

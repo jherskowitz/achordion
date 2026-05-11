@@ -104,14 +104,34 @@ export function UserCard({
         fallbackClassName={layout === "stack" ? "text-xs" : "text-sm"}
       />
       <div className="min-w-0 flex-1">
-        <Link
-          href={linkHref}
-          className="block min-w-0 py-0.5 pointer-coarse:py-1"
-        >
-          <p className="truncate text-sm font-medium pointer-coarse:text-base">
-            {username}
-          </p>
-        </Link>
+        {/* Username row — tier chip rides inline at the right
+            edge instead of trailing the whole card. The previous
+            layout (tier chip in a separate trailing slot) meant a
+            "Somewhat similar" chip ate ~120px of fixed width on
+            every viewport, leaving the "Currently into" line below
+            with almost no room to render on phones — most artists
+            ellipsised out of view. Inline tier keeps the chip
+            visible without starving the artist line. */}
+        <div className="flex items-baseline justify-between gap-2">
+          <Link
+            href={linkHref}
+            className="block min-w-0 py-0.5 pointer-coarse:py-1"
+          >
+            <p className="truncate text-sm font-medium pointer-coarse:text-base">
+              {username}
+            </p>
+          </Link>
+          {tier && (
+            <span
+              className={cn(
+                "shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium whitespace-nowrap",
+                tier.chipClass,
+              )}
+            >
+              {tier.label}
+            </span>
+          )}
+        </div>
         {/* Single info slot — see component doc for the swap
             mechanics. Min-height reserves space for on-air so cards
             stay uniform; the artists fallback sits in the same slot
@@ -130,16 +150,6 @@ export function UserCard({
           </Suspense>
         </div>
       </div>
-      {tier && (
-        <span
-          className={cn(
-            "shrink-0 self-start rounded-full px-2 py-0.5 text-[11px] font-medium whitespace-nowrap",
-            tier.chipClass,
-          )}
-        >
-          {tier.label}
-        </span>
-      )}
     </li>
   );
 }

@@ -197,12 +197,16 @@ export default async function ListenBrainzChartsPage({
           </Suspense>
         )}
 
-        {/* Range picker — Week / Month / Year / All time. Same pill
-            tab pattern; sits to the right with ml-auto. */}
+        {/* Range picker — Week / Month / Year / All time. On
+            sm+ sits to the right with ml-auto. On mobile the
+            flex-wrap drops it to its own line; `ml-auto` would
+            then float it to the right edge of that line, leaving
+            an awkward indent — `sm:ml-auto` confines that
+            right-alignment to desktop. */}
         <div
           role="tablist"
           aria-label="Time range"
-          className="border-border/60 ml-auto inline-flex rounded-xl border p-1 text-sm"
+          className="border-border/60 inline-flex rounded-xl border p-1 text-sm sm:ml-auto"
         >
           {RANGES.map((r) => {
             const active = r.code === range;
