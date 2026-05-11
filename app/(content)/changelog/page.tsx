@@ -27,6 +27,22 @@ interface ChangelogEntry {
 
 const ENTRIES: ChangelogEntry[] = [
   {
+    date: "2026-05-11",
+    intro:
+      "Every profile now has a sense of identity built from listening data — a one-sentence bio, personality and milestone chips, and an interactive listener fingerprint. Plus a sitewide announcement banner, embed-widget polish, and Bluesky avatars across more list surfaces.",
+    highlights: [
+      "Auto-generated listener bio on profile pages. A live “Currently spinning A, B, and C” sentence derived from each user's last month of listening, with the artist names linking to their artist pages. When a profile owner has linked their Bluesky, that bio shows here instead — the two stay coherent without ever asking anyone to write anything.",
+      "Listener archetype chips. 0–3 small personality tags computed from listening patterns — “Night owl” / “Morning listener” from time-of-day peaks, “Same-thing-on-repeat” / “Broad listener” from track concentration, “Discoverer” / “Habitual listener” from how much of this month's top artists are freshly added. Hover any chip for a plain-English explanation of why it landed.",
+      "Listener milestone chips. Quantitative siblings to the archetype chips: total plays, distinct artists (“>500 artists” when above the listing cap), current listening streak, “Listening since 2018.” Both chip strips wrap together as one identity band under the bio.",
+      "Interactive listener fingerprint. A radial-bar glyph on every profile header where each wedge is one of that user's top 24 artists, bar height = their relative plays, colour = a deterministic hash of the artist's top genre (so any two people who listen to a lot of, say, jazz share visible colour clusters in their fingerprints). Hover a wedge to highlight it and see the artist + play count; click to open the artist page. Works on desktop and mobile.",
+      "Site-wide announcement banner. The dismissible bar at the top of the page is now a real feature — used here for the MusicBrainz maintenance heads-up earlier today, more notices as they come up.",
+      "Activity feed: “X linked their Bluesky to Achordion.” When someone you follow on Bluesky links their Achordion profile, that event shows up in your feed with their Bluesky avatar + a direct link to their bsky.app.",
+      "Bluesky avatars now flow into every user-card surface — Top Listeners on album pages, Followers / Following / Similar Users grids, Find Bluesky Friends in Settings. A linked profile reads as the same person everywhere.",
+      "Embed widgets: light/dark background picker right above the snippet textarea (defaults to dark; existing embeds keep rendering dark with no change), and the “Open in Achordion” link moved to the upper-right of the card so it doesn't sit awkwardly between rows of service icons.",
+      "Mobile site header polish: theme toggle, avatar, and sign-in button collapse into the hamburger menu on phones so the on-air pill has room to breathe in the trailing slot. Hamburger menu already carries every one of those entries — nothing's lost.",
+    ],
+  },
+  {
     date: "2026-05-10",
     intro:
       "Optional Bluesky cross-platform identity, browser notifications for feed updates, richer Followers / Following / Similar Users cards, and a swath of mobile polish.",
