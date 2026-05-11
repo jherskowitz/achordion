@@ -14,6 +14,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { UserAvatar } from "@/components/achordion/user-avatar";
 import { LiveOnAirIndicator } from "@/components/achordion/live-on-air-indicator";
+import { useFeedNotifications } from "@/lib/use-feed-notifications";
 
 /**
  * Sitewide top header.
@@ -84,6 +85,12 @@ export function SiteHeader() {
     refetchOnWindowFocus: true,
   });
   const feedUnread = unread?.count ?? 0;
+
+  // Browser notifications on unread-count increases — gated on a
+  // user opt-in toggle in /settings + browser permission grant + tab
+  // not currently visible. See `lib/use-feed-notifications.ts` for
+  // the full gating logic.
+  useFeedNotifications(unread?.count);
 
   const nav: MainNavItem[] = [
     { href: "/explore", label: "Explore" },

@@ -5,6 +5,7 @@ import { ThemeRadio } from "@/components/achordion/theme-radio";
 import { UserAvatar } from "@/components/achordion/user-avatar";
 import { BlueskyLinkForm } from "@/components/achordion/bluesky-link-form";
 import { BlueskyFriendsSection } from "@/components/achordion/bluesky-friends-section";
+import { FeedNotificationsToggle } from "@/components/achordion/feed-notifications-toggle";
 import { Suspense } from "react";
 import { isFeatureEnabled } from "@/lib/flags";
 import { getBskyLink } from "@/lib/bsky-link";
@@ -137,6 +138,15 @@ export default async function SettingsProfilePage() {
           <BlueskyFriendsSection viewer={username} />
         </Suspense>
       )}
+
+      <section className="space-y-3">
+        <h3 className="text-sm font-medium">Feed notifications</h3>
+        <p className="text-muted-foreground text-sm leading-6">
+          Get a browser notification when there&apos;s new activity
+          on your Achordion feed. Off by default.
+        </p>
+        <FeedNotificationsToggle />
+      </section>
 
       <section className="space-y-3">
         <h3 className="text-sm font-medium">Theme</h3>
