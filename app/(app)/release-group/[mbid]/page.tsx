@@ -26,7 +26,6 @@ import { CoverArt } from "@/components/achordion/cover-art";
 import { PlayOnHoverFab } from "@/components/achordion/play-on-hover-fab";
 import { TrackList } from "@/components/achordion/track-list";
 import { TopListenersList } from "@/components/achordion/top-listeners-list";
-import { auth } from "@/auth";
 import { resolveBskyAvatarsForUsers } from "@/lib/bsky-display";
 import {
   ExternalLinks,
@@ -380,14 +379,23 @@ async function TopListenersStream({
   const listeners = await promise;
   if (!listeners?.listeners || listeners.listeners.length === 0) return null;
   // Upgrade DiceBear default avatars to each listener's linked
-  // Bluesky avatar when available. `resolveBskyAvatarsForUsers`
-  // returns an empty map when the viewer's flag is off, the user
-  // hasn't linked, or Bluesky is unreachable — so this is a no-op
-  // for unlinked rows, no fallback rendering required.
-  const session = await auth();
-  const viewer = session?.user?.mbUsername ?? null;
+  // Bluesky avatar when available.
+  //
+  // ⚠️ We pass `null` for the viewer rather than calling `auth()`
+  // here — see AGENTS.md § "Auth-gated content on edge-cached
+  // routes". The album route lives behind PUBLIC_ENTITY_CACHE
+  // (1h s-maxage on the Vercel edge); any `auth()` / cookies()
+  // call in the render path marks the route dynamic and
+  // bypasses that edge cache, costing every visitor the full
+  // origin round-trip. The bsky-link flag is currently
+  // default-on for everyone, so the flag check inside
+  // resolveBskyAvatarsForUsers passes with a null viewer. If we
+  // ever go back to allowlist mode for bsky-link, this surface
+  // should move to a client-island fetch (same pattern as
+  // <AlbumReviewsClient>) rather than re-introducing the
+  // auth() call here.
   const bskyAvatars = await resolveBskyAvatarsForUsers(
-    viewer,
+    null,
     listeners.listeners.map((l) => l.user_name),
   );
   return (
