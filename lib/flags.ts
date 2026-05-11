@@ -105,3 +105,72 @@ export async function isFeatureEnabledForViewer(flag: string): Promise<boolean> 
   const session = await auth();
   return isFeatureEnabled(flag, session?.user?.mbUsername ?? null);
 }
+
+/**
+ * Static registry of flags the admin UI knows how to surface. New
+ * flags should be added here when introduced — anything not listed
+ * still works at runtime (the flag system is dynamic by name) but
+ * won't appear in `/admin/flags`. Keep alphabetical for stable
+ * render order.
+ */
+export interface FlagDefinition {
+  id: string;
+  /** Short label rendered next to the toggle. */
+  label: string;
+  /** One-sentence description of what the flag gates. */
+  description: string;
+}
+
+export const KNOWN_FLAGS: ReadonlyArray<FlagDefinition> = [
+  {
+    id: "bsky-link",
+    label: "Bluesky linking",
+    description:
+      "Profile-page Bluesky avatar / handle / bio overlay, /settings link UI, Find Bluesky Friends section, and bsky-friend-linked feed events.",
+  },
+  {
+    id: "reviews",
+    label: "Album reviews",
+    description:
+      "CritiqueBrainz reviews + Wikipedia 'Critical reception' fallback on /release-group/<mbid>.",
+  },
+  {
+    id: "write_reviews",
+    label: "Write reviews",
+    description:
+      "Inline write-a-review form on the album page. Posts to CritiqueBrainz via the configured OAuth integration.",
+  },
+];
+
+/**
+ * Pull the per-flag state directly from Redis (or env fallback) so
+ * the admin UI can render the current resolution without going
+ * through the per-user `isFeatureEnabled` check. Returns `null`
+ * when Upstash isn't configured and there's no env fallback —
+ * caller renders an "unavailable" UI instead of guessing.
+ */
+export interface FlagState {
+  /** Redis value at `flag:<id>:default`. `"on"` | `"off"` | null. */
+  defaultValue: "on" | "off" | null;
+  /** Members of `flag:<id>:users`. Empty when no allowlist is set. */
+  users: string[];
+}
+
+export async function getFlagState(flag: string): Promise<FlagState | null> {
+  if (redis) {
+    const def = await redis
+      .get<string>(`flag:${flag}:default`)
+      .catch(() => null);
+    const users = await redis
+      .smembers(`flag:${flag}:users`)
+      .catch(() => [] as string[]);
+    return {
+      defaultValue: def === "on" ? "on" : def === "off" ? "off" : null,
+      users,
+    };
+  }
+  const envDef = envDefault(flag);
+  const envUsers = Array.from(envAllowlist(flag));
+  if (envDef === null && envUsers.length === 0) return null;
+  return { defaultValue: envDef, users: envUsers };
+}

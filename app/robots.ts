@@ -65,6 +65,11 @@ export default function robots(): MetadataRoute.Robots {
           "/playlist/",
           "/user/",
           "/api/",
+          // Admin surface is auth-gated server-side (404 for
+          // non-admins), but advertising it via robots-allow would
+          // still leak its existence in crawl logs. Disallow is
+          // belt-and-suspenders alongside the server gate.
+          "/admin",
         ],
       },
     ],
