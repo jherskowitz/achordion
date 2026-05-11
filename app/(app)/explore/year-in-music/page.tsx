@@ -14,6 +14,7 @@ import { OpenInParachordButton } from "@/components/achordion/open-in-parachord-
 import type { ParachordTrack } from "@/lib/parachord";
 import { TopAlbumsGrid } from "@/components/achordion/top-albums-grid";
 import { SimilarUsersList } from "@/components/achordion/similar-users-list";
+import { resolveBskyAvatarsForUsers } from "@/lib/bsky-display";
 import { YearInMusicHero } from "@/components/achordion/year-in-music/hero";
 import { YearCalendarHeatmap } from "@/components/achordion/year-in-music/calendar";
 import { YearTopGenres } from "@/components/achordion/year-in-music/top-genres";
@@ -89,6 +90,14 @@ export default async function ExploreYearInMusicPage({ searchParams }: PageParam
     .map(([user_name, similarity]) => ({ user_name, similarity }))
     .sort((a, b) => b.similarity - a.similarity)
     .slice(0, 24);
+  // Bsky avatar overrides for the similar-users grid. `username` is
+  // the viewer here (YIM is auth-gated to the user's own year).
+  const bskyAvatars = username
+    ? await resolveBskyAvatarsForUsers(
+        username,
+        similarUsers.map((u) => u.user_name),
+      )
+    : new Map<string, string>();
 
   return (
     <PageShell className="pt-8">
@@ -218,7 +227,11 @@ export default async function ExploreYearInMusicPage({ searchParams }: PageParam
               hint="Users with the most overlap this year."
               seeAllHref="/explore/similar-users"
             />
-            <SimilarUsersList users={similarUsers} layout="grid" />
+            <SimilarUsersList
+              users={similarUsers}
+              layout="grid"
+              bskyAvatars={bskyAvatars}
+            />
           </section>
         )}
       </div>

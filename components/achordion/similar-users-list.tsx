@@ -6,6 +6,9 @@ interface SimilarUsersListProps {
   /** "grid" — multi-column responsive cards (full page).
    *  "stack" — vertical list (sidebar). */
   layout?: "grid" | "stack";
+  /** Optional bsky-avatar override map; see `<UserList>` for the
+   *  same shape. Parent fetches via `resolveBskyAvatarsForUsers`. */
+  bskyAvatars?: Map<string, string>;
 }
 
 /** Bucket users into three qualitative tiers based on their rank
@@ -43,6 +46,7 @@ function tierFor(index: number, total: number): {
 export function SimilarUsersList({
   users,
   layout = "grid",
+  bskyAvatars,
 }: SimilarUsersListProps) {
   if (users.length === 0) {
     return (
@@ -72,6 +76,7 @@ export function SimilarUsersList({
           href={`/user/${encodeURIComponent(u.user_name)}/stats`}
           tier={tierFor(i, users.length)}
           layout={layout}
+          avatarOverride={bskyAvatars?.get(u.user_name.toLowerCase())}
         />
       ))}
     </ul>

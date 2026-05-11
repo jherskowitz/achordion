@@ -27,6 +27,7 @@ import { FreshReleasesGrid } from "@/components/achordion/fresh-releases-grid";
 import { OpenInParachordButton } from "@/components/achordion/open-in-parachord-button";
 import { RecommendedArtistsList } from "@/components/achordion/recommended-artists-list";
 import { SimilarUsersList } from "@/components/achordion/similar-users-list";
+import { resolveBskyAvatarsForUsers } from "@/lib/bsky-display";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getPlaylist } from "@/lib/clients/listenbrainz";
@@ -396,7 +397,17 @@ async function SimilarUsersSection({
   layout?: "grid" | "stack";
 }) {
   const users = await getSimilarUsers(username, limit).catch(() => []);
-  return <SimilarUsersList users={users} layout={layout} />;
+  const bskyAvatars = await resolveBskyAvatarsForUsers(
+    username,
+    users.map((u) => u.user_name),
+  );
+  return (
+    <SimilarUsersList
+      users={users}
+      layout={layout}
+      bskyAvatars={bskyAvatars}
+    />
+  );
 }
 
 function parseFamiliarity(raw: string | undefined): number {

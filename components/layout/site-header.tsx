@@ -131,20 +131,24 @@ export function SiteHeader() {
             </>
           }
         />
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex min-w-0 items-center gap-2">
           {showAuthed && (
             // Self-on-air pill — renders only while the viewer is
             // actively listening (LiveOnAirIndicator returns null when
             // playing-now is empty). hideListenAlong=true since
             // listen-along to yourself loops back to nothing useful.
-            // max-w cap keeps long track names from blowing out the
-            // header on small viewports.
+            // The width cap shrinks on narrow viewports so the pill
+            // doesn't compete with the always-visible Search icon
+            // for room — long track names overflow into the inner
+            // marquee instead. `min-w-0` on the wrapper above lets
+            // the pill actually shrink (flex children default to
+            // intrinsic min content width otherwise).
             <LiveOnAirIndicator
               username={username}
               initialListen={null}
               hideListenAlong
               size="compact"
-              className="max-w-[220px]"
+              className="min-w-0 max-w-[140px] sm:max-w-[220px]"
             />
           )}
           <Button
@@ -156,7 +160,14 @@ export function SiteHeader() {
           >
             <Search className="size-4" />
           </Button>
-          <ThemeToggle />
+          {/* Theme toggle, avatar, and Sign-In are sm-and-up only.
+              Mobile gets them via the hamburger menu (theme in the
+              mobile footer, /settings + /login in mobileExtras) so
+              the header has room for the on-air pill + search
+              without overflowing. */}
+          <span className="hidden sm:inline-flex">
+            <ThemeToggle />
+          </span>
           {showAuthed ? (
             <Link
               href="/settings"
@@ -168,7 +179,7 @@ export function SiteHeader() {
               // size-7 (matches the rest of the trailing slot's
               // visual rhythm) while widening the tap area to ~44px
               // for thumb-friendliness.
-              className="hover:ring-ring/40 ml-1 inline-flex rounded-full transition-shadow hover:ring-2 pointer-coarse:relative pointer-coarse:before:absolute pointer-coarse:before:-inset-2 pointer-coarse:before:content-['']"
+              className="hover:ring-ring/40 ml-1 hidden rounded-full transition-shadow hover:ring-2 sm:inline-flex pointer-coarse:relative pointer-coarse:before:absolute pointer-coarse:before:-inset-2 pointer-coarse:before:content-['']"
             >
               <UserAvatar
                 username={username}
@@ -181,6 +192,7 @@ export function SiteHeader() {
             <Button
               size="sm"
               nativeButton={false}
+              className="hidden sm:inline-flex"
               render={<Link href="/login" suppressHydrationWarning />}
             >
               Sign In

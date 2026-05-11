@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { auth } from "@/auth";
 import { getSimilarUsers } from "@/lib/clients/listenbrainz";
+import { resolveBskyAvatarsForUsers } from "@/lib/bsky-display";
 import { PageShell } from "@/components/achordion/page-shell";
 import { SimilarUsersList } from "@/components/achordion/similar-users-list";
 import { EmptyState } from "@/components/achordion/empty-state";
@@ -12,7 +13,17 @@ export const metadata = { title: "Similar listeners" };
 
 async function Body({ username }: { username: string }) {
   const users = await getSimilarUsers(username, 60).catch(() => []);
-  return <SimilarUsersList users={users} layout="grid" />;
+  const bskyAvatars = await resolveBskyAvatarsForUsers(
+    username,
+    users.map((u) => u.user_name),
+  );
+  return (
+    <SimilarUsersList
+      users={users}
+      layout="grid"
+      bskyAvatars={bskyAvatars}
+    />
+  );
 }
 
 function Fallback() {

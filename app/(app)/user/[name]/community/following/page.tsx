@@ -1,5 +1,7 @@
 import { Suspense } from "react";
+import { auth } from "@/auth";
 import { getFollowing } from "@/lib/clients/listenbrainz";
+import { resolveBskyAvatarsForUsers } from "@/lib/bsky-display";
 import { UserList } from "@/components/achordion/user-list";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -10,9 +12,13 @@ interface PageParams {
 async function Following({ name }: { name: string }) {
   const following = await getFollowing(name);
   following.sort((a, b) => a.localeCompare(b));
+  const session = await auth();
+  const viewer = session?.user?.mbUsername ?? null;
+  const bskyAvatars = await resolveBskyAvatarsForUsers(viewer, following);
   return (
     <UserList
       users={following}
+      bskyAvatars={bskyAvatars}
       emptyMessage={`${name} isn't following anyone yet.`}
     />
   );

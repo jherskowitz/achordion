@@ -75,6 +75,11 @@ export interface UserCardProps {
   /** "grid" — multi-column responsive cards (full page).
    *  "stack" — vertical list (sidebar). */
   layout?: "grid" | "stack";
+  /** Optional Bluesky avatar override. Parent fetches via
+   *  `resolveBskyAvatarsForUsers` and passes per-card so the avatar
+   *  swaps from DiceBear to the linked Bluesky avatar. Omitted /
+   *  undefined → DiceBear default. */
+  avatarOverride?: string;
 }
 
 export function UserCard({
@@ -82,6 +87,7 @@ export function UserCard({
   href,
   tier,
   layout = "grid",
+  avatarOverride,
 }: UserCardProps) {
   const linkHref = href ?? `/user/${encodeURIComponent(username)}`;
   return (
@@ -93,6 +99,7 @@ export function UserCard({
     >
       <UserAvatar
         username={username}
+        imageUrl={avatarOverride}
         className={layout === "stack" ? "size-7" : "size-9"}
         fallbackClassName={layout === "stack" ? "text-xs" : "text-sm"}
       />

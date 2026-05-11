@@ -26,6 +26,8 @@ import { CoverArt } from "@/components/achordion/cover-art";
 import { PlayOnHoverFab } from "@/components/achordion/play-on-hover-fab";
 import { TrackList } from "@/components/achordion/track-list";
 import { TopListenersList } from "@/components/achordion/top-listeners-list";
+import { auth } from "@/auth";
+import { resolveBskyAvatarsForUsers } from "@/lib/bsky-display";
 import {
   ExternalLinks,
   categoriseLinks,
@@ -377,13 +379,27 @@ async function TopListenersStream({
 }) {
   const listeners = await promise;
   if (!listeners?.listeners || listeners.listeners.length === 0) return null;
+  // Upgrade DiceBear default avatars to each listener's linked
+  // Bluesky avatar when available. `resolveBskyAvatarsForUsers`
+  // returns an empty map when the viewer's flag is off, the user
+  // hasn't linked, or Bluesky is unreachable — so this is a no-op
+  // for unlinked rows, no fallback rendering required.
+  const session = await auth();
+  const viewer = session?.user?.mbUsername ?? null;
+  const bskyAvatars = await resolveBskyAvatarsForUsers(
+    viewer,
+    listeners.listeners.map((l) => l.user_name),
+  );
   return (
     <div>
       {/* h2 (sidebar): sibling of the main column's "Tracks" h2. */}
       <h2 className="mb-3 text-xs tracking-wide uppercase text-muted-foreground">
         Top listeners
       </h2>
-      <TopListenersList listeners={listeners.listeners} />
+      <TopListenersList
+        listeners={listeners.listeners}
+        bskyAvatars={bskyAvatars}
+      />
     </div>
   );
 }

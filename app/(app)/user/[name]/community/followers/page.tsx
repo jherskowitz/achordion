@@ -1,5 +1,7 @@
 import { Suspense } from "react";
+import { auth } from "@/auth";
 import { getFollowers } from "@/lib/clients/listenbrainz";
+import { resolveBskyAvatarsForUsers } from "@/lib/bsky-display";
 import { UserList } from "@/components/achordion/user-list";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -10,9 +12,16 @@ interface PageParams {
 async function Followers({ name }: { name: string }) {
   const followers = await getFollowers(name);
   followers.sort((a, b) => a.localeCompare(b));
+  // Batch-fetch bsky avatar overrides for the visible list. Each
+  // linked user's avatar swaps from DiceBear; unlinked rows keep
+  // the default. See lib/bsky-display.ts for the cost shape.
+  const session = await auth();
+  const viewer = session?.user?.mbUsername ?? null;
+  const bskyAvatars = await resolveBskyAvatarsForUsers(viewer, followers);
   return (
     <UserList
       users={followers}
+      bskyAvatars={bskyAvatars}
       emptyMessage={`No one is following ${name} yet.`}
     />
   );

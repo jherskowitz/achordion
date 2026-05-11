@@ -10,9 +10,15 @@ import { UserCard } from "./user-card";
 export function UserList({
   users,
   emptyMessage = "Nothing here yet.",
+  bskyAvatars,
 }: {
   users: string[];
   emptyMessage?: string;
+  /** Map<lower-cased lbUsername, bsky avatar URL>. Parent batches
+   *  the lookup via `resolveBskyAvatarsForUsers` (one Redis pass +
+   *  one Bluesky fetch per linked user, all cached). When omitted
+   *  or when a row has no entry, the avatar falls back to DiceBear. */
+  bskyAvatars?: Map<string, string>;
 }) {
   if (users.length === 0) {
     return (
@@ -24,7 +30,12 @@ export function UserList({
   return (
     <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
       {users.map((name) => (
-        <UserCard key={name} username={name} layout="grid" />
+        <UserCard
+          key={name}
+          username={name}
+          layout="grid"
+          avatarOverride={bskyAvatars?.get(name.toLowerCase())}
+        />
       ))}
     </ul>
   );

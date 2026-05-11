@@ -14,9 +14,17 @@ export function TopListenersList({
    *  "cards" — multi-column responsive bordered cards for full-width
    *  page sections. */
   layout = "stack",
+  /** Optional Map<lower-cased lbUsername, bsky avatar URL>. Pages
+   *  fetch this via `resolveBskyAvatarsForUsers` and pass it through
+   *  so each row's avatar upgrades from the DiceBear default to the
+   *  linked Bluesky avatar. Falls back to DiceBear when the map
+   *  doesn't carry an entry for a row (linkage absent / flag off /
+   *  Bluesky unreachable). */
+  bskyAvatars,
 }: {
   listeners: ListenerEntry[];
   layout?: "stack" | "cards";
+  bskyAvatars?: Map<string, string>;
 }) {
   if (listeners.length === 0) return null;
   const max = listeners[0]?.listen_count ?? 1;
@@ -52,6 +60,7 @@ export function TopListenersList({
                 </span>
                 <UserAvatar
                   username={l.user_name}
+                  imageUrl={bskyAvatars?.get(l.user_name.toLowerCase())}
                   className="size-9 shrink-0"
                   fallbackClassName="text-sm"
                 />
@@ -107,6 +116,7 @@ export function TopListenersList({
                 </span>
                 <UserAvatar
                   username={l.user_name}
+                  imageUrl={bskyAvatars?.get(l.user_name.toLowerCase())}
                   className="size-6 shrink-0"
                   fallbackClassName="text-[10px]"
                 />
