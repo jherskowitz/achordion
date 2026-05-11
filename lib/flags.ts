@@ -129,6 +129,30 @@ export const KNOWN_FLAGS: ReadonlyArray<FlagDefinition> = [
       "Profile-page Bluesky avatar / handle / bio overlay, /settings link UI, Find Bluesky Friends section, and bsky-friend-linked feed events.",
   },
   {
+    id: "listener-bio",
+    label: "Auto-generated listener bio",
+    description:
+      "Profile-page sentence composed from the user's recent listening data — top artists this month, play volume, streak. Fallback when the profile owner hasn't linked a Bluesky bio.",
+  },
+  {
+    id: "listener-archetypes",
+    label: "Listener archetype chips",
+    description:
+      "Profile-page personality chips computed from listening patterns — Night owl, Same-thing-on-repeat, Discoverer, etc. Independent of the auto-bio.",
+  },
+  {
+    id: "listener-fingerprint",
+    label: "Listener fingerprint",
+    description:
+      "Profile-page radial-bar SVG glyph derived from the user's top 24 artists — bar height = relative listen count, hue = artist-MBID hash. Visually distinctive per user; renders at thumbnail size on cards and full size on the profile header.",
+  },
+  {
+    id: "listener-milestones",
+    label: "Listener milestone chips",
+    description:
+      "Profile-page chips quantifying lifetime listening behaviour — total plays, distinct artists, current streak, listening-since year. Surfaces below the bio next to the archetype chips.",
+  },
+  {
     id: "reviews",
     label: "Album reviews",
     description:

@@ -5,6 +5,10 @@ import { getFollowing, getPlayingNow } from "@/lib/clients/listenbrainz";
 import { getLbTokenForRequest } from "@/lib/lb-token";
 import { getBskyDisplayProfile } from "@/lib/bsky-display";
 import { BlueskyStrip } from "./bluesky-strip";
+import { ListenerBioRow } from "./listener-bio-row";
+import { ListenerArchetypeChips } from "./listener-archetype-chips";
+import { ListenerMilestones } from "./listener-milestones";
+import { ListenerFingerprint } from "./listener-fingerprint";
 import { FollowToggle } from "./follow-toggle";
 import { LiveOnAirIndicator } from "./live-on-air-indicator";
 import { SectionTabs, type SectionTab } from "./section-tabs";
@@ -105,14 +109,56 @@ export async function UserPageHeader({ name }: { name: string }) {
               size="default"
               className="mt-2"
             />
-            {/* Optional Bluesky-identity row — Bluesky favicon (handle
-                in tooltip) followed by the linked account's bio
-                rendered inline. Renders null when the viewer's flag
-                is off, when the profile owner hasn't linked, or when
-                Bluesky is unreachable. Suspended so a slow AppView
-                call doesn't block the header. */}
+            {/* Bio slot — exactly one of two renderers wins:
+                  - <BlueskyStrip> shows the linked account's bsky
+                    bio when the profile owner has linked one (the
+                    editable-bio path).
+                  - <ListenerBioRow> falls through to an auto-
+                    generated "currently spinning X · N plays this
+                    month" sentence composed from LB stats when no
+                    bsky link exists.
+                Both check the bsky-link state internally; only
+                one renders non-null. Each is Suspense-wrapped so a
+                slow LB / Bluesky AppView call doesn't block the
+                header. */}
             <Suspense fallback={null}>
               <BlueskyStrip name={name} />
+            </Suspense>
+            <Suspense fallback={null}>
+              <ListenerBioRow name={name} />
+            </Suspense>
+            {/* Listener-archetype chip strip — independent of which
+                bio renderer wins above. Computes 0-3 personality
+                tags from LB stats. Behind its own
+                `listener-archetypes` flag (separate from
+                `listener-bio`) so each surface can be dogfooded /
+                kill-switched independently. */}
+            {/* Shared chip row — archetype + milestone chips wrap
+                together as one continuous strip rather than two
+                stacked lists. Each child component renders bare
+                `<li>` elements (gated on its own flag, returning
+                an empty fragment when off / cold) so they slot
+                seamlessly into this single `<ul>`. Empty `<ul>` is
+                visually invisible; we only pay the layout cost
+                when at least one source produces chips. */}
+            <ul className="mt-2 flex flex-wrap gap-1.5">
+              <Suspense fallback={null}>
+                <ListenerArchetypeChips name={name} />
+              </Suspense>
+              <Suspense fallback={null}>
+                <ListenerMilestones name={name} />
+              </Suspense>
+            </ul>
+          </div>
+          {/* Listener-fingerprint glyph. On desktop (sm+) it sits
+              on the right edge of the header, vertically centered
+              against the text column. On mobile the outer flex
+              wraps to a column, so the fingerprint stacks below
+              the username + bio + chips, centered with a top
+              margin to separate it from the bio strip. */}
+          <div className="mt-4 flex shrink-0 self-center sm:mt-0 sm:ml-auto">
+            <Suspense fallback={null}>
+              <ListenerFingerprint name={name} size="lg" />
             </Suspense>
           </div>
           {viewer && !isOwnProfile && (
