@@ -8,6 +8,7 @@ import {
   type FeedEvent,
 } from "@/lib/clients/listenbrainz";
 import { getLbTokenForRequest } from "@/lib/lb-token";
+import { getBskyFriendLinkEvents } from "@/lib/bsky-friend-events";
 import { PageShell } from "@/components/achordion/page-shell";
 import { EmptyState } from "@/components/achordion/empty-state";
 import { FeedEventList } from "@/components/achordion/feed-event-list";
@@ -55,7 +56,7 @@ async function FeedBody({
   // The page's `excludeSelf` filter still hides own activity when
   // requested. Cached at the LB-client layer; steady-state cost is
   // mostly cache hits.
-  const [events, lovedEvents] = await Promise.all([
+  const [events, lovedEvents, bskyFriendEvents] = await Promise.all([
     getUserFeed(name, token, { count: 50 }),
     getFollowing(name)
       .catch(() => [] as string[])
@@ -65,6 +66,12 @@ async function FeedBody({
           () => [] as FeedEvent[],
         );
       }),
+    // Bluesky-friend-linked synthetic events. Passing `null` for
+    // `sinceUnix` so the feed shows every match (the unread-count
+    // endpoint applies its own cutoff for the badge). Fails-soft
+    // to an empty list — Bluesky outage or feature-flag-off
+    // returns nothing and the rest of the feed still renders.
+    getBskyFriendLinkEvents(name, null).catch(() => [] as FeedEvent[]),
   ]);
   if (events === null) {
     return (
@@ -83,7 +90,7 @@ async function FeedBody({
   // it in follow-list dedup elsewhere). Without this normalisation,
   // a viewer's own loves can leak past the "Hide my own" filter.
   const nameLc = name.toLowerCase();
-  const merged = [...events, ...lovedEvents].sort(
+  const merged = [...events, ...lovedEvents, ...bskyFriendEvents].sort(
     (a, b) => b.created - a.created,
   );
   const sliced = merged.slice(0, 50);

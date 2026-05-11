@@ -12,6 +12,7 @@ import {
   HandHeart,
   Heart,
   Star,
+  Link2,
 } from "lucide-react";
 import { CoverArt } from "./cover-art";
 import { InlineTrackLinks } from "./inline-track-links";
@@ -741,6 +742,70 @@ interface NotificationMeta {
   message?: string;
 }
 
+// ─── bsky_friend_linked ─────────────────────────────────────────────
+
+interface BskyFriendLinkedEventMeta {
+  bsky_handle?: string;
+  bsky_display_name?: string;
+  bsky_avatar?: string;
+}
+
+function BskyFriendLinkedEvent({ event }: { event: FeedEvent }) {
+  const m = event.metadata as BskyFriendLinkedEventMeta | undefined;
+  const lbName = event.user_name ?? null;
+  const handle = m?.bsky_handle;
+  const displayName = m?.bsky_display_name;
+  const avatar = m?.bsky_avatar;
+  return (
+    <EventShell
+      icon={
+        // Generic linkage icon — keeps the row aligned with the
+        // other event types' Lucide glyphs. The card body contains
+        // the explicit "Bluesky" attribution + a deep link to the
+        // friend's bsky.app profile.
+        <Link2 className="size-4" />
+      }
+      header={
+        <>
+          <UserLink name={lbName} /> linked their Bluesky to Achordion
+          <span className="text-muted-foreground/70">
+            {" · "}
+            <RelativeTime value={event.created} />
+          </span>
+        </>
+      }
+    >
+      {handle && (
+        <a
+          href={`https://bsky.app/profile/${handle}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="border-border/60 bg-card/30 hover:bg-card/60 mt-2 inline-flex items-center gap-2 rounded-md border px-2 py-1.5 text-sm transition-colors"
+        >
+          {avatar ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={avatar}
+              alt=""
+              width={20}
+              height={20}
+              loading="lazy"
+              referrerPolicy="no-referrer"
+              className="size-5 shrink-0 rounded-full object-cover"
+            />
+          ) : null}
+          <span className="text-foreground/90">
+            {displayName ?? `@${handle}`}
+          </span>
+          <span className="text-muted-foreground text-xs">
+            @{handle} · Bluesky
+          </span>
+        </a>
+      )}
+    </EventShell>
+  );
+}
+
 function NotificationEvent({ event }: { event: FeedEvent }) {
   const m = event.metadata as NotificationMeta | undefined;
   // Notifications come back with embedded HTML (links to LB pages).
@@ -900,6 +965,8 @@ export async function FeedEventList({
             return <FollowEvent event={e} key={key} />;
           case "notification":
             return <NotificationEvent event={e} key={key} />;
+          case "bsky_friend_linked":
+            return <BskyFriendLinkedEvent event={e} key={key} />;
           default:
             return null; // unknown event types — quietly skip
         }

@@ -1,6 +1,8 @@
 import type { ReactNode } from "react";
+import { Suspense } from "react";
 import { SiteHeader } from "@/components/layout/site-header";
 import { SiteFooter } from "@/components/layout/site-footer";
+import { AnnouncementBanner } from "@/components/layout/announcement-banner";
 
 /**
  * Static-content layout (`#8`).
@@ -30,6 +32,12 @@ import { SiteFooter } from "@/components/layout/site-footer";
 export default function ContentLayout({ children }: { children: ReactNode }) {
   return (
     <>
+      {/* Site-wide announcement banner. The fetch inside is
+          `unstable_cache`-wrapped (60s revalidate) so adding it here
+          doesn't flip these static-rendered pages dynamic. */}
+      <Suspense fallback={null}>
+        <AnnouncementBanner />
+      </Suspense>
       <SiteHeader />
       <main className="flex-1">{children}</main>
       <SiteFooter />
