@@ -412,6 +412,35 @@ async function TopListenersStream({
   );
 }
 
+export async function generateMetadata({ params }: PageParams) {
+  const { mbid } = await params;
+  try {
+    const rg = await getReleaseGroup(mbid);
+    const credit = formatArtistCredit(rg["artist-credit"]);
+    const year = rg["first-release-date"]?.slice(0, 4);
+    const title = credit.name ? `${rg.title} — ${credit.name}` : rg.title;
+    const description = credit.name
+      ? `${rg.title}${year ? ` (${year})` : ""} by ${credit.name} on Achordion. Play any track on Spotify, Apple Music, Bandcamp, or any other service you use.`
+      : `${rg.title} on Achordion.`;
+    return {
+      title,
+      description,
+      openGraph: {
+        title,
+        description,
+        type: "music.album",
+      },
+      twitter: {
+        card: "summary_large_image" as const,
+        title,
+        description,
+      },
+    };
+  } catch {
+    return { title: "Album" };
+  }
+}
+
 export default async function ReleaseGroupPage({ params }: PageParams) {
   const { mbid } = await params;
   return (

@@ -562,6 +562,46 @@ function ListSkeleton() {
   );
 }
 
+export async function generateMetadata({ params }: PageParams) {
+  const { mbid } = await params;
+  try {
+    const artist = await getArtist(mbid);
+    const topGenre =
+      artist.genres
+        ?.slice()
+        .sort((a, b) => b.count - a.count)[0]?.name?.toLowerCase() ??
+      null;
+    const country = artist.country ?? null;
+    const description = [
+      topGenre ? `${capitalize(topGenre)}` : null,
+      country,
+      "on Achordion",
+    ]
+      .filter(Boolean)
+      .join(" · ");
+    return {
+      title: artist.name,
+      description: description || `${artist.name} on Achordion.`,
+      openGraph: {
+        title: artist.name,
+        description: description || `${artist.name} on Achordion.`,
+        type: "profile",
+      },
+      twitter: {
+        card: "summary_large_image" as const,
+        title: artist.name,
+        description: description || `${artist.name} on Achordion.`,
+      },
+    };
+  } catch {
+    return { title: "Artist" };
+  }
+}
+
+function capitalize(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
 export default async function ArtistPage({
   params,
   searchParams,

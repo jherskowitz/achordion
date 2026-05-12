@@ -410,6 +410,34 @@ function HeaderSkeleton() {
   );
 }
 
+export async function generateMetadata({ params }: PageProps) {
+  const { mbid } = await params;
+  try {
+    const data = await getPlaylist(mbid);
+    if (!data) return { title: "Playlist" };
+    const trackCount = data.tracks.length;
+    const trackLabel = `${trackCount} track${trackCount === 1 ? "" : "s"}`;
+    const title = data.creator ? `${data.title} by ${data.creator}` : data.title;
+    const description = `${data.title}${data.creator ? ` by ${data.creator}` : ""} · ${trackLabel} · Achordion playlist.`;
+    return {
+      title: data.title,
+      description,
+      openGraph: {
+        title,
+        description,
+        type: "music.playlist",
+      },
+      twitter: {
+        card: "summary_large_image" as const,
+        title,
+        description,
+      },
+    };
+  } catch {
+    return { title: "Playlist" };
+  }
+}
+
 export default async function PlaylistPage({ params }: PageProps) {
   const { mbid } = await params;
   return (

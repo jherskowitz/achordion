@@ -4,6 +4,7 @@ import {
   getRecentListens,
   getCurrentPin,
 } from "@/lib/clients/listenbrainz";
+import { indexPinMentionsFromList } from "@/lib/index-pin-mentions";
 import { LiveScrobbleList } from "@/components/achordion/live-scrobble-list";
 import { TrackListActionsMenu } from "@/components/achordion/track-list-actions-menu";
 import { OpenInParachordButton } from "@/components/achordion/open-in-parachord-button";
@@ -40,6 +41,10 @@ async function PinnedSection({
     return null;
   }
   if (!pin) return null;
+  // Passive backfill: scan this pin's blurb for @mentions and
+  // fan-out into the mention-index. Fire-and-forget so the
+  // profile-overview render isn't blocked by Upstash writes.
+  void indexPinMentionsFromList([pin], name);
   // Thankable when the viewer isn't the profile owner. LB also
   // requires the viewer to be following the pin owner — we don't
   // pre-check; the button surfaces the LB error if not.
@@ -164,6 +169,26 @@ function ScrobbleListSkeleton() {
       ))}
     </ul>
   );
+}
+
+export async function generateMetadata({ params }: PageParams) {
+  const { name } = await params;
+  const title = `${name}'s listening on Achordion`;
+  const description = `Pins, listens, and stats from ${name} on Achordion — the open ListenBrainz/MusicBrainz community.`;
+  return {
+    title: name,
+    description,
+    openGraph: {
+      title,
+      description,
+      type: "profile",
+    },
+    twitter: {
+      card: "summary_large_image" as const,
+      title,
+      description,
+    },
+  };
 }
 
 export default async function UserOverviewPage({ params }: PageParams) {

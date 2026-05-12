@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { getLbTokenForRequest } from "@/lib/lb-token";
 import { getUserFeed } from "@/lib/clients/listenbrainz";
 import { getBskyFriendLinkEvents } from "@/lib/bsky-friend-events";
+import { getMentionEvents } from "@/lib/mention-events";
 
 const COOKIE = "feed_seen_ts";
 
@@ -25,23 +26,29 @@ export async function GET() {
   // a brand-new sign-in to flash a "50 unread" badge.
   const cutoff = lastSeenTs ?? Math.floor(Date.now() / 1000);
 
-  // Parallel-fetch the two sources: native LB feed + Achordion-side
-  // bsky-friend-linked synthetic events. Both fail-soft so a Bluesky
-  // outage doesn't suppress the LB-only count (and vice versa).
-  const [events, bskyFriendEvents] = await Promise.all([
+  // Parallel-fetch the three sources: native LB feed + Achordion-
+  // side bsky-friend-linked + Achordion-side @-mention synthetic
+  // events. All fail-soft so any one outage doesn't suppress the
+  // others' contribution to the count.
+  const [events, bskyFriendEvents, mentionEvents] = await Promise.all([
     getUserFeed(viewer, token, { count: 50 }),
     getBskyFriendLinkEvents(viewer, cutoff).catch(() => []),
+    getMentionEvents(viewer, cutoff).catch(() => []),
   ]);
   if (events === null) {
-    // LB feed unreachable — fall back to just the bsky-side count
-    // so the badge still reflects new friend-link events.
+    // LB feed unreachable — fall back to just the synthetic-side
+    // counts so the badge still reflects new friend-link / mention
+    // events.
     return Response.json(
-      { count: bskyFriendEvents.length, lastSeenTs },
+      {
+        count: bskyFriendEvents.length + mentionEvents.length,
+        lastSeenTs,
+      },
       { status: 200 },
     );
   }
 
-  let count = bskyFriendEvents.length;
+  let count = bskyFriendEvents.length + mentionEvents.length;
   for (const e of events) {
     if ((e.user_name ?? "") === viewer) continue;
     if (e.created > cutoff) count++;

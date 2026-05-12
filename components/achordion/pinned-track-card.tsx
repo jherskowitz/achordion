@@ -18,6 +18,7 @@ import { IconTooltip } from "@/components/ui/icon-tooltip";
 import { AddSourcesButton } from "./add-sources-button";
 import { TrackActionsMenuSlot } from "./track-actions-menu-slot";
 import { ThanksButton } from "./thanks-button";
+import { MentionText } from "./mention-text";
 import { Skeleton } from "@/components/ui/skeleton";
 import { artistHref, releaseGroupHref } from "@/lib/entity-links";
 import { cn } from "@/lib/utils";
@@ -299,7 +300,7 @@ export function PinnedTrackCard({
                 isHero ? "text-sm leading-6" : "text-xs leading-5",
               )}
             >
-              &ldquo;{pin.blurb_content}&rdquo;
+              &ldquo;<MentionText text={pin.blurb_content} />&rdquo;
             </blockquote>
           )}
           {isHero && (

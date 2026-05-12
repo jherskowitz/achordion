@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { auth } from "@/auth";
 import { getUserPins } from "@/lib/clients/listenbrainz";
+import { indexPinMentionsFromList } from "@/lib/index-pin-mentions";
 import { PinnedTrackCard } from "@/components/achordion/pinned-track-card";
 import { PageShell } from "@/components/achordion/page-shell";
 import { EmptyState } from "@/components/achordion/empty-state";
@@ -20,6 +21,11 @@ async function PinsHistory({
   let pins;
   try {
     pins = await getUserPins(name, 50);
+    // Fire-and-forget: scan each pin's blurb for @mentions and
+    // fan-out into the mention-index so mentioned users see this
+    // pin in their /feed. No await — the render returns
+    // immediately; the Upstash writes happen in the background.
+    void indexPinMentionsFromList(pins, name);
   } catch (err) {
     return (
       <EmptyState

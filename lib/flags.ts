@@ -153,6 +153,12 @@ export const KNOWN_FLAGS: ReadonlyArray<FlagDefinition> = [
       "Profile-page chips quantifying lifetime listening behaviour — total plays, distinct artists, current streak, listening-since year. Surfaces below the bio next to the archetype chips.",
   },
   {
+    id: "mentions",
+    label: "@username mentions in pin comments",
+    description:
+      "Parse `@username` tokens in pin blurbs and render them as profile links. Mentioned users see the pin in their /feed as a synthesised `mention` event and the unread badge counts it.",
+  },
+  {
     id: "reviews",
     label: "Album reviews",
     description:

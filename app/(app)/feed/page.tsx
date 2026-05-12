@@ -9,6 +9,7 @@ import {
 } from "@/lib/clients/listenbrainz";
 import { getLbTokenForRequest } from "@/lib/lb-token";
 import { getBskyFriendLinkEvents } from "@/lib/bsky-friend-events";
+import { getMentionEvents } from "@/lib/mention-events";
 import { PageShell } from "@/components/achordion/page-shell";
 import { EmptyState } from "@/components/achordion/empty-state";
 import { FeedEventList } from "@/components/achordion/feed-event-list";
@@ -56,23 +57,29 @@ async function FeedBody({
   // The page's `excludeSelf` filter still hides own activity when
   // requested. Cached at the LB-client layer; steady-state cost is
   // mostly cache hits.
-  const [events, lovedEvents, bskyFriendEvents] = await Promise.all([
-    getUserFeed(name, token, { count: 50 }),
-    getFollowing(name)
-      .catch(() => [] as string[])
-      .then((following) => {
-        const targets = [name, ...following.filter((u) => u !== name)];
-        return getLovedRecordingEvents(targets).catch(
-          () => [] as FeedEvent[],
-        );
-      }),
-    // Bluesky-friend-linked synthetic events. Passing `null` for
-    // `sinceUnix` so the feed shows every match (the unread-count
-    // endpoint applies its own cutoff for the badge). Fails-soft
-    // to an empty list — Bluesky outage or feature-flag-off
-    // returns nothing and the rest of the feed still renders.
-    getBskyFriendLinkEvents(name, null).catch(() => [] as FeedEvent[]),
-  ]);
+  const [events, lovedEvents, bskyFriendEvents, mentionEvents] =
+    await Promise.all([
+      getUserFeed(name, token, { count: 50 }),
+      getFollowing(name)
+        .catch(() => [] as string[])
+        .then((following) => {
+          const targets = [name, ...following.filter((u) => u !== name)];
+          return getLovedRecordingEvents(targets).catch(
+            () => [] as FeedEvent[],
+          );
+        }),
+      // Bluesky-friend-linked synthetic events. Passing `null` for
+      // `sinceUnix` so the feed shows every match (the unread-count
+      // endpoint applies its own cutoff for the badge). Fails-soft
+      // to an empty list — Bluesky outage or feature-flag-off
+      // returns nothing and the rest of the feed still renders.
+      getBskyFriendLinkEvents(name, null).catch(() => [] as FeedEvent[]),
+      // @-mention synthetic events. Anyone who pinned a track and
+      // tagged this viewer with `@<viewer>` in the blurb. Same
+      // shape contract as the bsky events above — fails-soft on
+      // Upstash or flag-off.
+      getMentionEvents(name, null).catch(() => [] as FeedEvent[]),
+    ]);
   if (events === null) {
     return (
       <EmptyState
@@ -90,9 +97,12 @@ async function FeedBody({
   // it in follow-list dedup elsewhere). Without this normalisation,
   // a viewer's own loves can leak past the "Hide my own" filter.
   const nameLc = name.toLowerCase();
-  const merged = [...events, ...lovedEvents, ...bskyFriendEvents].sort(
-    (a, b) => b.created - a.created,
-  );
+  const merged = [
+    ...events,
+    ...lovedEvents,
+    ...bskyFriendEvents,
+    ...mentionEvents,
+  ].sort((a, b) => b.created - a.created);
   const sliced = merged.slice(0, 50);
   const filtered = excludeSelf
     ? sliced.filter((e) => (e.user_name ?? "").toLowerCase() !== nameLc)

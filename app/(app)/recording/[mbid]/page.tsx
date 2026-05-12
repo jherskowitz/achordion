@@ -419,8 +419,29 @@ export async function generateMetadata({ params }: PageProps) {
   try {
     const r = await getRecording(mbid);
     const credit = formatArtistCredit(r["artist-credit"]);
+    const title = credit.name ? `${r.title} — ${credit.name}` : r.title;
+    const description = credit.name
+      ? `Listen to "${r.title}" by ${credit.name} on Achordion. Play it on Spotify, Apple Music, Bandcamp, or any other service you use.`
+      : `Listen to "${r.title}" on Achordion.`;
+    // Per-page openGraph is critical: the root layout sets a static
+    // `openGraph.title = "Achordion"` that otherwise leaks to every
+    // page, breaking Threads/Discord/Twitter preview cards (they
+    // dedupe by og:title across URLs). The colocated
+    // `opengraph-image.tsx` file in this route auto-injects the
+    // `og:image` URL — we only need title/description/type here.
     return {
-      title: credit.name ? `${r.title} — ${credit.name}` : r.title,
+      title,
+      description,
+      openGraph: {
+        title,
+        description,
+        type: "music.song",
+      },
+      twitter: {
+        card: "summary_large_image" as const,
+        title,
+        description,
+      },
     };
   } catch {
     return { title: "Track" };

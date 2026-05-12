@@ -19,6 +19,7 @@ import { InlineTrackLinks } from "./inline-track-links";
 import { RelativeTime } from "./relative-time";
 import { ThanksButton } from "./thanks-button";
 import { TrackActionsMenu } from "./track-actions-menu";
+import { MentionText } from "./mention-text";
 import {
   caaReleaseGroupUrl,
   caaUrlFromListen,
@@ -204,7 +205,7 @@ function TrackEventBody({
         </p>
         {blurb && (
           <p className="text-foreground/80 mt-1.5 text-sm leading-5 italic">
-            “{blurb}”
+            “<MentionText text={blurb} />”
           </p>
         )}
       </div>
@@ -806,6 +807,68 @@ function BskyFriendLinkedEvent({ event }: { event: FeedEvent }) {
   );
 }
 
+// ─── mention ────────────────────────────────────────────────────────
+
+interface MentionEventMeta {
+  row_id?: number;
+  from_user?: string;
+  recording_mbid?: string | null;
+  track_name?: string | null;
+  artist_name?: string | null;
+  blurb?: string;
+}
+
+function MentionEvent({ event }: { event: FeedEvent }) {
+  const m = event.metadata as MentionEventMeta | undefined;
+  const fromUser = event.user_name ?? m?.from_user ?? null;
+  const trackName = m?.track_name ?? null;
+  const artistName = m?.artist_name ?? null;
+  const recordingMbid = m?.recording_mbid ?? null;
+  const blurb = m?.blurb ?? "";
+  return (
+    <EventShell
+      icon={<MessageSquareQuote className="size-4" />}
+      header={
+        <>
+          <UserLink name={fromUser} /> mentioned you in a pin
+          <span className="text-muted-foreground/70">
+            {" · "}
+            <RelativeTime value={event.created} />
+          </span>
+        </>
+      }
+    >
+      {trackName && artistName && (
+        <p className="text-muted-foreground mt-1 text-xs">
+          on{" "}
+          <Link
+            href={recordingHref({
+              mbid: recordingMbid,
+              artist: artistName,
+              title: trackName,
+            })}
+            className="text-foreground/90 hover:underline"
+          >
+            {trackName}
+          </Link>{" "}
+          by{" "}
+          <Link
+            href={artistHref({ mbid: null, name: artistName })}
+            className="text-foreground/90 hover:underline"
+          >
+            {artistName}
+          </Link>
+        </p>
+      )}
+      {blurb && (
+        <p className="text-foreground/80 mt-2 text-sm leading-5 italic">
+          “<MentionText text={blurb} />”
+        </p>
+      )}
+    </EventShell>
+  );
+}
+
 function NotificationEvent({ event }: { event: FeedEvent }) {
   const m = event.metadata as NotificationMeta | undefined;
   // Notifications come back with embedded HTML (links to LB pages).
@@ -967,6 +1030,8 @@ export async function FeedEventList({
             return <NotificationEvent event={e} key={key} />;
           case "bsky_friend_linked":
             return <BskyFriendLinkedEvent event={e} key={key} />;
+          case "mention":
+            return <MentionEvent event={e} key={key} />;
           default:
             return null; // unknown event types — quietly skip
         }
