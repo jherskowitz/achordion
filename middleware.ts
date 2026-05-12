@@ -32,6 +32,21 @@ const BLOCKED_UA =
   /(GPTBot|ChatGPT-User|OAI-SearchBot|ClaudeBot|Claude-Web|anthropic-ai|CCBot|PerplexityBot|Google-Extended|Applebot-Extended|Bytespider|Amazonbot|Meta-ExternalAgent|DuckAssistBot|Diffbot|AhrefsBot|SemrushBot|MJ12bot|DotBot|PetalBot|DataForSeoBot|BLEXBot|SeekportBot|Barkrowler)/i;
 
 /**
+ * Link-preview crawlers we ALWAYS let through, regardless of the
+ * ASN block or per-IP rate limit. Pasting an Achordion URL into
+ * Threads / Discord / Slack / Bluesky / Twitter triggers a one-
+ * off scrape from the platform's IP range — those ranges
+ * sometimes overlap our datacenter ASN block (Meta's Sharing
+ * Debugger has been observed using AWS-routed IPs), which would
+ * otherwise return 403 and break the unfurl.
+ *
+ * Matches the same set we allow in `app/robots.ts`. Order doesn't
+ * matter — the regex match is constant-time on UA length.
+ */
+const ALLOWLIST_UA =
+  /(facebookexternalhit|Facebot|Twitterbot|LinkedInBot|Slackbot-LinkExpanding|Slackbot|Discordbot|Bluesky Cardyb|Mastodon|WhatsApp|TelegramBot|Pinterest|redditbot)/i;
+
+/**
  * AS numbers (without the "AS" prefix) of cloud providers + bot
  * hosting infrastructure. Real residential / mobile ISP traffic
  * never originates from these.
@@ -75,6 +90,19 @@ const BLOCKED_ASNS = new Set([
 ]);
 
 export async function middleware(request: NextRequest) {
+  const ua = request.headers.get("user-agent") ?? "";
+
+  // 0. Link-preview UA allowlist — short-circuit BEFORE ASN /
+  //    UA-block / rate-limit checks. These bots scrape one URL
+  //    on a paste, not the whole catalog, so the rate-limit
+  //    concern doesn't apply; and they sometimes route through
+  //    datacenter IPs that overlap our BLOCKED_ASNS, which
+  //    would have otherwise 403'd them and broken every Threads
+  //    / Discord / Slack preview card.
+  if (ALLOWLIST_UA.test(ua)) {
+    return NextResponse.next();
+  }
+
   // 1. ASN block.
   const asn = request.headers.get("x-vercel-ip-asn") ?? "";
   if (asn && BLOCKED_ASNS.has(asn)) {
@@ -82,7 +110,6 @@ export async function middleware(request: NextRequest) {
   }
 
   // 2. UA block.
-  const ua = request.headers.get("user-agent") ?? "";
   if (BLOCKED_UA.test(ua)) {
     return new NextResponse("Forbidden", { status: 403 });
   }
