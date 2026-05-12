@@ -112,9 +112,16 @@ export function EmbedShareButton({
     <Dialog>
       <DialogTrigger
         render={
+          // No `nativeButton={false}` — Base UI's Button only
+          // honours that flag when there's a `render` prop supplying
+          // a non-<button> element. Without one (as here, inside
+          // DialogTrigger's own render slot), setting it to false
+          // made Base UI warn on every render, which the e2e
+          // harness treated as a failed route. Default
+          // `nativeButton={true}` is correct: the Button renders a
+          // native <button> and DialogTrigger wires it up.
           <Button
             size="sm"
-            nativeButton={false}
             className="text-muted-foreground hover:text-foreground inline-flex h-7 items-center gap-1.5 rounded-md bg-transparent px-2 text-xs underline-offset-4 hover:underline"
           >
             <Code2 className="size-3.5" />
