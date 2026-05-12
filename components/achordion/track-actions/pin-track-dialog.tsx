@@ -14,6 +14,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { pinTrackAction } from "@/app/(app)/track/actions";
 import type { TrackRef } from "../track-actions-menu";
+import { MentionAutocompleteTextarea } from "../mention-autocomplete-textarea";
 
 const BLURB_MAX = 240;
 
@@ -103,14 +104,14 @@ export function PinTrackDialog({ open, onOpenChange, track }: Props) {
             >
               Note (optional)
             </label>
-            <textarea
+            <MentionAutocompleteTextarea
               id="pin-blurb"
               value={blurb}
-              onChange={(e) => setBlurb(e.target.value.slice(0, BLURB_MAX))}
+              onChange={(next) => setBlurb(next.slice(0, BLURB_MAX))}
               maxLength={BLURB_MAX}
               rows={3}
-              placeholder="Why this track? (visible on your profile)"
-              className="resize-none rounded-md border border-input bg-background px-2 py-1.5 text-sm outline-none focus:ring-1 focus:ring-ring"
+              placeholder="Why this track? Use @username to tag someone."
+              className="w-full resize-none rounded-md border border-input bg-background px-2 py-1.5 text-sm outline-none focus:ring-1 focus:ring-ring"
             />
             <div className="self-end text-xs text-muted-foreground tabular-nums">
               {blurb.length}/{BLURB_MAX}

@@ -27,6 +27,17 @@ interface ChangelogEntry {
 
 const ENTRIES: ChangelogEntry[] = [
   {
+    date: "2026-05-12",
+    intro:
+      "Rich preview cards when you share Achordion links anywhere, @mentions in pin comments, and a tidier Settings page.",
+    highlights: [
+      "Dynamic Open Graph / Twitter cards on every entity. Paste an artist, album, track, playlist, or user URL into Threads / Discord / Slack / Bluesky / Twitter and the preview unfurls a 1200×630 card with the cover art (or avatar), title, and meta — automatically, no setup. Album cards show the cover + title + artist + year; track cards do the same scoped to the recording; artist cards lead with the hero photo and top genre; user cards lead with the avatar + “Currently into” line; playlist cards show a 2×2 mosaic of the first four covers + creator + track count. (Discord and Threads cache previews aggressively — re-sharing an old URL may still show the prior preview until their caches expire.)",
+      "@mentions in pin comments. Tag a friend by writing “@username” anywhere in your pin's comment on ListenBrainz — that username renders as a clickable link to their Achordion profile, AND they get the pin in their /feed (alongside pins and loves from your network) with the usual unread-count badge and opt-in browser notification. The mentioned user doesn't need to be following you. Built on existing LB pin data — no extra writes to your scrobbling history, no Achordion-side scratchpad.",
+      "Settings page navigation moved from a side panel to top tabs (Profile / Connections) — same shape as every other page-with-subnav on the site, including on mobile. The own-profile avatar in Settings now also reads from your linked Bluesky account when you have one, matching the rest of the surfaces.",
+      "Plumbing for link-preview crawlers: explicit robots.txt allow-list + middleware short-circuit for Threads / Discord / Slack / Bluesky / Twitter / LinkedIn / Mastodon / WhatsApp / Telegram bots. Their unfurl fetches now bypass our generic crawler rules and rate limits since they only scrape pasted URLs, not the catalog.",
+    ],
+  },
+  {
     date: "2026-05-11",
     intro:
       "Every profile now has a sense of identity built from listening data — a one-sentence bio, personality and milestone chips, and an interactive listener fingerprint. Plus a sitewide announcement banner, embed-widget polish, and Bluesky avatars across more list surfaces.",

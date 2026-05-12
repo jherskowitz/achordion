@@ -385,6 +385,35 @@ DEL announcements:json         # clear every banner
 
 ---
 
+## Synthesised feed events (Achordion-side notifications)
+
+LB's feed endpoint emits pins / loves / recommendations / follows from the viewer's network. Anything OUTSIDE that — bsky-friend linkages, @-mention pings, future Achordion-specific surfaces — gets merged into `/feed` as **synthetic FeedEvent objects** that share the LB FeedEvent shape so `<FeedEventList>` can branch on `event_type` and render them in one pass.
+
+Three live today, all following the same pattern:
+
+| Helper | Source | Event type |
+|---|---|---|
+| `getLovedRecordingEvents()` | fan-out over viewer's following → each user's recent feedback | `loved_recording` |
+| `getBskyFriendLinkEvents()` | reverse `bsky-link-by-did` lookup against viewer's Bluesky follows | `bsky_friend_linked` |
+| `getMentionEvents()` | Upstash mention-index (sorted set per mentioned user) | `mention` |
+
+**Where they get merged**:
+- `app/(app)/feed/page.tsx` — fetches LB's `getUserFeed` + all three synthetics in parallel, merges, sorts by `created` desc, slices to 50, hands the array to `<FeedEventList>`.
+- `app/api/me/feed-unread/route.ts` — same three synthetics counted alongside LB events for the badge + browser-notification trigger. All fail-soft (Promise.all with .catch fallbacks) so any single source going down doesn't suppress the others.
+
+**Each renderer in `feed-event-list.tsx`** is a small function that takes the FeedEvent + reads its `metadata` payload as a typed shape; renderers branch via the central `switch (e.event_type)` block at the bottom of the file. Adding a fourth event type is the smallest possible PR: add a helper that returns `FeedEvent[]`, register a constant for the event-type string, write a renderer function, add a case to the switch.
+
+**Passive backfill for mentions** lives at `lib/index-pin-mentions.ts` (called fire-and-forget from `getUserPins` / `getCurrentPin` call sites — `/user/<name>` and `/user/<name>/pins` pages). Parses `@username` tokens out of each pin's blurb and `ZADD mention:<lb-username>` for each mentioned recipient. Sorted-set trimmed to 200 entries per user, 90-day TTL.
+
+**Mention rendering** at the visual layer:
+- `lib/mentions.ts` — `parseMentions(text)` returns alternating `{ kind: "text" | "mention" }` segments; `extractMentions(text)` returns the unique lower-cased username set for indexing.
+- `<MentionText text={...}>` in `components/achordion/mention-text.tsx` wraps mention segments in `<Link href="/user/<name>">@name</Link>` and leaves text segments as-is. No HTML strings, no `dangerouslySetInnerHTML` — every output is a typed React element.
+- Used in both `<PinnedTrackCard>` (profile-page pins) and the `PinEvent` renderer (feed pins). Add it to any future free-text surface where `@mentions` should be clickable.
+
+Behind the `mentions` flag in the admin registry — flip via `/admin/flags`.
+
+---
+
 ## Tag-voting blocklist
 
 Tag voting + add-tag is OPEN to every signed-in user — this is community-driven classification, gating it behind allowlists defeats the purpose. But every open vote system attracts the occasional bad actor (spammy tags, downvote campaigns, slurs in custom tag names). The blocklist at `lib/tag-blocklist.ts` is the moderation lever.
@@ -804,6 +833,38 @@ Use case: Parachord's share sheet renders a "Copy embed code" pill alongside its
 9. **Don't add `<OdesliLinks>` to new code.** It bypasses the track-links cache and the ISRC alias path. Use `<StreamingLinksRow>` (client island) or `resolveTrackLinks()` (server-side) instead.
 10. **Don't render `relativeTime(...)` directly inline.** Use `<RelativeTime value={...} />` so the SSR/CSR clock-drift mismatch gets `suppressHydrationWarning` automatically. Mixed-text parents can take `suppressHydrationWarning` directly if there are multiple relative-time children.
 11. **Don't render listens / listeners stats inline.** Use `<EntityHeaderStats totalListens totalListeners />` from `components/achordion/entity-header-stats.tsx` — three pages used to define duplicate copies of the block.
+
+---
+
+## Dynamic Open Graph / Twitter cards
+
+Every entity route ships a colocated `opengraph-image.tsx` next to its `page.tsx` — `app/(app)/artist/[mbid]/opengraph-image.tsx`, `…/release-group/[mbid]/…`, `…/recording/[mbid]/…`, `…/playlist/[mbid]/…`, `…/user/[name]/…`. Next renders these into PNGs via `next/og`'s `ImageResponse` and auto-injects them into the page's `<meta property="og:image">` tag at build/render time.
+
+**Edge-sandbox constraints** apply to every file:
+- Inline styles only — no Tailwind classes.
+- No `server-only` imports inside the OG file. The helpers it calls (LB / MB clients, the bsky display helper, `caaReleaseUrl`) are fine because they don't pull in `server-only` themselves; double-check before importing anything new.
+- Plain `<img>` is correct — the linter's `@next/next/no-img-element` doesn't apply inside ImageResponse JSX, and `next/image` won't compile in this sandbox.
+- CAA URLs that 307-redirect to archive.org work fine; `ImageResponse` follows redirects.
+- MB / LB / Bluesky failures must fall through to a generic Achordion-branded card — never throw. Scrapers always need a valid PNG.
+
+**Per-page openGraph metadata** is separate from the image and MUST be set in `generateMetadata` on each entity page. The root layout sets a static `openGraph.title = "Achordion"` that otherwise leaks to every page — Meta then dedupe-caches "no preview" across the whole site. Each entity page returns:
+
+```ts
+return {
+  title,
+  description,
+  openGraph: { title, description, type: "music.song" | "music.album" | "profile" | "music.playlist" },
+  twitter: { card: "summary_large_image" as const, title, description },
+};
+```
+
+`og:type` choice matters for Meta's richer-card categorisation: `music.song` for recordings, `music.album` for release-groups, `profile` for artists + users, `music.playlist` for playlists. Twitter inherits `summary_large_image` from the root but each page still sets `twitter.title` + `twitter.description` for distinct cache entries per URL.
+
+**Link-preview crawler allowlist** is symbiotic across two files:
+- `app/robots.ts` has an explicit `allow: /` rule listing every preview UA (facebookexternalhit, Facebot, Twitterbot, LinkedInBot, Slackbot, Discordbot, Bluesky Cardyb, Mastodon, WhatsApp, TelegramBot, Pinterest, redditbot). These overrides win over the wildcard `disallow: /recording/` etc. because robots.txt rule-matching is most-specific-UA-wins.
+- `middleware.ts` mirrors the same set in an `ALLOWLIST_UA` regex that short-circuits at the top of the middleware, ahead of the ASN block + rate limit. Meta's Sharing Debugger sometimes routes through datacenter IPs that overlap our `BLOCKED_ASNS` set; the short-circuit ensures we never accidentally 403 a known preview crawler.
+
+When adding a new entity route that should be shareable, check **both** files have the UA list intact and add the new `opengraph-image.tsx` + `generateMetadata` openGraph block alongside the page.
 
 ---
 
