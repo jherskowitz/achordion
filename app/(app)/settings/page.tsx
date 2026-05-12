@@ -9,6 +9,7 @@ import { FeedNotificationsToggle } from "@/components/achordion/feed-notificatio
 import { Suspense } from "react";
 import { isFeatureEnabled } from "@/lib/flags";
 import { getBskyLink } from "@/lib/bsky-link";
+import { getBskyDisplayProfile } from "@/lib/bsky-display";
 import { signOutAction, unlinkBlueskyAction } from "./actions";
 
 const SITE_URL =
@@ -22,10 +23,19 @@ export default async function SettingsProfilePage() {
 
   const username = session.user.mbUsername;
   const displayName = session.user.name ?? username;
-  const avatarUrl = session.user.image ?? undefined;
 
   const bskyEnabled = await isFeatureEnabled("bsky-link", username);
   const bskyLink = bskyEnabled ? await getBskyLink(username) : null;
+  // Avatar override: prefer the linked Bluesky avatar when one's
+  // available (same source the profile-page header reads from); the
+  // shared cache slot keyed by DID means this is a hit for any
+  // viewer who's already touched a bsky-strip surface today.
+  // Falls back to the session image (MB-derived) when not linked
+  // or when the AppView is unreachable.
+  const bskyDisplay = bskyEnabled
+    ? await getBskyDisplayProfile(username, username)
+    : null;
+  const avatarUrl = bskyDisplay?.avatar ?? session.user.image ?? undefined;
   const expectedBskyBioUrl = `${SITE_URL}/user/${username}`;
 
   return (
