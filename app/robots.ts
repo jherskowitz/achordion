@@ -50,6 +50,41 @@ export default function robots(): MetadataRoute.Robots {
         ],
         disallow: "/",
       },
+      // Link-preview scrapers — allow them ON every entity route so
+      // sharing an album / artist / track / playlist / user URL into
+      // Threads / Discord / Slack / Bluesky / Twitter unfurls a rich
+      // card. These bots ONLY fetch URLs that get pasted; they don't
+      // walk the catalog, so the rate-limit concern that gates the
+      // wildcard rule below doesn't apply. Each per-platform UA is
+      // documented inline so future additions are obvious.
+      //
+      // robots.txt rule-matching is "most specific rule wins per UA"
+      // — these explicit `allow: /` entries override the wildcard
+      // `disallow: /recording/` etc. below for these specific bots.
+      {
+        userAgent: [
+          // Meta family: Threads / Instagram / Facebook / Messenger.
+          "facebookexternalhit",
+          "Facebot",
+          // Twitter / X card crawler.
+          "Twitterbot",
+          // LinkedIn unfurler.
+          "LinkedInBot",
+          // Slack unfurler.
+          "Slackbot-LinkExpanding",
+          "Slackbot",
+          // Discord unfurler.
+          "Discordbot",
+          // Bluesky's card service.
+          "Bluesky Cardyb",
+          // Mastodon unfurler.
+          "Mastodon",
+          // Generic OpenGraph fetchers.
+          "WhatsApp",
+          "TelegramBot",
+        ],
+        allow: "/",
+      },
       // Generic crawlers — restrict to the curated surfaces. The
       // catalog routes proxy upstream MB/LB calls and aren't worth
       // indexing exhaustively (the canonical pages live at
