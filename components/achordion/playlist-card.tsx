@@ -33,12 +33,16 @@ export function PlaylistCard({
   entry,
   /** Hide the creator byline when we already know whose page we're on. */
   hideCreatorIfMatches,
-  /** Tracks for the cover mosaic. When omitted, no mosaic renders. */
+  /** Tracks for the cover mosaic. Three states:
+   *    - `undefined` (default): no mosaic renders at all (text-only).
+   *    - "loading": mosaic skeleton renders (caller hasn't fetched
+   *       tracks yet — used by lazy IntersectionObserver loaders).
+   *    - `LbRadioTrack[]`: real mosaic from the supplied tracks. */
   tracks,
 }: {
   entry: LbPlaylistSummary;
   hideCreatorIfMatches?: string;
-  tracks?: LbRadioTrack[];
+  tracks?: LbRadioTrack[] | "loading";
 }) {
   const p = entry.playlist;
   const ext = p.extension?.[JSPF_PLAYLIST_KEY];
@@ -52,6 +56,10 @@ export function PlaylistCard({
   const dateStr =
     formatDate(ext?.last_modified_at) ?? formatDate(p.date) ?? null;
   const showMosaic = tracks !== undefined;
+  // The mosaic expects `LbRadioTrack[] | undefined`; the "loading"
+  // sentinel maps to `undefined` (skeleton state) at that boundary.
+  const mosaicTracks =
+    tracks === "loading" ? undefined : (tracks as LbRadioTrack[] | undefined);
 
   const body = (
     <div className="min-w-0 flex-1">
@@ -115,7 +123,7 @@ export function PlaylistCard({
     // card beyond its column on mobile even though the H3 has its
     // own min-w-0 + truncate.
     <div className="flex min-w-0 gap-3">
-      <PlaylistCoverMosaic tracks={tracks} size={64} alt={p.title} />
+      <PlaylistCoverMosaic tracks={mosaicTracks} size={64} alt={p.title} />
       {body}
     </div>
   ) : (

@@ -23,7 +23,10 @@ function uniqueCovers(tracks: LbRadioTrack[], max: number): string[] {
 }
 
 interface PlaylistCoverMosaicProps {
-  tracks: LbRadioTrack[];
+  /** Pass `undefined` to render the skeleton (covers not yet
+   *  fetched — used by lazy-loading callers). An empty array renders
+   *  the disc-icon placeholder (no covers available). */
+  tracks: LbRadioTrack[] | undefined;
   /** Used as both the rendered display size (px square) and as the
    *  next/image hint. Shape is always square. */
   size?: number;
@@ -47,9 +50,28 @@ export function PlaylistCoverMosaic({
   className,
   alt = "Playlist cover",
 }: PlaylistCoverMosaicProps) {
-  const covers = uniqueCovers(tracks, 4);
   const sizedByClass = !!className && SIZED_BY_CLASS.test(className);
   const sizeStyle = sizedByClass ? undefined : { width: size, height: size };
+
+  // Skeleton state: caller hasn't fetched the tracklist yet (e.g.
+  // IntersectionObserver-driven lazy mosaic on the playlists index).
+  // Renders the same square as the real mosaic so the card height
+  // doesn't jump when tracks resolve and the mosaic swaps in.
+  if (tracks === undefined) {
+    return (
+      <div
+        className={cn(
+          "bg-muted/60 shrink-0 animate-pulse rounded-md",
+          className,
+        )}
+        style={sizeStyle}
+        role="img"
+        aria-label={`${alt} (loading)`}
+      />
+    );
+  }
+
+  const covers = uniqueCovers(tracks, 4);
 
   if (covers.length === 0) {
     return (
