@@ -209,6 +209,14 @@ export async function POST(
   }
   const { accessToken, scope } = await readJwtMbAuth(request);
   if (!accessToken) {
+    // Diagnostic: this branch is what fires when the user comes back
+    // from a successful MB consent screen but the vote still 401s.
+    // Means the JWT got refreshed but didn't carry mbAccessToken —
+    // either the OAuth callback didn't write it, or this request is
+    // reading a different cookie than the one the callback wrote.
+    console.warn(
+      `[mb-tag-vote] no accessToken in JWT user=${session.user.mbUsername} jwt-scope="${scope}" entity=${entity}`,
+    );
     return NextResponse.json(
       { error: "no MB access token", reason: "scope_required" },
       { status: 401, headers: NO_STORE },

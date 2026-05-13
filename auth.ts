@@ -20,6 +20,15 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       // populated only at sign-in / re-auth, so we only update on
       // those events — afterwards the token persists in the JWT.
       if (account) {
+        // Temporary diagnostic for the tag-vote re-auth loop: confirm
+        // the jwt callback IS running with `account` populated on
+        // re-auth, and that account.access_token is the string-typed
+        // field we expect. If this log never appears post-consent,
+        // NextAuth isn't routing the OAuth callback through this
+        // callback at all (cookie / handler-mismatch issue).
+        console.log(
+          `[auth-jwt] account-present provider=${account.provider} has_access_token=${typeof account.access_token === "string"} scope=${account.scope ?? "<undefined>"}`,
+        );
         if (typeof account.access_token === "string") {
           token.mbAccessToken = account.access_token;
         }
