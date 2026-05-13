@@ -237,10 +237,10 @@ export function AnnouncementsEditor({
     ]);
   }
 
-  function save() {
+  function persist(next: Announcement[]) {
     setStatus({ kind: "idle" });
     startTransition(() => {
-      saveAnnouncements(items)
+      saveAnnouncements(next)
         .then(() => setStatus({ kind: "saved" }))
         .catch((e: unknown) => {
           setStatus({
@@ -249,6 +249,25 @@ export function AnnouncementsEditor({
           });
         });
     });
+  }
+
+  function save() {
+    persist(items);
+  }
+
+  // Delete is a discrete, terminal action — auto-save so the row
+  // disappears from Redis the moment the user clicks the trash icon.
+  // Field edits stay batched behind the Save button (per-keystroke
+  // writes would be wasteful + spammy), but deletion has no half-
+  // state where you'd want to defer commit, and "click X → gone" is
+  // the universal mental model. Without the auto-save here, a user
+  // who clicked Delete + refreshed (without noticing the Save button
+  // was still pending) would see the deleted row reappear, which
+  // looks identical to a persistence bug.
+  function deleteAt(index: number) {
+    const next = items.filter((_, idx) => idx !== index);
+    setItems(next);
+    persist(next);
   }
 
   return (
@@ -302,9 +321,7 @@ export function AnnouncementsEditor({
                 copy[i] = next;
                 setItems(copy);
               }}
-              onDelete={() => {
-                setItems(items.filter((_, idx) => idx !== i));
-              }}
+              onDelete={() => deleteAt(i)}
             />
           ))}
         </ul>
