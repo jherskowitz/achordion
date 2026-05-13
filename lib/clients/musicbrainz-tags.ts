@@ -108,17 +108,6 @@ export async function submitTagVote(opts: {
     cache: "no-store",
   });
   if (res.status === 401 || res.status === 403) {
-    // Capture MB's response body — distinguishes "missing scope"
-    // (expected when the user's token predates our tag-scope add)
-    // from "token revoked" / "account flagged" / other gnarlier
-    // cases. The body is small (a couple of lines of XML or text),
-    // so logging it whole is fine. Without this, every auth failure
-    // looks identical to the user and we can't tell which lever to
-    // pull next.
-    const body = await res.text().catch(() => "");
-    console.warn(
-      `[mb-tag-vote] auth error ${res.status} entity=${entity} mbid=${mbid} vote=${vote} body=${body.slice(0, 500)}`,
-    );
     throw new TagAuthError(
       `MB rejected the tag vote (${res.status}); session likely expired or scope was revoked`,
       "scope_required",

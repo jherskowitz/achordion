@@ -235,23 +235,13 @@ export async function POST(
       { status: 403, headers: NO_STORE },
     );
   }
-  const { accessToken, scope } = await readJwtMbAuth(request);
+  const { accessToken } = await readJwtMbAuth(request);
   if (!accessToken) {
     return NextResponse.json(
       { error: "no MB access token", reason: "scope_required" },
       { status: 401, headers: NO_STORE },
     );
   }
-
-  // Temporary diagnostic: which scope does the JWT think it has on
-  // this request? MB's token endpoint doesn't echo back granted scope,
-  // so we fall back to the requested string ("profile tag"). If users
-  // see scope_required errors here while the JWT claims "profile tag",
-  // it means MB issued a token that doesn't carry the tag privilege —
-  // an app-registration / consent-screen problem, not a client bug.
-  console.log(
-    `[mb-tag-vote] user=${session.user.mbUsername} jwt-scope="${scope}" entity=${entity} vote=${vote}`,
-  );
 
   try {
     await submitTagVote({ entity, mbid, tag, vote, accessToken });

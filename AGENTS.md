@@ -434,6 +434,64 @@ When triggering blocks, prefer the lightest touch — most "polluting" tag activ
 
 ---
 
+## Reading the MB OAuth access token from a server route
+
+Tag voting (and any future MB-write endpoint — collections, ratings) needs the user's MB OAuth access token, stored on Auth.js's session JWT as `mbAccessToken`. Two non-obvious things to know before adding more endpoints like this.
+
+### 1. Don't use `getToken()` from `next-auth/jwt`
+
+In our Auth.js v5 beta (`next-auth@^5.0.0-beta.31`), `getToken({ req, secret })` returns `null` for HTTPS requests even when the cookie is valid and `auth()` decodes it just fine. Its default cookie name + salt don't match what Auth.js v5's encoder writes. The result is a silent auth failure that looks identical to "user isn't signed in" or "scope is missing" from the client side.
+
+**Use `decode()` directly instead**, with explicit cookie name and matching salt:
+
+```ts
+import { decode } from "next-auth/jwt";
+
+async function readMbAccessToken(request: NextRequest): Promise<string | null> {
+  const secureCookie =
+    request.url.startsWith("https://") ||
+    request.headers.get("x-forwarded-proto") === "https";
+  const cookieName = secureCookie
+    ? "__Secure-authjs.session-token"
+    : "authjs.session-token";
+  const cookie = request.cookies.get(cookieName)?.value;
+  if (!cookie || !process.env.AUTH_SECRET) return null;
+  try {
+    const token = await decode({
+      token: cookie,
+      secret: process.env.AUTH_SECRET,
+      salt: cookieName,
+    });
+    return typeof token?.mbAccessToken === "string" ? token.mbAccessToken : null;
+  } catch {
+    return null;
+  }
+}
+```
+
+Salt MUST equal the cookie name — that's what Auth.js v5 uses when encoding. The `try/catch` covers expired or rotated-secret tokens (rare, but a `null` return is friendlier than an unhandled throw).
+
+Reference implementation: `app/api/musicbrainz/[entity]/[mbid]/tags/route.ts` (`readJwtMbAuth`). The `/api/auth/mb-debug` route keeps a side-by-side `getToken` vs `decode` comparison as a canary — if a future Auth.js upgrade fixes the `getToken` defaults, that endpoint will show `viaGetToken.hasMbAccessToken: true` and we can simplify the code.
+
+### 2. MB OAuth: scope widening requires `approval_prompt=force`
+
+MB's OAuth2 server is older Google-style, not OIDC. To force the consent screen for users whose original grant predates a scope we've since added (e.g. users who signed in before we asked for `tag`), the authorize URL needs `approval_prompt=force` — *not* the OIDC-spec `prompt=consent`, which MB silently ignores. Pass it via the `authorizationParams` (third) argument to `signIn()`:
+
+```ts
+await signOut({ redirect: false });
+void signIn("musicbrainz", { callbackUrl }, { approval_prompt: "force" });
+```
+
+Without it, MB silently re-issues the cached `profile`-only grant on every re-auth attempt, causing a vote-401 → re-auth → vote-401 loop. `signOut + signIn` (rather than `signIn` alone) is also needed — Auth.js's same-provider sign-in shortcuts the OAuth handshake when an active session exists.
+
+Reference: `triggerReAuth` in `components/achordion/tag-chips.tsx`. MB's full param list: https://musicbrainz.org/doc/Development/OAuth2
+
+### 3. MB creates a new grant per scope set — old grants linger
+
+When you widen a scope at MB, MB doesn't migrate the existing grant — it creates a parallel one. Users will see duplicate "Achordion" rows on https://musicbrainz.org/account/applications, one per scope set. The most recent token issued is the one in effect; the others are orphaned and can be revoked without signing the user out. Worth knowing if support questions surface — the duplication is MB's design, not a bug on our side.
+
+---
+
 ## Auth-gated content on edge-cached routes (client-island pattern)
 
 Public entity routes (`/release-group/:mbid`, `/artist/:mbid`, `/recording/:mbid`, `/charts/*`, `/about`, `/faq`, etc.) carry a shared `CDN-Cache-Control: public, s-maxage=3600, stale-while-revalidate=86400` header (see `PUBLIC_ENTITY_CACHE` in `next.config.ts`). The Vercel edge serves a single SSR'd response to every visitor for an hour, refreshing in the background — the entire reason these pages feel instant.
