@@ -4,6 +4,7 @@ import { revalidateTag } from "next/cache";
 import { auth } from "@/auth";
 import { getLbTokenForRequest } from "@/lib/lb-token";
 import {
+  deletePlaylist,
   editPlaylist,
   getPlaylist,
   type PlaylistEditFields,
@@ -128,4 +129,39 @@ export async function editPlaylistAction(
   }
   bustCache(mbid, ctx.viewer);
   return { ok: true };
+}
+
+export type DeleteResult =
+  | { ok: true; redirectTo: string }
+  | { ok: false; reason: string };
+
+/**
+ * Permanently delete a playlist on LB. Owner-only — same gate as
+ * `editPlaylistAction`. On success returns the URL to redirect to
+ * (the owner's profile playlists tab); the client navigates there
+ * after the action settles so the user lands somewhere sensible
+ * rather than on a now-404 page.
+ *
+ * Cache bust mirrors the edit path: the playlist's own slot + the
+ * owner's playlists-list slot so the deleted playlist disappears
+ * from any list view that was already rendered.
+ */
+export async function deletePlaylistAction(
+  mbid: string,
+): Promise<DeleteResult> {
+  const ctx = await loadOwnedPlaylist(mbid);
+  if (!ctx.ok) return ctx;
+  const result = await deletePlaylist(mbid, ctx.token);
+  if (!result.ok) {
+    return {
+      ok: false,
+      reason:
+        result.message ?? `ListenBrainz returned ${result.status}.`,
+    };
+  }
+  bustCache(mbid, ctx.viewer);
+  return {
+    ok: true,
+    redirectTo: `/user/${encodeURIComponent(ctx.viewer)}/playlists`,
+  };
 }

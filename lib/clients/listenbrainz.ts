@@ -1957,6 +1957,43 @@ export function setPlaylistVisibility(
   return editPlaylist(mbid, { isPublic, collaborators }, token);
 }
 
+/**
+ * Permanently delete a playlist on ListenBrainz. Endpoint is
+ * `POST /1/playlist/<mbid>/delete` — no body required. LB returns
+ * 200 on success and 404 if the playlist doesn't exist (already
+ * gone, or the caller never owned it). The token must belong to
+ * the playlist's creator; collaborators can't delete.
+ *
+ * No way to undelete on LB's side, so callers should confirm
+ * destructive intent before invoking.
+ */
+export async function deletePlaylist(
+  mbid: string,
+  token: string,
+): Promise<{ ok: boolean; status: number; message?: string }> {
+  const res = await fetch(
+    `${LB_BASE}/playlist/${encodeURIComponent(mbid)}/delete`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Token ${token}`,
+        "Content-Type": "application/json",
+        "User-Agent": USER_AGENT,
+        Accept: "application/json",
+      },
+      cache: "no-store",
+    },
+  );
+  let message: string | undefined;
+  try {
+    const json = (await res.json()) as { error?: string };
+    if (json.error) message = json.error;
+  } catch {
+    // Non-JSON body — fall back to status.
+  }
+  return { ok: res.ok, status: res.status, message };
+}
+
 // ─── Similar artists (LB Labs) ──────────────────────────────────────
 
 const SIMILAR_ARTISTS_ALGORITHM =
