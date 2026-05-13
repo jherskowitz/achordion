@@ -1,12 +1,25 @@
 import Link from "next/link";
 import { Globe, Lock, Sparkles, Users } from "lucide-react";
-import {
-  playlistMbidFromIdentifier,
-  type LbPlaylistSummary,
-  type LbRadioTrack,
+import type {
+  LbPlaylistSummary,
+  LbRadioTrack,
 } from "@/lib/clients/listenbrainz";
 import { stripHtml } from "@/lib/strip-html";
 import { PlaylistCoverMosaic } from "./playlist-cover-mosaic";
+
+// Inline from `lib/clients/listenbrainz.ts` — see the matching note
+// in `playlists-browser.tsx` for why. Any runtime import from the LB
+// client module drags `lib/lb-token.ts`'s `import "server-only"` into
+// the bundle, and Next 16 rejects that at build time when the
+// importer ends up in a client subtree (this file is imported by
+// `playlists-browser.tsx`, which is `"use client"`).
+function playlistMbidFromIdentifier(
+  identifier: string | undefined | null,
+): string | null {
+  if (!identifier) return null;
+  const m = identifier.match(/\/playlist\/([0-9a-f-]{36})/i);
+  return m?.[1] ?? null;
+}
 
 const JSPF_PLAYLIST_KEY = "https://musicbrainz.org/doc/jspf#playlist";
 
