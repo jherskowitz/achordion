@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { auth } from "@/auth";
-import { getToken } from "next-auth/jwt";
+import { decode } from "next-auth/jwt";
 import {
   submitTagVote,
   TagApiError,
@@ -73,17 +73,45 @@ function parseEntity(value: string): TagEntity | null {
     : null;
 }
 
+/**
+ * Decode the Auth.js v5 session JWT directly out of the request
+ * cookie. We can't use `getToken()` from `next-auth/jwt` here — in
+ * v5 beta its cookie-name / salt defaults don't match what Auth.js's
+ * encoder writes, so it returns null even when the cookie is valid
+ * and `auth()` decodes it just fine. Calling `decode()` ourselves
+ * with explicit cookie name + salt sidesteps the mismatch.
+ *
+ * Cookie naming follows Auth.js v5: `__Secure-` prefix in HTTPS,
+ * `authjs.` (not `next-auth.`) infix. Salt defaults to the cookie
+ * name on Auth.js's encode side, so we mirror that here.
+ */
 async function readJwtMbAuth(
   request: NextRequest,
 ): Promise<{ accessToken: string | null; scope: string }> {
-  const jwt = await getToken({
-    req: request,
-    secret: process.env.AUTH_SECRET,
-  });
-  return {
-    accessToken: typeof jwt?.mbAccessToken === "string" ? jwt.mbAccessToken : null,
-    scope: typeof jwt?.mbScope === "string" ? jwt.mbScope : "",
-  };
+  const secureCookie =
+    request.url.startsWith("https://") ||
+    request.headers.get("x-forwarded-proto") === "https";
+  const cookieName = secureCookie
+    ? "__Secure-authjs.session-token"
+    : "authjs.session-token";
+  const cookie = request.cookies.get(cookieName)?.value;
+  if (!cookie) return { accessToken: null, scope: "" };
+  const secret = process.env.AUTH_SECRET;
+  if (!secret) return { accessToken: null, scope: "" };
+  try {
+    const token = await decode({
+      token: cookie,
+      secret,
+      salt: cookieName,
+    });
+    return {
+      accessToken:
+        typeof token?.mbAccessToken === "string" ? token.mbAccessToken : null,
+      scope: typeof token?.mbScope === "string" ? token.mbScope : "",
+    };
+  } catch {
+    return { accessToken: null, scope: "" };
+  }
 }
 
 
@@ -207,32 +235,10 @@ export async function POST(
       { status: 403, headers: NO_STORE },
     );
   }
-  const jwt = await getToken({
-    req: request,
-    secret: process.env.AUTH_SECRET,
-  });
-  const accessToken = typeof jwt?.mbAccessToken === "string" ? jwt.mbAccessToken : null;
-  const scope = typeof jwt?.mbScope === "string" ? jwt.mbScope : "";
+  const { accessToken, scope } = await readJwtMbAuth(request);
   if (!accessToken) {
-    // Diagnostic payload (TEMP — pull once root cause is known): we
-    // were getting 401s here with no log surfacing on Vercel, so the
-    // response now carries enough JWT shape to diagnose from
-    // DevTools. NO secret material is leaked: we only echo back
-    // which keys exist on the JWT (not their values) and the scope
-    // string (which is just our requested "profile tag" or whatever
-    // MB echoes — never a token).
     return NextResponse.json(
-      {
-        error: "no MB access token",
-        reason: "scope_required",
-        debug: {
-          jwt_has_mbUsername: typeof jwt?.mbUsername === "string",
-          jwt_has_mbAccessToken: typeof jwt?.mbAccessToken === "string",
-          jwt_mbAccessToken_typeof: typeof jwt?.mbAccessToken,
-          jwt_mbScope: scope || null,
-          jwt_keys: jwt ? Object.keys(jwt).sort() : null,
-        },
-      },
+      { error: "no MB access token", reason: "scope_required" },
       { status: 401, headers: NO_STORE },
     );
   }
