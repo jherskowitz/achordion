@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidateTag } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { auth } from "@/auth";
 import { getLbTokenForRequest } from "@/lib/lb-token";
 import {
@@ -54,6 +54,15 @@ async function loadOwnedPlaylist(
 function bustCache(mbid: string, viewer: string) {
   revalidateTag(`lb:playlist:${mbid}`, "max");
   revalidateTag(`lb:user:${viewer}:playlists`, "max");
+  // revalidateTag only busts the data-cache layer. Next.js also keeps
+  // an RSC payload cache on the client per route; without a path-
+  // level revalidation, navigating back to the owner's playlists tab
+  // after a visibility flip serves a stale render that still labels
+  // the playlist PRIVATE (or PUBLIC). revalidatePath marks the route
+  // stale so the next navigation re-renders from scratch and picks up
+  // the fresh data the tag-bust just enabled.
+  revalidatePath(`/user/${viewer}/playlists`);
+  revalidatePath(`/user/${viewer}`);
 }
 
 export type VisibilityResult =
