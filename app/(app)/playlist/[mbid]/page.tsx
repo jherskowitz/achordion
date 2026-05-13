@@ -307,22 +307,27 @@ async function PlaylistBody({ mbid }: { mbid: string }) {
 
       {mirrorLinks && mirrorLinks.links.length > 0 && (
         <section className="mb-8">
-          <h2 className="text-muted-foreground mb-2 text-xs font-medium uppercase tracking-wider">
+          <h2 className="text-muted-foreground mb-2 text-xs tracking-wide uppercase">
             Listen on
           </h2>
           <ul className="space-y-2">
-            {mirrorLinks.links.map((link) => (
-              <li key={link.url}>
-                <a
-                  href={link.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="hover:text-foreground underline underline-offset-4"
-                >
-                  {link.label}
-                </a>
-              </li>
-            ))}
+            {mirrorLinks.links.map((link) => {
+              const href = safeHttpUrl(link.url);
+              if (!href) return null;
+              return (
+                <li key={href}>
+                  <a
+                    href={href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-sm underline-offset-4 hover:underline"
+                  >
+                    {link.label}
+                    <ExternalLink className="size-3" />
+                  </a>
+                </li>
+              );
+            })}
           </ul>
         </section>
       )}
