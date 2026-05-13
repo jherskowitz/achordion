@@ -120,12 +120,32 @@ export async function saveAnnouncements(items: unknown): Promise<void> {
   } else {
     await r.set(ANNOUNCEMENTS_KEY, JSON.stringify(validated));
   }
-  // Bust both the in-process unstable_cache slot (lib/announcements.ts)
-  // and the route handler's CDN cache so admin edits surface within
-  // the next render rather than after the 60s revalidate window.
+  // Bust three caching layers so admin edits surface immediately:
+  //   1. The in-process `unstable_cache` slot in lib/announcements.ts
+  //      (server-component re-renders read fresh from Redis).
+  //   2. The /api/announcements route's CDN cache (Parachord-desktop
+  //      polls this path).
+  //   3. The route-group layouts that mount <AnnouncementBanner> as
+  //      server components — `app/(app)/layout.tsx` and
+  //      `app/(content)/layout.tsx`. These wrap every public entity
+  //      page, all of which sit behind PUBLIC_ENTITY_CACHE (s-maxage=
+  //      3600) at the edge, so the banner HTML is baked into every
+  //      cached page. Without a layout-level revalidation an admin
+  //      delete only takes effect after the 1h edge TTL expires.
+  //      `revalidatePath("/", "layout")` is the supported way to
+  //      evict every page under the root layout in one call.
+  //
+  // TODO: convert the banner to a client island fetching
+  // /api/announcements directly (see AGENTS.md "Auth-gated content
+  // on edge-cached routes"). That removes the dependency on
+  // layout-wide cache eviction — admin edits would surface within
+  // the 60s API SWR window regardless of which edge-cached page the
+  // user is on.
+  //
   // Next 16 `revalidateTag` requires the second profile arg ("default"
   // matches the default fetch profile used by unstable_cache).
   revalidateTag("announcements", "default");
   revalidatePath("/admin/announcements");
   revalidatePath("/api/announcements");
+  revalidatePath("/", "layout");
 }
