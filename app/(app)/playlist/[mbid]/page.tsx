@@ -7,6 +7,7 @@ import { auth } from "@/auth";
 import { getLbTokenForRequest } from "@/lib/lb-token";
 import { getPlaylist } from "@/lib/clients/listenbrainz";
 import { caaReleaseUrl } from "@/lib/clients/coverart";
+import { getPlaylistLinks } from "@/lib/playlist-links-store";
 import { parachordPlayTrack, type ParachordTrack } from "@/lib/parachord";
 import {
   artistHref,
@@ -101,6 +102,10 @@ async function PlaylistBody({ mbid }: { mbid: string }) {
   }
   if (!data) notFound();
   const xspfUrl = await publicUrl(`/api/playlist/${mbid}/xspf`);
+  // Parachord-submitted mirror links (Spotify/Apple Music playlist URLs
+  // for the same playlist). Empty/null when no client has pushed mirror
+  // data yet — render is gated on links.length below.
+  const mirrorLinks = await getPlaylistLinks(mbid).catch(() => null);
   const viewer = session?.user?.mbUsername ?? null;
   const isOwner =
     !!viewer &&
@@ -299,6 +304,28 @@ async function PlaylistBody({ mbid }: { mbid: string }) {
           </div>
         </div>
       </header>
+
+      {mirrorLinks && mirrorLinks.links.length > 0 && (
+        <section className="mb-8">
+          <h2 className="text-muted-foreground mb-2 text-xs font-medium uppercase tracking-wider">
+            Listen on
+          </h2>
+          <ul className="space-y-2">
+            {mirrorLinks.links.map((link) => (
+              <li key={link.url}>
+                <a
+                  href={link.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hover:text-foreground underline underline-offset-4"
+                >
+                  {link.label}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {data.tracks.length === 0 ? (
         <p className="text-muted-foreground text-sm">
