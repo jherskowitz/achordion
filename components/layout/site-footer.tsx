@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AdminFooterLink } from "./admin-footer-link";
 
 export function SiteFooter() {
   return (
@@ -86,6 +87,11 @@ export function SiteFooter() {
           >
             Parachord
           </a>
+          {/* Admin link — client island, renders only when the
+              session resolves to the site owner. Hidden for
+              everyone else; the actual access gate is enforced
+              server-side by `lib/admin.ts`. */}
+          <AdminFooterLink />
         </nav>
       </div>
     </footer>
