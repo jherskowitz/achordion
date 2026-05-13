@@ -8,15 +8,28 @@ import {
   useState,
 } from "react";
 import { Loader2, Search } from "lucide-react";
-import {
-  playlistMbidFromIdentifier,
-  type LbPlaylistSummary,
-  type LbRadioTrack,
-  type UserPlaylistsPage,
+import type {
+  LbPlaylistSummary,
+  LbRadioTrack,
+  UserPlaylistsPage,
 } from "@/lib/clients/listenbrainz";
 import { PlaylistCard } from "@/components/achordion/playlist-card";
 import { EmptyState } from "@/components/achordion/empty-state";
 import { cn } from "@/lib/utils";
+
+// Inline copy of `playlistMbidFromIdentifier` from the LB client.
+// Importing the function from `lib/clients/listenbrainz.ts` (even
+// alongside type-only imports) drags the whole module — including its
+// `import "server-only"` chain via `lib/lb-token.ts` — into the client
+// bundle, which Next 16 hard-rejects at build time. Type imports get
+// stripped by tsc, so they're safe; runtime imports aren't.
+function playlistMbidFromIdentifier(
+  identifier: string | undefined | null,
+): string | null {
+  if (!identifier) return null;
+  const m = identifier.match(/\/playlist\/([0-9a-f-]{36})/i);
+  return m?.[1] ?? null;
+}
 
 const JSPF_PLAYLIST_KEY = "https://musicbrainz.org/doc/jspf#playlist";
 
