@@ -34,7 +34,7 @@ export interface PlaylistPreviewResponse {
   tracks: Array<
     Pick<
       LbRadioTrack,
-      "title" | "artist" | "releaseMbid" | "caaReleaseMbid" | "caaId"
+      "title" | "artistName" | "releaseMbid" | "caaReleaseMbid" | "caaId"
     >
   >;
   isPublic: boolean;
@@ -68,7 +68,7 @@ export async function GET(
       .slice(0, PREVIEW_TRACK_LIMIT)
       .map((t) => ({
         title: t.title,
-        artist: t.artist,
+        artistName: t.artistName,
         releaseMbid: t.releaseMbid,
         caaReleaseMbid: t.caaReleaseMbid,
         caaId: t.caaId,
