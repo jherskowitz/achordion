@@ -53,7 +53,7 @@ const ACHORDION_ORIGIN = "https://achordion.xyz";
 
 /** Public entity types we expose canonical routes for. `album` and
  *  `track` are aliases that get normalised to their canonical names. */
-type EntityType = "artist" | "release-group" | "recording";
+type EntityType = "artist" | "release-group" | "recording" | "playlist";
 
 const TYPE_ALIASES: Record<string, EntityType> = {
   artist: "artist",
@@ -61,6 +61,7 @@ const TYPE_ALIASES: Record<string, EntityType> = {
   album: "release-group",
   recording: "recording",
   track: "recording",
+  playlist: "playlist",
 };
 
 const QuerySchema = z.object({
@@ -105,7 +106,9 @@ function canonicalUrl(type: EntityType, mbid: string): string {
       ? `/artist/${mbid}`
       : type === "release-group"
         ? `/release-group/${mbid}`
-        : `/recording/${mbid}`;
+        : type === "playlist"
+          ? `/playlist/${mbid}`
+          : `/recording/${mbid}`;
   return `${ACHORDION_ORIGIN}${path}`;
 }
 
@@ -164,7 +167,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     ...(embedUrl(type, mbid) ? { embed_url: embedUrl(type, mbid) } : {}),
   };
 
-  if (includeNames) {
+  if (includeNames && type !== "playlist") {
     try {
       if (type === "artist") {
         const artist = await getArtist(mbid);
