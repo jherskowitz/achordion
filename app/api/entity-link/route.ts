@@ -15,7 +15,7 @@ import {
  * them stable as the single source of truth on Achordion's side.
  *
  * Inputs:
- *   - `type`: artist | release-group | recording. Aliases:
+ *   - `type`: artist | release-group | recording | playlist. Aliases:
  *     `album` → release-group, `track` → recording.
  *   - `mbid`: MusicBrainz ID for the entity.
  *   - `include` (optional, comma-separated): `names` to enrich the
@@ -71,7 +71,7 @@ const QuerySchema = z.object({
     .transform((v) => v.toLowerCase().trim())
     .refine((v): v is keyof typeof TYPE_ALIASES => v in TYPE_ALIASES, {
       message:
-        "type must be one of: artist, release-group, recording (aliases: album, track)",
+        "type must be one of: artist, release-group, recording, playlist (aliases: album, track)",
     }),
   // MBIDs are 36-char UUIDs — validate shape so we fail fast before
   // making any MB call.
