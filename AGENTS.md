@@ -754,6 +754,26 @@ Parachord can push confirmed-on-playback MBID → external-streaming-URL matches
 
 Submit only matches Parachord has actually played back successfully — that's the whole point of the source-priority. Drive-by URL matching belongs in Achordion's own Odesli/MB resolution path.
 
+### `POST /api/playlist-links/submit`
+
+Parachord push endpoint for playlist mirror-link mappings. Accepts:
+
+  {
+    "mbid":         "<listenbrainz-playlist-mbid (UUID)>",
+    "name":         "<playlist title>",                       // optional
+    "creatorName":  "<playlist creator>",                     // optional
+    "trackCount":   <int>,                                    // optional
+    "links":        [
+      { "host": "open.spotify.com",  "url": "https://...",  "label": "Spotify" },
+      { "host": "music.apple.com",   "url": "https://...",  "label": "Apple Music" },
+      { "host": "listenbrainz.org",  "url": "https://...",  "label": "ListenBrainz" }
+    ]
+  }
+
+Storage: per-MBID Redis key with 90-day TTL via `lib/playlist-links-store.ts`. Source is always `"parachord"`. Same bearer (`PARACHORD_TRACK_LINKS_TOKEN`) and same rate-limit class as track-links/submit.
+
+Used by `/playlist/<mbid>` page to render "Listen on Spotify / Apple Music / ListenBrainz" links. Also surfaced via `/api/entity-link?type=playlist` as the canonical URL for sharing.
+
 ### Entity-link lookup (GET `/api/entity-link`)
 
 Parachord can ask Achordion for the canonical Achordion URL for any artist / album / track MBID. Use this instead of hard-coding our URL convention — if Achordion ever moves a route (e.g. `/release-group/<mbid>` → somewhere else), the change ships through this endpoint without any client update.
