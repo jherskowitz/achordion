@@ -124,12 +124,17 @@ export function TagChips({
     // re-run the OAuth handshake. Clearing the session first
     // guarantees a fresh OAuth round-trip with the widened scope.
     //
-    // `prompt: "consent"` forces MB's authorize endpoint to show
-    // its consent screen and issue a new access token, even if the
-    // user has previously approved this app. Without it, MB can
-    // silently re-use a cached `profile`-only grant and re-issue
-    // the same token that doesn't have the `tag` scope — leading
-    // to a vote-401-reauth-401 loop.
+    // `approval_prompt=force` forces MB's authorize endpoint to
+    // show its consent screen and issue a new access token, even if
+    // the user has previously approved this app. MB uses the older
+    // Google-OAuth-style param name here (not the newer OIDC
+    // `prompt=consent` — MB silently ignores that one and re-issues
+    // the cached grant). Without forcing consent, a user who first
+    // authorized Achordion before we added the `tag` scope will
+    // keep getting tokens with the old `profile`-only grant and
+    // hit a vote-401-reauth-401 loop.
+    // See https://musicbrainz.org/doc/Development/OAuth2 for the
+    // full param list MB honors.
     //
     // Also pin a timestamp so the loop guard below can break the
     // cycle if MB STILL hands back a tag-less token (e.g. user
@@ -145,7 +150,7 @@ export function TagChips({
     void signIn(
       "musicbrainz",
       { callbackUrl },
-      { prompt: "consent" },
+      { approval_prompt: "force" },
     );
   };
 
@@ -157,7 +162,15 @@ export function TagChips({
   const blocked = !!votesQuery.data?.blocked;
   const canInteract = sessionStatus === "authenticated" && !blocked;
 
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  // `errorMsg` carries either a plain string (generic failures) or
+  // the structured `revoke-and-retry` variant that renders an inline
+  // link to MB's applications page. Keeping the variant typed (rather
+  // than parsing a string for a URL) means the link target is fixed at
+  // the source, never drifts if we reword the copy.
+  type TagError =
+    | { kind: "msg"; text: string }
+    | { kind: "revoke-and-retry" };
+  const [errorMsg, setErrorMsg] = useState<TagError | null>(null);
 
   const voteMutation = useMutation({
     mutationFn: async (vars: { tag: string; vote: TagVote }) => {
@@ -233,16 +246,21 @@ export function TagChips({
         // (e.g. revoke + re-grant the app on MB) instead of an
         // infinite redirect loop.
         if (reAuthRecentlyAttempted()) {
-          setErrorMsg(
-            "Tag voting requires extra permission MB didn't grant. Try revoking Achordion at musicbrainz.org/account/applications and signing in again.",
-          );
+          // The new tag chip is in `pendingTags` from the optimistic
+          // add — without rolling it back here, the row keeps a chip
+          // that never made it to MB, which reads as "the tag was
+          // saved" even though the vote failed.
+          setPendingTags([]);
+          setErrorMsg({ kind: "revoke-and-retry" });
           return;
         }
         void triggerReAuth();
       } else {
-        setErrorMsg(
-          err instanceof Error ? err.message : "Couldn't submit vote",
-        );
+        setErrorMsg({
+          kind: "msg",
+          text:
+            err instanceof Error ? err.message : "Couldn't submit vote",
+        });
       }
     },
   });
@@ -250,9 +268,10 @@ export function TagChips({
   function handleVote(name: string, vote: TagVote) {
     if (sessionStatus !== "authenticated") {
       if (reAuthRecentlyAttempted()) {
-        setErrorMsg(
-          "Sign-in didn't complete. Try a fresh page load and click again.",
-        );
+        setErrorMsg({
+          kind: "msg",
+          text: "Sign-in didn't complete. Try a fresh page load and click again.",
+        });
         return;
       }
       void triggerReAuth();
@@ -369,9 +388,35 @@ export function TagChips({
         <span
           role="status"
           aria-live="polite"
-          className="text-amber-600 dark:text-amber-400 ml-1 inline-flex items-center text-xs"
+          className="text-amber-600 dark:text-amber-400 ml-1 inline-flex flex-wrap items-center gap-x-1 text-xs"
         >
-          {errorMsg}
+          {errorMsg.kind === "revoke-and-retry" ? (
+            <>
+              <span>
+                MB didn&apos;t grant tag-voting permission. Revoke
+                Achordion in your{" "}
+                <a
+                  href="https://musicbrainz.org/account/applications"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline underline-offset-2 hover:text-amber-700 dark:hover:text-amber-300"
+                >
+                  MusicBrainz applications
+                </a>
+                , then{" "}
+                <button
+                  type="button"
+                  onClick={() => void triggerReAuth()}
+                  className="underline underline-offset-2 hover:text-amber-700 dark:hover:text-amber-300"
+                >
+                  sign in again
+                </button>
+                .
+              </span>
+            </>
+          ) : (
+            <span>{errorMsg.text}</span>
+          )}
         </span>
       )}
     </div>
