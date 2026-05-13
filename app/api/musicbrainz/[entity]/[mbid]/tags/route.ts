@@ -207,18 +207,32 @@ export async function POST(
       { status: 403, headers: NO_STORE },
     );
   }
-  const { accessToken, scope } = await readJwtMbAuth(request);
+  const jwt = await getToken({
+    req: request,
+    secret: process.env.AUTH_SECRET,
+  });
+  const accessToken = typeof jwt?.mbAccessToken === "string" ? jwt.mbAccessToken : null;
+  const scope = typeof jwt?.mbScope === "string" ? jwt.mbScope : "";
   if (!accessToken) {
-    // Diagnostic: this branch is what fires when the user comes back
-    // from a successful MB consent screen but the vote still 401s.
-    // Means the JWT got refreshed but didn't carry mbAccessToken —
-    // either the OAuth callback didn't write it, or this request is
-    // reading a different cookie than the one the callback wrote.
-    console.warn(
-      `[mb-tag-vote] no accessToken in JWT user=${session.user.mbUsername} jwt-scope="${scope}" entity=${entity}`,
-    );
+    // Diagnostic payload (TEMP — pull once root cause is known): we
+    // were getting 401s here with no log surfacing on Vercel, so the
+    // response now carries enough JWT shape to diagnose from
+    // DevTools. NO secret material is leaked: we only echo back
+    // which keys exist on the JWT (not their values) and the scope
+    // string (which is just our requested "profile tag" or whatever
+    // MB echoes — never a token).
     return NextResponse.json(
-      { error: "no MB access token", reason: "scope_required" },
+      {
+        error: "no MB access token",
+        reason: "scope_required",
+        debug: {
+          jwt_has_mbUsername: typeof jwt?.mbUsername === "string",
+          jwt_has_mbAccessToken: typeof jwt?.mbAccessToken === "string",
+          jwt_mbAccessToken_typeof: typeof jwt?.mbAccessToken,
+          jwt_mbScope: scope || null,
+          jwt_keys: jwt ? Object.keys(jwt).sort() : null,
+        },
+      },
       { status: 401, headers: NO_STORE },
     );
   }
