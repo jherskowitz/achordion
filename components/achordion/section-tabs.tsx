@@ -24,7 +24,14 @@ export function SectionTabs({
     <nav
       aria-label="Section tabs"
       className={cn(
-        "border-border/60 -mx-4 overflow-x-auto border-b sm:-mx-6",
+        // `overflow-y-clip` is critical: the active-tab underline
+        // sits at `-bottom-px` on its Link, protruding 1px below the
+        // nav's content box. Without an explicit y-axis rule, CSS
+        // implicitly upgrades `overflow-y: visible` to `auto` here
+        // (because overflow-x is non-visible), which renders a stray
+        // vertical scrollbar for that 1px. `clip` doesn't get the
+        // upgrade and never shows a scrollbar.
+        "border-border/60 -mx-4 overflow-x-auto overflow-y-clip border-b sm:-mx-6",
         className,
       )}
     >
