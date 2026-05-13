@@ -69,9 +69,6 @@ export default async function PlaylistsPage({ params }: PageParams) {
   const { name } = await params;
   return (
     <PageShell className="pt-8">
-      <h2 className="mb-6 text-sm font-semibold tracking-wide uppercase">
-        Playlists
-      </h2>
       <Suspense fallback={<ListShellFallback />}>
         <PlaylistsList name={name} />
       </Suspense>
