@@ -54,6 +54,51 @@ const SORT_OPTIONS = [
 
 type SortKey = (typeof SORT_OPTIONS)[number]["value"];
 
+type Visibility = "all" | "public" | "private";
+
+const VISIBILITY_OPTIONS: Array<{ value: Visibility; label: string }> = [
+  { value: "all", label: "All" },
+  { value: "public", label: "Public" },
+  { value: "private", label: "Private" },
+];
+
+/** Mirrors PlaylistCard's read: `ext.public === false` ⇒ private,
+ *  anything else (including missing) ⇒ public. */
+function isPublicEntry(entry: LbPlaylistSummary): boolean {
+  const ext = entry.playlist.extension?.[JSPF_PLAYLIST_KEY];
+  return ext?.public !== false;
+}
+
+function emptyMatchDescription({
+  query,
+  visibility,
+  loaded,
+  showLoadMoreHint,
+}: {
+  query: string;
+  visibility: Visibility;
+  loaded: number;
+  showLoadMoreHint: boolean;
+}): string {
+  const scopeLabel =
+    visibility === "all"
+      ? null
+      : visibility === "public"
+        ? "public"
+        : "private";
+  const queryPart = query ? `"${query}"` : null;
+  const subject =
+    queryPart && scopeLabel
+      ? `${scopeLabel} playlists matching ${queryPart}`
+      : queryPart
+        ? `playlists matching ${queryPart}`
+        : `${scopeLabel} playlists`;
+  if (showLoadMoreHint) {
+    return `Nothing in the ${loaded} loaded playlists matched ${subject}. Load more to keep searching.`;
+  }
+  return `Nothing matched ${subject}.`;
+}
+
 function dateMs(entry: LbPlaylistSummary, prefer: "modified" | "created"): number {
   const p = entry.playlist;
   const ext = p.extension?.[JSPF_PLAYLIST_KEY];
@@ -214,6 +259,10 @@ export function PlaylistsBrowser({
   const [loadError, setLoadError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<SortKey>("modified-desc");
+  // Visibility filter only matters when the viewer can see private
+  // entries — anonymous / non-self loads never include them. Default
+  // to "all" so the chip set is a noop until the user picks a filter.
+  const [visibility, setVisibility] = useState<Visibility>("all");
 
   const loadMore = useCallback(async () => {
     if (loading) return;
@@ -262,6 +311,10 @@ export function PlaylistsBrowser({
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     let result = items;
+    if (visibility !== "all") {
+      const wantPublic = visibility === "public";
+      result = result.filter((entry) => isPublicEntry(entry) === wantPublic);
+    }
     if (q) {
       result = result.filter((entry) => {
         const title = entry.playlist.title.toLowerCase();
@@ -270,28 +323,62 @@ export function PlaylistsBrowser({
       });
     }
     return sortPlaylists(result, sort);
-  }, [items, query, sort]);
+  }, [items, query, sort, visibility]);
 
-  const filtering = query.trim().length > 0;
+  const filtering = query.trim().length > 0 || visibility !== "all";
   const showLoadMoreHint =
     filtering && filtered.length === 0 && items.length < total;
 
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div className="relative max-w-sm flex-1">
-          <Search
-            aria-hidden
-            className="text-muted-foreground/70 pointer-events-none absolute top-1/2 left-3 size-3.5 -translate-y-1/2"
-          />
-          <input
-            type="text"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Filter playlists…"
-            aria-label="Filter playlists"
-            className="border-border/60 bg-background placeholder:text-muted-foreground/60 focus:ring-foreground/20 block h-9 w-full rounded-md border pr-3 pl-8 text-sm outline-none focus:ring-2"
-          />
+        <div className="flex flex-1 flex-col gap-2 sm:flex-row sm:items-center">
+          <div className="relative max-w-sm flex-1">
+            <Search
+              aria-hidden
+              className="text-muted-foreground/70 pointer-events-none absolute top-1/2 left-3 size-3.5 -translate-y-1/2"
+            />
+            <input
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Filter playlists…"
+              aria-label="Filter playlists"
+              className="border-border/60 bg-background placeholder:text-muted-foreground/60 focus:ring-foreground/20 block h-9 w-full rounded-md border pr-3 pl-8 text-sm outline-none focus:ring-2"
+            />
+          </div>
+          {isSelf && (
+            // Visibility pills — owner-only. Non-self viewers never
+            // see private entries in the data set, so the filter
+            // would just be an "All / Public / (empty Private)"
+            // affordance with no use case.
+            <div
+              role="radiogroup"
+              aria-label="Filter by visibility"
+              className="border-border/60 bg-muted/20 inline-flex items-center rounded-md border p-0.5 text-xs"
+            >
+              {VISIBILITY_OPTIONS.map((opt) => {
+                const active = visibility === opt.value;
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    role="radio"
+                    aria-checked={active}
+                    onClick={() => setVisibility(opt.value)}
+                    className={cn(
+                      "inline-flex h-7 items-center rounded px-3 transition-colors",
+                      active
+                        ? "bg-background text-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground",
+                    )}
+                  >
+                    {opt.label}
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
         <label className="text-muted-foreground inline-flex items-center gap-2 text-xs">
           Sort
@@ -317,11 +404,12 @@ export function PlaylistsBrowser({
       ) : filtered.length === 0 && filtering ? (
         <EmptyState
           title="No matches"
-          description={
-            showLoadMoreHint
-              ? `Nothing in the ${items.length} loaded playlists matched "${query}". Load more to keep searching.`
-              : `Nothing matched "${query}".`
-          }
+          description={emptyMatchDescription({
+            query: query.trim(),
+            visibility,
+            loaded: items.length,
+            showLoadMoreHint,
+          })}
         />
       ) : (
         <ul className="grid grid-cols-1 gap-3 md:grid-cols-2">
