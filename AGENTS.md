@@ -524,6 +524,19 @@ For routes that resolve identifiers via expensive external calls (`/api/track-co
 
 Together: a cover-art URL resolves once per (artist, album) pair globally, and once per browser tab per hour. Cover-art URLs are essentially immutable once known, so a 24h cache is safe.
 
+### Mutating actions must `revalidatePath` API routes, not just `revalidateTag`
+
+When an action mutates data that's surfaced by both a server-rendered page AND an API route (e.g. the playlist edit / delete / visibility actions touch `/user/<name>/playlists` and `/api/user/<name>/playlists`), `revalidateTag` is not enough on its own.
+
+`revalidateTag` busts the in-process Next.js data-fetch cache that `lbFetch` / `mbFetch` populate inside the route handler. But the route's HTTP **response** can also live in two places `revalidateTag` doesn't reach:
+
+1. **Vercel's edge CDN cache** — set by the response's `Cache-Control: public, s-maxage=N` header. A subsequent same-URL request can be served directly from the edge without re-running the function. Anonymous "Load more" type calls on a tagged-but-CDN-cached route can serve up to `s-maxage` seconds of stale data after a mutation.
+2. **The RSC payload cache** on the client — set per route segment when Next ships a server-rendered page. Without a path-level revalidation, navigating back to the page after a mutation serves a stale render.
+
+Call `revalidatePath(...)` on every affected path in addition to the tag bust. Reference implementation: `bustCache()` in `app/(app)/playlist/[mbid]/actions.ts` — busts `lb:playlist:<mbid>` and `lb:user:<viewer>:playlists` tags, and revalidates the four affected paths (`/user/<viewer>/playlists`, `/user/<viewer>`, `/api/user/<viewer>/playlists`, `/api/playlist/<mbid>/preview`).
+
+Rule of thumb: every URL that surfaces the mutated data should be in the `revalidatePath` list. Skipping the API-route paths is the easy miss — they don't show up in `git grep` for the page route.
+
 ---
 
 ## MusicBrainz client patterns

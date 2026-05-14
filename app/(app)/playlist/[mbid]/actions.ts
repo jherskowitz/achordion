@@ -54,15 +54,29 @@ async function loadOwnedPlaylist(
 function bustCache(mbid: string, viewer: string) {
   revalidateTag(`lb:playlist:${mbid}`, "max");
   revalidateTag(`lb:user:${viewer}:playlists`, "max");
-  // revalidateTag only busts the data-cache layer. Next.js also keeps
-  // an RSC payload cache on the client per route; without a path-
-  // level revalidation, navigating back to the owner's playlists tab
-  // after a visibility flip serves a stale render that still labels
-  // the playlist PRIVATE (or PUBLIC). revalidatePath marks the route
-  // stale so the next navigation re-renders from scratch and picks up
-  // the fresh data the tag-bust just enabled.
+  // revalidateTag only busts the in-process Next.js data-fetch cache.
+  // Two additional caches sit on top of that and need explicit busts:
+  //
+  //   1. The RSC payload cache that Next.js keeps client-side per
+  //      route. Without a path-level revalidation, navigating back to
+  //      the owner's playlists tab after a visibility flip serves a
+  //      stale render — chip still labelled PRIVATE / PUBLIC, even
+  //      though the data layer has fresh state.
+  //
+  //   2. Vercel's edge CDN cache on the `/api/user/<name>/playlists`
+  //      route, which carries `s-maxage=60` for anonymous viewers.
+  //      `revalidateTag` doesn't propagate to the CDN entry, so
+  //      anonymous "Load more" clients can see up to 60s of stale
+  //      data post-edit. Same pattern for the playlist's preview
+  //      endpoint (`s-maxage=3600` in the public-playlist path) —
+  //      busting it here keeps mosaic previews honest after edits.
+  //
+  // Calling revalidatePath on each affected path makes Next.js mark
+  // both the RSC payload and the CDN entry stale.
   revalidatePath(`/user/${viewer}/playlists`);
   revalidatePath(`/user/${viewer}`);
+  revalidatePath(`/api/user/${viewer}/playlists`);
+  revalidatePath(`/api/playlist/${mbid}/preview`);
 }
 
 export type VisibilityResult =
