@@ -1,9 +1,11 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { unstable_cache } from "next/cache";
 import { auth } from "@/auth";
 import { getLbTokenForRequest } from "@/lib/lb-token";
 import {
   getPlaylist,
   type LbRadioTrack,
+  type PlaylistDetail,
 } from "@/lib/clients/listenbrainz";
 
 /**
@@ -18,13 +20,31 @@ import {
  * sending so the response stays small. `<PlaylistCoverMosaic>`
  * only needs 4 unique covers from the head of the tracklist.
  *
- * Auth: passes the viewer's LB token when they're the playlist
- * owner — required for private playlists. Public playlists work
- * with or without a token; private ones 404 anonymously.
+ * Caching strategy (avoids LB rate-limit when a heavy scroll fans
+ * out 50+ card fetches):
+ *
+ *   1. Unauthenticated `getPlaylist` runs first. It uses the LB
+ *      client's own 5-min Next data cache (tag `lb:playlist:<mbid>`,
+ *      busted by the edit/delete actions). Public playlists never
+ *      progress past this step — they're fully cached for everyone.
+ *   2. If unauthenticated returns null AND the viewer has an LB
+ *      token, we fall through to an authenticated lookup wrapped in
+ *      `unstable_cache` keyed by `[mbid, viewer-username]`. Same tag,
+ *      same revalidate window — so the existing edit/delete tag
+ *      busts evict this slot too. The viewer-username in the cache
+ *      key keeps private data from cross-sharing between sessions
+ *      even though two different tokens could theoretically hit the
+ *      same mbid URL: each user's slot is independent.
+ *
+ * Net effect: an owner scrolling 60 private playlist cards now pays
+ * roughly one LB call per playlist *per 5 minutes*, not per scroll.
+ * Edits surface instantly via the existing tag-revalidation in the
+ * playlist edit/delete server actions.
  */
 export const dynamic = "force-dynamic";
 
 const PREVIEW_TRACK_LIMIT = 16;
+const PRIVATE_PREVIEW_REVALIDATE_S = 5 * 60;
 
 interface RouteContext {
   params: Promise<{ mbid: string }>;
@@ -40,6 +60,41 @@ export interface PlaylistPreviewResponse {
   isPublic: boolean;
 }
 
+/**
+ * Authenticated `getPlaylist` wrapped in a tagged 5-min cache slot,
+ * scoped by viewer username so private data never leaks across
+ * sessions. Returns `null` on any error — the caller treats both
+ * fetch failure and "viewer doesn't own this playlist" as "no
+ * private data available."
+ */
+function fetchAuthedPlaylistCached(
+  mbid: string,
+  token: string,
+  viewerUsername: string,
+): Promise<PlaylistDetail | null> {
+  return unstable_cache(
+    async () => {
+      try {
+        return await getPlaylist(mbid, token);
+      } catch {
+        return null;
+      }
+    },
+    [
+      "playlist-preview",
+      "owner",
+      mbid,
+      // Lower-cased so casing differences don't fragment the slot.
+      // The session username is canonical from the JWT.
+      viewerUsername.toLowerCase(),
+    ],
+    {
+      revalidate: PRIVATE_PREVIEW_REVALIDATE_S,
+      tags: [`lb:playlist:${mbid}`],
+    },
+  )();
+}
+
 export async function GET(
   _req: NextRequest,
   ctx: RouteContext,
@@ -51,13 +106,23 @@ export async function GET(
 
   const session = await auth();
   const viewer = session?.user?.mbUsername;
-  // We don't know if the viewer is the owner until after the fetch,
-  // so just always send the token when one's available. LB ignores
-  // the token for public playlists owned by others.
   const token = viewer ? await getLbTokenForRequest() : null;
 
   try {
-    const detail = await getPlaylist(mbid, token ?? undefined);
+    // Step 1: try the cheap, fully-cached unauthenticated path. This
+    // covers every public playlist regardless of viewer, and avoids
+    // forcing the no-store authed path even for the playlist owner
+    // when the playlist they're viewing happens to be public.
+    let detail = await getPlaylist(mbid).catch(() => null);
+    let usedToken = false;
+    // Step 2: private playlists 404 unauthenticated. Fall through to
+    // the cached authed lookup if the viewer has a token. The slot is
+    // viewer-scoped so non-owner sessions don't get to read someone
+    // else's private playlist via a shared cache.
+    if (!detail && token && viewer) {
+      detail = await fetchAuthedPlaylistCached(mbid, token, viewer);
+      usedToken = !!detail;
+    }
     if (!detail) {
       return NextResponse.json(
         { error: "playlist not found" },
@@ -77,12 +142,11 @@ export async function GET(
       tracks,
       isPublic: detail.isPublic,
     };
-    // Public playlists CDN-cache cheaply; private/self responses
-    // stay browser-private. We don't know whether the viewer's
-    // token was needed to resolve this fetch without a more
-    // involved owner check, so the safe default for any token-
-    // attached lookup is no-store — anonymous reads cache normally.
-    const headers = token
+    // Public-path responses CDN-share cheaply. Authed-path responses
+    // contain private playlist content — must not cross-share at the
+    // edge layer, even though the server-side unstable_cache slot is
+    // viewer-keyed and safe.
+    const headers = usedToken
       ? { "Cache-Control": "private, no-store" }
       : {
           "Cache-Control":
