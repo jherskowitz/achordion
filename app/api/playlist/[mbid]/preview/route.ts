@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { getLbTokenForRequest } from "@/lib/lb-token";
 import {
   getPlaylist,
+  ListenBrainzError,
   type LbRadioTrack,
   type PlaylistDetail,
 } from "@/lib/clients/listenbrainz";
@@ -61,6 +62,32 @@ export interface PlaylistPreviewResponse {
 }
 
 /**
+ * One-shot 429 retry. LB caps clients at ~1 req/sec; under a burst
+ * of N preview fetches (a user scrolling fast through their
+ * playlists), the first wave can transiently 429. Wait 750ms and
+ * try once more — almost always succeeds within LB's rate-limit
+ * window. Any other error propagates.
+ */
+async function fetchWithRateLimitRetry<T>(
+  fn: () => Promise<T>,
+): Promise<T | null> {
+  try {
+    return await fn();
+  } catch (err) {
+    if (err instanceof ListenBrainzError && err.status === 429) {
+      await new Promise((r) => setTimeout(r, 750));
+      try {
+        return await fn();
+      } catch {
+        return null;
+      }
+    }
+    if (err instanceof ListenBrainzError && err.status === 404) return null;
+    throw err;
+  }
+}
+
+/**
  * Authenticated `getPlaylist` wrapped in a tagged 5-min cache slot,
  * scoped by viewer username so private data never leaks across
  * sessions. Returns `null` on any error — the caller treats both
@@ -113,7 +140,14 @@ export async function GET(
     // covers every public playlist regardless of viewer, and avoids
     // forcing the no-store authed path even for the playlist owner
     // when the playlist they're viewing happens to be public.
-    let detail = await getPlaylist(mbid).catch(() => null);
+    //
+    // Retry once on LB 429 with a short backoff. When the playlists-
+    // index fans out N preview fetches in a burst, the first wave
+    // can transiently trip LB's rate limit; one 750ms re-try almost
+    // always succeeds (LB's window is 1s) and saves the user from a
+    // user-visible 502 + empty-mosaic fallback on cards that would
+    // otherwise have populated.
+    let detail = await fetchWithRateLimitRetry(() => getPlaylist(mbid));
     let usedToken = false;
     // Step 2: private playlists 404 unauthenticated. Fall through to
     // the cached authed lookup if the viewer has a token. The slot is

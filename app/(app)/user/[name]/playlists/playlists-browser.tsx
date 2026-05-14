@@ -34,6 +34,45 @@ function playlistMbidFromIdentifier(
 const JSPF_PLAYLIST_KEY = "https://musicbrainz.org/doc/jspf#playlist";
 
 /**
+ * Module-level concurrency limiter for the preview fetch.
+ *
+ * Each `<PlaylistCardLazy>` fires one preview fetch when it scrolls
+ * into view. A user scrolling fast through 100 cards used to fan out
+ * to 100 parallel `/api/playlist/<mbid>/preview` requests, which —
+ * even with the server-side tagged cache — caused a wave of cold-
+ * cache LB calls that tripped LB's 1-req/sec rate-limit and bubbled
+ * back as 502 errors on our route. Vercel alerts caught it: 1.8k
+ * requests / 5 min from a single IP, ~5% LB 429s.
+ *
+ * Cap concurrent fetches at PREVIEW_MAX_INFLIGHT. Subsequent cards
+ * wait their turn. The cap is generous enough that a normal scroll
+ * still feels instant (one card resolves, the next slot opens) while
+ * still capping the worst-case parallel pressure on LB.
+ */
+const PREVIEW_MAX_INFLIGHT = 3;
+let previewInFlight = 0;
+const previewQueue: Array<() => void> = [];
+
+function acquirePreviewSlot(): Promise<void> {
+  if (previewInFlight < PREVIEW_MAX_INFLIGHT) {
+    previewInFlight++;
+    return Promise.resolve();
+  }
+  return new Promise<void>((resolve) => {
+    previewQueue.push(() => {
+      previewInFlight++;
+      resolve();
+    });
+  });
+}
+
+function releasePreviewSlot() {
+  previewInFlight--;
+  const next = previewQueue.shift();
+  if (next) next();
+}
+
+/**
  * Sort options exposed on the playlists index. "Modified" uses
  * `extension.last_modified_at` (LB updates this on edit + track
  * add/remove); "Created" uses the JSPF `date` field. Both fall back
@@ -193,9 +232,16 @@ function PlaylistCardLazy({
           if (!e.isIntersecting || startedRef.current) continue;
           startedRef.current = true;
           io.disconnect();
-          fetch(`/api/playlist/${encodeURIComponent(mbid)}/preview`, {
-            credentials: "same-origin",
-          })
+          // Throttle through the module-level semaphore. Hundred
+          // cards scrolling into view at once now queue behind 3 in-
+          // flight fetches at a time rather than fanning out 100
+          // parallel requests through to LB.
+          acquirePreviewSlot()
+            .then(() =>
+              fetch(`/api/playlist/${encodeURIComponent(mbid)}/preview`, {
+                credentials: "same-origin",
+              }),
+            )
             .then((r) => (r.ok ? r.json() : { tracks: [] }))
             .then((data: { tracks?: LbRadioTrack[] }) => {
               setTracks(data.tracks ?? []);
@@ -205,7 +251,8 @@ function PlaylistCardLazy({
               // (disc-icon placeholder) so the card still shows up
               // with its title + metadata.
               setTracks([]);
-            });
+            })
+            .finally(releasePreviewSlot);
         }
       },
       // 300px rootMargin so the fetch fires slightly before the card
