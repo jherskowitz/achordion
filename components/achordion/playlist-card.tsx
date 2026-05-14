@@ -6,6 +6,7 @@ import type {
 } from "@/lib/clients/listenbrainz";
 import { stripHtml } from "@/lib/strip-html";
 import { PlaylistCoverMosaic } from "./playlist-cover-mosaic";
+import { PlaylistVisibilityToggle } from "./playlist-visibility-toggle";
 
 // Inline from `lib/clients/listenbrainz.ts` — see the matching note
 // in `playlists-browser.tsx` for why. Any runtime import from the LB
@@ -46,6 +47,10 @@ export function PlaylistCard({
   entry,
   /** Hide the creator byline when we already know whose page we're on. */
   hideCreatorIfMatches,
+  /** When true, replace the read-only visibility chip with an
+   *  interactive toggle so the owner can flip Public/Private without
+   *  opening the playlist. Non-owners see the static chip. */
+  isOwner = false,
   /** Tracks for the cover mosaic. Three states:
    *    - `undefined` (default): no mosaic renders at all (text-only).
    *    - "loading": mosaic skeleton renders (caller hasn't fetched
@@ -55,6 +60,7 @@ export function PlaylistCard({
 }: {
   entry: LbPlaylistSummary;
   hideCreatorIfMatches?: string;
+  isOwner?: boolean;
   tracks?: LbRadioTrack[] | "loading";
 }) {
   const p = entry.playlist;
@@ -73,6 +79,33 @@ export function PlaylistCard({
   // sentinel maps to `undefined` (skeleton state) at that boundary.
   const mosaicTracks =
     tracks === "loading" ? undefined : (tracks as LbRadioTrack[] | undefined);
+  const isPublic = ext?.public !== false;
+
+  // Visibility affordance: interactive toggle for the owner, static
+  // chip for everyone else. Both wrap in `relative z-10` so the
+  // stretched-link below doesn't intercept clicks on the toggle.
+  const visibilityNode =
+    isOwner && mbid ? (
+      <span className="relative z-10">
+        <PlaylistVisibilityToggle mbid={mbid} initialIsPublic={isPublic} />
+      </span>
+    ) : ext?.public === false ? (
+      <span
+        className="text-muted-foreground/70 inline-flex shrink-0 items-center gap-1 text-[10px] tracking-wide uppercase"
+        title="Private playlist"
+      >
+        <Lock className="size-3" />
+        private
+      </span>
+    ) : (
+      <span
+        className="text-muted-foreground/60 inline-flex shrink-0 items-center gap-1 text-[10px] tracking-wide uppercase"
+        title="Public playlist"
+      >
+        <Globe className="size-3" />
+        public
+      </span>
+    );
 
   const body = (
     <div className="min-w-0 flex-1">
@@ -80,23 +113,7 @@ export function PlaylistCard({
         <h3 className="text-foreground min-w-0 flex-1 truncate text-base font-medium">
           {p.title}
         </h3>
-        {ext?.public === false ? (
-          <span
-            className="text-muted-foreground/70 inline-flex shrink-0 items-center gap-1 text-[10px] tracking-wide uppercase"
-            title="Private playlist"
-          >
-            <Lock className="size-3" />
-            private
-          </span>
-        ) : (
-          <span
-            className="text-muted-foreground/60 inline-flex shrink-0 items-center gap-1 text-[10px] tracking-wide uppercase"
-            title="Public playlist"
-          >
-            <Globe className="size-3" />
-            public
-          </span>
-        )}
+        {visibilityNode}
       </div>
       {(showCreator || dateStr || algoSource || isCollab) && (
         <p className="text-muted-foreground mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs">
@@ -143,20 +160,34 @@ export function PlaylistCard({
     body
   );
 
-  // `overflow-hidden` is the belt-and-suspenders cap on the card —
-  // if anything inside still tries to overflow horizontally, it gets
-  // visually clipped at the card boundary instead of pushing the
-  // card past its column on small screens.
-  const cardClass =
-    "border-border/60 hover:border-foreground/30 hover:bg-muted/30 block overflow-hidden rounded-xl border px-4 py-3 transition-colors";
-  const cardClassStatic =
-    "border-border/60 overflow-hidden rounded-xl border px-4 py-3";
+  // Card wrapper. `relative` is required so the stretched link below
+  // anchors to this element. `overflow-hidden` belt-and-suspenders
+  // caps inner overflow at the card boundary on mobile.
+  //
+  // Why a stretched link instead of wrapping `inner` in a single
+  // <Link>: an interactive child (the visibility toggle) can't be
+  // nested inside an anchor — both clicks would fire, both keyboard
+  // focuses would land, both screen-reader rosters would announce the
+  // anchor as a button. The stretched-link pattern (link absolutely
+  // covers the card; interactive children get `relative z-10` to sit
+  // above) cleanly separates the two click targets without breaking
+  // the "click anywhere on the card to open" affordance.
+  const cardClass = mbid
+    ? "border-border/60 hover:border-foreground/30 hover:bg-muted/30 relative block overflow-hidden rounded-xl border px-4 py-3 transition-colors"
+    : "border-border/60 relative overflow-hidden rounded-xl border px-4 py-3";
 
-  return mbid ? (
-    <Link href={`/playlist/${mbid}`} className={cardClass}>
+  return (
+    <div className={cardClass}>
       {inner}
-    </Link>
-  ) : (
-    <div className={cardClassStatic}>{inner}</div>
+      {mbid && (
+        <Link
+          href={`/playlist/${mbid}`}
+          aria-label={p.title}
+          className="absolute inset-0 z-0 focus-visible:ring-foreground/30 rounded-xl focus-visible:ring-2 focus-visible:outline-none"
+        >
+          <span className="sr-only">{p.title}</span>
+        </Link>
+      )}
+    </div>
   );
 }

@@ -167,9 +167,11 @@ function sortPlaylists(
 function PlaylistCardLazy({
   entry,
   hideCreatorIfMatches,
+  isOwner = false,
 }: {
   entry: LbPlaylistSummary;
   hideCreatorIfMatches?: string;
+  isOwner?: boolean;
 }) {
   const mbid = playlistMbidFromIdentifier(entry.playlist.identifier);
   const ref = useRef<HTMLLIElement>(null);
@@ -220,6 +222,7 @@ function PlaylistCardLazy({
       <PlaylistCard
         entry={entry}
         hideCreatorIfMatches={hideCreatorIfMatches}
+        isOwner={isOwner}
         tracks={tracks}
       />
     </li>
@@ -418,6 +421,7 @@ export function PlaylistsBrowser({
               key={entry.playlist.identifier}
               entry={entry}
               hideCreatorIfMatches={name}
+              isOwner={isSelf}
             />
           ))}
         </ul>
