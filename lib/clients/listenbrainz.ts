@@ -7,12 +7,21 @@ const LB_LABS_BASE = "https://labs.api.listenbrainz.org";
 const USER_AGENT =
   "Achordion/0.1 (+https://github.com/jherskowitz/achordion)";
 
-class ListenBrainzError extends Error {
+export class ListenBrainzError extends Error {
+  // Next.js preserves `digest` across the server→client error boundary
+  // even in production (where the message is sanitized), so we tag
+  // 429 / 503 responses with a known string and let
+  // `app/(app)/error.tsx` show a rate-limit-specific page instead of
+  // the generic fallback. Mirrors the MusicBrainzError pattern.
+  digest?: string;
   constructor(
     public status: number,
     message: string,
   ) {
     super(message);
+    if (status === 429 || status === 503) {
+      this.digest = "LB_RATE_LIMITED";
+    }
   }
 }
 

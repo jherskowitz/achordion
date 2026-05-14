@@ -1,5 +1,8 @@
 import { Suspense } from "react";
-import { getUserPlaylists } from "@/lib/clients/listenbrainz";
+import {
+  getUserPlaylists,
+  ListenBrainzError,
+} from "@/lib/clients/listenbrainz";
 import { auth } from "@/auth";
 import { getLbTokenForRequest } from "@/lib/lb-token";
 import { PageShell } from "@/components/achordion/page-shell";
@@ -51,10 +54,24 @@ async function PlaylistsList({ name }: { name: string }) {
       token ?? undefined,
     );
   } catch (err) {
+    // Friendlier copy than dumping the raw LB error ("LB 429: Too Many
+    // Requests"). Distinguish rate-limit (transient, retry works) from
+    // a real LB outage (try later) so the user knows whether refreshing
+    // is going to help right now.
+    const rateLimited =
+      err instanceof ListenBrainzError && err.status === 429;
     return (
       <EmptyState
-        title="Couldn't load playlists"
-        description={err instanceof Error ? err.message : ""}
+        title={
+          rateLimited
+            ? "ListenBrainz is rate-limiting us"
+            : "Couldn't load playlists"
+        }
+        description={
+          rateLimited
+            ? "Wait a few seconds and reload. ListenBrainz caps how often any one client can pull a user's playlist list."
+            : "ListenBrainz returned an error while loading playlists. Try again in a moment, or check listenbrainz.org for status updates."
+        }
       />
     );
   }

@@ -23,7 +23,13 @@ export default function AppError({
     console.error(error);
   }, [error]);
 
-  const rateLimited = error.digest === "MB_RATE_LIMITED";
+  // Both upstream APIs ship a rate-limit-tagged Error; we treat them
+  // the same in the UI (the "what is this service" sentence picks the
+  // right name based on the digest).
+  const mbRateLimited = error.digest === "MB_RATE_LIMITED";
+  const lbRateLimited = error.digest === "LB_RATE_LIMITED";
+  const rateLimited = mbRateLimited || lbRateLimited;
+  const rateLimitedService = lbRateLimited ? "ListenBrainz" : "MusicBrainz";
 
   function handleRetry() {
     // `reset()` alone re-renders the error boundary's children, but
@@ -53,15 +59,16 @@ export default function AppError({
       </p>
       <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
         {rateLimited
-          ? "We're being rate-limited by MusicBrainz."
+          ? `We're being rate-limited by ${rateLimitedService}.`
           : "We hit a snag loading this page."}
       </h1>
       <p className="text-muted-foreground">
         {rateLimited ? (
           <>
-            MusicBrainz is the open music database powering most of Achordion,
-            and it caps requests at one per second. Try again in a few seconds
-            — once cached, repeat visits don&apos;t hit this limit.
+            {rateLimitedService} is one of the open music services powering
+            Achordion. It caps how often any one client can hit it — try again
+            in a few seconds. Once a page is cached, repeat visits don&apos;t
+            hit this limit.
           </>
         ) : (
           <>
