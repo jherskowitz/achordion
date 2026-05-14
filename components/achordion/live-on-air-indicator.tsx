@@ -5,8 +5,46 @@ import { Radio } from "lucide-react";
 import type { PlayingNowListen } from "@/lib/clients/listenbrainz";
 import { parachordListenAlong } from "@/lib/parachord";
 import { artistHref, recordingHref } from "@/lib/entity-links";
+import { useParachordPresence } from "@/lib/use-parachord-presence";
 import { cn } from "@/lib/utils";
 import { OnAirText } from "./on-air-text";
+
+/**
+ * Fire a one-shot beacon to record that the viewer clicked "Listen
+ * along" with `target` AND Parachord is actually running to honor
+ * the deep link. The beacon is gated on `connected` so we never
+ * record an event that won't be fulfilled (clicking the disabled
+ * "get Parachord" pill is a no-op intent, not an actual listen-
+ * along start).
+ *
+ * `navigator.sendBeacon` is the right primitive — fires reliably
+ * even as the page is being unloaded by the `parachord://`
+ * navigation. Falls back to a no-keepalive fetch if sendBeacon is
+ * unavailable; both are fire-and-forget from the click handler's
+ * perspective.
+ */
+function recordListenAlongEvent(target: string): void {
+  if (typeof navigator === "undefined") return;
+  const body = JSON.stringify({ target });
+  try {
+    if (typeof navigator.sendBeacon === "function") {
+      const blob = new Blob([body], { type: "application/json" });
+      navigator.sendBeacon("/api/listen-along/event", blob);
+      return;
+    }
+    void fetch("/api/listen-along/event", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "same-origin",
+      body,
+      keepalive: true,
+    }).catch(() => {});
+  } catch {
+    // sendBeacon throws synchronously in some quota-exhaustion
+    // states; fall back silently — the click navigation already
+    // fired and the user's primary action is unaffected.
+  }
+}
 
 // Adaptive polling: when the user is actively on-air, run fast (track
 // changes feel snappy on the pill). When they're idle / not playing,
@@ -165,6 +203,10 @@ export function LiveOnAirIndicator({
     };
   }, [username]);
 
+  // Hook must run unconditionally regardless of whether the pill
+  // ends up rendering, so this stays above the early return.
+  const parachordConnected = useParachordPresence();
+
   if (!listen) return null;
 
   const meta = listen.track_metadata;
@@ -205,6 +247,14 @@ export function LiveOnAirIndicator({
     />
   );
 
+  // Only fire the synthetic-event beacon when Parachord is reachable.
+  // Without it, the listen-along link 404s for the user (no app to
+  // hand the parachord:// URL to), and an event with no follow-
+  // through is just noise.
+  const onListenAlongClick = parachordConnected
+    ? () => recordListenAlongEvent(username)
+    : undefined;
+
   if (size === "default") {
     return (
       <div
@@ -228,6 +278,7 @@ export function LiveOnAirIndicator({
           // behavior, which makes tapping look broken to users.
           <a
             href={listenAlongHref}
+            onClick={onListenAlongClick}
             aria-label={`Listen along with ${username} in Parachord`}
             className="bg-primary text-primary-foreground inline-flex h-6 shrink-0 items-center gap-1 rounded-full px-2 text-[10px] font-medium transition-opacity hover:opacity-90"
           >
@@ -265,6 +316,7 @@ export function LiveOnAirIndicator({
         // affordance is self-explanatory without any tooltip.
         <a
           href={listenAlongHref}
+          onClick={onListenAlongClick}
           title={`Listen along with ${username} in Parachord`}
           aria-label={`Listen along with ${username} in Parachord`}
           className="bg-primary/90 text-primary-foreground hover:bg-primary inline-flex size-4 shrink-0 items-center justify-center gap-1 rounded-full transition-colors pointer-coarse:h-6 pointer-coarse:w-auto pointer-coarse:px-2 pointer-coarse:text-[10px] pointer-coarse:font-medium"

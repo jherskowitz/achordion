@@ -11,6 +11,7 @@ import {
   MessageSquareQuote,
   HandHeart,
   Heart,
+  Radio,
   Star,
   Link2,
 } from "lucide-react";
@@ -807,6 +808,51 @@ function BskyFriendLinkedEvent({ event }: { event: FeedEvent }) {
   );
 }
 
+// ─── listen_along ───────────────────────────────────────────────────
+
+interface ListenAlongEventMeta {
+  from_user?: string;
+  to_user?: string;
+}
+
+function ListenAlongEvent({
+  event,
+  viewer,
+}: {
+  event: FeedEvent;
+  viewer: string | null;
+}) {
+  const m = event.metadata as ListenAlongEventMeta | undefined;
+  const fromUser = event.user_name ?? m?.from_user ?? null;
+  const toUser = m?.to_user ?? null;
+  // Two framings depending on which side of the listen-along the
+  // viewer is on. "X tuned into your stream" reads more naturally
+  // when the viewer IS the target than "X listened along with you".
+  const viewerIsTarget =
+    !!viewer && !!toUser && viewer.toLowerCase() === toUser.toLowerCase();
+  return (
+    <EventShell
+      icon={<Radio className="size-4" />}
+      header={
+        <>
+          <UserLink name={fromUser} />{" "}
+          {viewerIsTarget ? (
+            <>tuned into your stream in Parachord</>
+          ) : (
+            <>
+              listened along with <UserLink name={toUser} /> in Parachord
+            </>
+          )}
+          <span className="text-muted-foreground/70">
+            {" · "}
+            <RelativeTime value={event.created} />
+          </span>
+        </>
+      }
+    />
+  );
+}
+
 // ─── mention ────────────────────────────────────────────────────────
 
 interface MentionEventMeta {
@@ -1032,6 +1078,10 @@ export async function FeedEventList({
             return <BskyFriendLinkedEvent event={e} key={key} />;
           case "mention":
             return <MentionEvent event={e} key={key} />;
+          case "listen_along":
+            return (
+              <ListenAlongEvent event={e} viewer={viewer} key={key} />
+            );
           default:
             return null; // unknown event types — quietly skip
         }

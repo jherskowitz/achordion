@@ -159,6 +159,12 @@ export const KNOWN_FLAGS: ReadonlyArray<FlagDefinition> = [
       "Parse `@username` tokens in pin blurbs and render them as profile links. Mentioned users see the pin in their /feed as a synthesised `mention` event and the unread badge counts it.",
   },
   {
+    id: "listen-along-events",
+    label: "Listen-along feed events",
+    description:
+      "Record a synthesised `listen_along` event when a viewer clicks the Listen along pill on another user's on-air indicator AND their Parachord desktop client is confirmed connected. Followers see 'X listened along with Y' cards in their feed; the target sees 'X tuned into your stream' notifications.",
+  },
+  {
     id: "reviews",
     label: "Album reviews",
     description:

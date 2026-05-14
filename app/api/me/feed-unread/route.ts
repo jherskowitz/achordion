@@ -1,9 +1,10 @@
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { getLbTokenForRequest } from "@/lib/lb-token";
-import { getUserFeed } from "@/lib/clients/listenbrainz";
+import { getFollowing, getUserFeed } from "@/lib/clients/listenbrainz";
 import { getBskyFriendLinkEvents } from "@/lib/bsky-friend-events";
 import { getMentionEvents } from "@/lib/mention-events";
+import { getListenAlongEvents } from "@/lib/listen-along-events";
 
 const COOKIE = "feed_seen_ts";
 
@@ -26,29 +27,34 @@ export async function GET() {
   // a brand-new sign-in to flash a "50 unread" badge.
   const cutoff = lastSeenTs ?? Math.floor(Date.now() / 1000);
 
-  // Parallel-fetch the three sources: native LB feed + Achordion-
-  // side bsky-friend-linked + Achordion-side @-mention synthetic
-  // events. All fail-soft so any one outage doesn't suppress the
-  // others' contribution to the count.
-  const [events, bskyFriendEvents, mentionEvents] = await Promise.all([
-    getUserFeed(viewer, token, { count: 50 }),
-    getBskyFriendLinkEvents(viewer, cutoff).catch(() => []),
-    getMentionEvents(viewer, cutoff).catch(() => []),
-  ]);
+  // Parallel-fetch every source: native LB feed + Achordion-side
+  // synthetic events (bsky-friend-linked, @-mention, listen-along).
+  // All fail-soft so any one outage doesn't suppress the others'
+  // contribution to the count. `following` is needed by the listen-
+  // along reader; fetch it once and share.
+  const followingPromise = getFollowing(viewer).catch(() => [] as string[]);
+  const [events, bskyFriendEvents, mentionEvents, listenAlongEvents] =
+    await Promise.all([
+      getUserFeed(viewer, token, { count: 50 }),
+      getBskyFriendLinkEvents(viewer, cutoff).catch(() => []),
+      getMentionEvents(viewer, cutoff).catch(() => []),
+      followingPromise.then((following) =>
+        getListenAlongEvents(viewer, following, cutoff).catch(() => []),
+      ),
+    ]);
+  const syntheticCount =
+    bskyFriendEvents.length + mentionEvents.length + listenAlongEvents.length;
   if (events === null) {
-    // LB feed unreachable — fall back to just the synthetic-side
-    // counts so the badge still reflects new friend-link / mention
-    // events.
+    // LB feed unreachable — fall back to the synthetic-side count so
+    // the badge still reflects new friend-link / mention / listen-
+    // along events.
     return Response.json(
-      {
-        count: bskyFriendEvents.length + mentionEvents.length,
-        lastSeenTs,
-      },
+      { count: syntheticCount, lastSeenTs },
       { status: 200 },
     );
   }
 
-  let count = bskyFriendEvents.length + mentionEvents.length;
+  let count = syntheticCount;
   for (const e of events) {
     if ((e.user_name ?? "") === viewer) continue;
     if (e.created > cutoff) count++;

@@ -10,6 +10,7 @@ import {
 import { getLbTokenForRequest } from "@/lib/lb-token";
 import { getBskyFriendLinkEvents } from "@/lib/bsky-friend-events";
 import { getMentionEvents } from "@/lib/mention-events";
+import { getListenAlongEvents } from "@/lib/listen-along-events";
 import { PageShell } from "@/components/achordion/page-shell";
 import { EmptyState } from "@/components/achordion/empty-state";
 import { FeedEventList } from "@/components/achordion/feed-event-list";
@@ -57,29 +58,47 @@ async function FeedBody({
   // The page's `excludeSelf` filter still hides own activity when
   // requested. Cached at the LB-client layer; steady-state cost is
   // mostly cache hits.
-  const [events, lovedEvents, bskyFriendEvents, mentionEvents] =
-    await Promise.all([
-      getUserFeed(name, token, { count: 50 }),
-      getFollowing(name)
-        .catch(() => [] as string[])
-        .then((following) => {
-          const targets = [name, ...following.filter((u) => u !== name)];
-          return getLovedRecordingEvents(targets).catch(
-            () => [] as FeedEvent[],
-          );
-        }),
-      // Bluesky-friend-linked synthetic events. Passing `null` for
-      // `sinceUnix` so the feed shows every match (the unread-count
-      // endpoint applies its own cutoff for the badge). Fails-soft
-      // to an empty list — Bluesky outage or feature-flag-off
-      // returns nothing and the rest of the feed still renders.
-      getBskyFriendLinkEvents(name, null).catch(() => [] as FeedEvent[]),
-      // @-mention synthetic events. Anyone who pinned a track and
-      // tagged this viewer with `@<viewer>` in the blurb. Same
-      // shape contract as the bsky events above — fails-soft on
-      // Upstash or flag-off.
-      getMentionEvents(name, null).catch(() => [] as FeedEvent[]),
-    ]);
+  // Resolve `following` once at the top so both loved-events and
+  // listen-along-events can reuse it. Without this, both code paths
+  // would fire their own getFollowing() call, doubling the LB read
+  // cost for the merge.
+  const followingPromise = getFollowing(name).catch(() => [] as string[]);
+  const [
+    events,
+    lovedEvents,
+    bskyFriendEvents,
+    mentionEvents,
+    listenAlongEvents,
+  ] = await Promise.all([
+    getUserFeed(name, token, { count: 50 }),
+    followingPromise.then((following) => {
+      const targets = [name, ...following.filter((u) => u !== name)];
+      return getLovedRecordingEvents(targets).catch(
+        () => [] as FeedEvent[],
+      );
+    }),
+    // Bluesky-friend-linked synthetic events. Passing `null` for
+    // `sinceUnix` so the feed shows every match (the unread-count
+    // endpoint applies its own cutoff for the badge). Fails-soft
+    // to an empty list — Bluesky outage or feature-flag-off
+    // returns nothing and the rest of the feed still renders.
+    getBskyFriendLinkEvents(name, null).catch(() => [] as FeedEvent[]),
+    // @-mention synthetic events. Anyone who pinned a track and
+    // tagged this viewer with `@<viewer>` in the blurb. Same
+    // shape contract as the bsky events above — fails-soft on
+    // Upstash or flag-off.
+    getMentionEvents(name, null).catch(() => [] as FeedEvent[]),
+    // Listen-along synthetic events. Recorded server-side when an
+    // actor (viewer or followed user) clicks "Listen along" with a
+    // confirmed-connected Parachord client. We pull events where
+    // the actor is in viewer's following list OR the viewer is the
+    // target. Same fails-soft contract as the others.
+    followingPromise.then((following) =>
+      getListenAlongEvents(name, following, null).catch(
+        () => [] as FeedEvent[],
+      ),
+    ),
+  ]);
   if (events === null) {
     return (
       <EmptyState
@@ -102,6 +121,7 @@ async function FeedBody({
     ...lovedEvents,
     ...bskyFriendEvents,
     ...mentionEvents,
+    ...listenAlongEvents,
   ].sort((a, b) => b.created - a.created);
   const sliced = merged.slice(0, 50);
   const filtered = excludeSelf
