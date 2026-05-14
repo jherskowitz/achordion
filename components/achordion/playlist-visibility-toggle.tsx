@@ -3,7 +3,11 @@
 import { useState, useTransition } from "react";
 import { Globe, Loader2, Lock } from "lucide-react";
 import { setPlaylistVisibilityAction } from "@/app/(app)/playlist/[mbid]/actions";
-import { IconTooltip } from "@/components/ui/icon-tooltip";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
 /**
@@ -47,25 +51,34 @@ export function PlaylistVisibilityToggle({
 
   return (
     <span className="inline-flex flex-col items-start gap-1">
-      <IconTooltip label={title}>
-        <button
-          type="button"
-          onClick={flip}
-          disabled={pending}
-          aria-label={title}
-          className={cn(
-            "border-border/60 hover:border-foreground/40 hover:bg-muted/40 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] tracking-wide uppercase transition-colors disabled:opacity-60",
-            isPublic
-              ? "text-muted-foreground"
-              : "text-foreground bg-muted/30",
-          )}
-        >
-          <Icon
-            className={cn("size-3", pending && "animate-spin")}
-          />
-          {label}
-        </button>
-      </IconTooltip>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            onClick={flip}
+            disabled={pending}
+            aria-label={title}
+            className={cn(
+              "border-border/60 hover:border-foreground/40 hover:bg-muted/40 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] tracking-wide uppercase transition-colors disabled:opacity-60",
+              isPublic
+                ? "text-muted-foreground"
+                : "text-foreground bg-muted/30",
+            )}
+          >
+            <Icon
+              className={cn("size-3", pending && "animate-spin")}
+            />
+            {label}
+          </button>
+        </TooltipTrigger>
+        {/* Radix Tooltip portals out of the DOM, so the tip escapes
+            the playlist card's overflow-hidden boundary. The earlier
+            IconTooltip variant was CSS-only and got clipped on
+            `/user/<owner>/playlists` cards. */}
+        <TooltipContent className="max-w-[18rem] text-center text-xs">
+          {title}
+        </TooltipContent>
+      </Tooltip>
       {error && (
         <span className="text-destructive text-[11px]">{error}</span>
       )}
