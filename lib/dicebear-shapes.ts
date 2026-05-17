@@ -38,15 +38,35 @@ const SHAPE_COLORS = [
   "e2e8f0", // soft paper
 ].join(",");
 
-const DICEBEAR_BASE = "https://api.dicebear.com/9.x/shapes/svg";
+const DICEBEAR_SVG_BASE = "https://api.dicebear.com/9.x/shapes/svg";
+const DICEBEAR_PNG_BASE = "https://api.dicebear.com/9.x/shapes/png";
 
-export function dicebearShapesUrl(seed: string): string {
+function buildParams(seed: string, extra?: Record<string, string>): URLSearchParams {
   const params = new URLSearchParams({
     seed: seed.toLowerCase(),
     backgroundColor: BG_COLORS,
     shape1Color: SHAPE_COLORS,
     shape2Color: SHAPE_COLORS,
     shape3Color: SHAPE_COLORS,
+    ...extra,
   });
-  return `${DICEBEAR_BASE}?${params}`;
+  return params;
+}
+
+export function dicebearShapesUrl(seed: string): string {
+  return `${DICEBEAR_SVG_BASE}?${buildParams(seed)}`;
+}
+
+/**
+ * PNG variant for surfaces that can't render the SVG variant —
+ * specifically `next/og` (satori) for Open Graph images, where the
+ * `<img>` SVG fetch + content-type detection drops the avatar
+ * silently. DiceBear renders the same seed deterministically across
+ * formats, so the OG image and the in-app avatar visually match.
+ *
+ * `size` defaults to 512 — large enough for OG's 516×516 cell
+ * without scaling blur, small enough to keep the fetch cheap.
+ */
+export function dicebearShapesPngUrl(seed: string, size = 512): string {
+  return `${DICEBEAR_PNG_BASE}?${buildParams(seed, { size: String(size) })}`;
 }

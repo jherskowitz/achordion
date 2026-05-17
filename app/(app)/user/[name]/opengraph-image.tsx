@@ -1,7 +1,7 @@
 import { ImageResponse } from "next/og";
 import { getUserTopArtists } from "@/lib/clients/listenbrainz";
 import { getBskyDisplayProfile } from "@/lib/bsky-display";
-import { dicebearShapesUrl } from "@/lib/dicebear-shapes";
+import { dicebearShapesPngUrl } from "@/lib/dicebear-shapes";
 
 /**
  * Dynamic Open Graph image for `/user/<name>`.
@@ -36,7 +36,10 @@ export default async function UserOg({ params }: OgProps) {
 
   // Avatar override: prefer the linked Bluesky avatar.
   const bskyDisplay = await getBskyDisplayProfile(name, null).catch(() => null);
-  const avatarUrl = bskyDisplay?.avatar ?? dicebearShapesUrl(name);
+  // PNG variant required here — satori (next/og) doesn't render
+  // DiceBear's SVG URL reliably. Bluesky avatars are already PNG/
+  // JPEG so they pass through unchanged.
+  const avatarUrl = bskyDisplay?.avatar ?? dicebearShapesPngUrl(name, 516);
 
   const currentlyInto =
     topArtists.length > 0
