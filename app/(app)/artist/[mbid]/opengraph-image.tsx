@@ -1,6 +1,7 @@
 import { ImageResponse } from "next/og";
 import { getArtist } from "@/lib/clients/musicbrainz";
 import { resolveArtistImage } from "@/components/achordion/artist-avatar";
+import { dicebearShapesPngUrl } from "@/lib/dicebear-shapes";
 
 /**
  * Dynamic Open Graph image for `/artist/<mbid>`.
@@ -69,38 +70,26 @@ export default async function ArtistOg({ params }: OgProps) {
             backgroundColor: "#171717",
           }}
         >
-          {hero.url ? (
-            <img
-              src={hero.url}
-              alt=""
-              width={516}
-              height={516}
-              style={{
-                width: 516,
-                height: 516,
-                objectFit: "cover",
-                borderRadius: 999,
-                boxShadow: "0 24px 64px rgba(0, 0, 0, 0.6)",
-              }}
-            />
-          ) : (
-            <div
-              style={{
-                width: 516,
-                height: 516,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                borderRadius: 999,
-                backgroundColor: "#262626",
-                color: "#737373",
-                fontSize: 200,
-                fontWeight: 700,
-              }}
-            >
-              {artist.name.slice(0, 1).toUpperCase()}
-            </div>
-          )}
+          <img
+            // Hero photo when Wikidata / fanart.tv produced one;
+            // DiceBear shapes seeded by MBID otherwise — mirrors the
+            // in-app <ArtistAvatar> fallback so an artist who shows
+            // up as a coloured shape in the app shows up as the
+            // same shape on shared links. PNG variant required for
+            // satori (the SVG variant doesn't render reliably under
+            // next/og — same reason the user OG uses PNG too).
+            src={hero.url ?? dicebearShapesPngUrl(mbid, 516)}
+            alt=""
+            width={516}
+            height={516}
+            style={{
+              width: 516,
+              height: 516,
+              objectFit: "cover",
+              borderRadius: 999,
+              boxShadow: "0 24px 64px rgba(0, 0, 0, 0.6)",
+            }}
+          />
         </div>
 
         <div
