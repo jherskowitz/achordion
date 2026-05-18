@@ -132,11 +132,21 @@ export async function indexListenAlong(opts: {
 
 /**
  * Return listen-along events relevant to `viewer`:
- *   - Events where `viewer` is in their `following` list as the actor.
- *   - Events where `viewer` is the target (someone tuned into them).
+ *   - Events where the viewer is the **actor** (their own clicks),
+ *     so the feed reads "You listened along with X" alongside the
+ *     viewer's loves / pins / etc.
+ *   - Events where the viewer is the **target** (someone tuned
+ *     into their stream).
+ *   - Events where the **actor is in viewer's following list**
+ *     (someone they follow tuned into someone else).
+ *
+ * The three streams overlap on edges where the viewer is following
+ * themselves (impossible — filtered out below) or where the viewer
+ * is BOTH the target and a follower of the actor; the (fromUser,
+ * toUser, created) dedupe collapses those collisions.
  *
  * Caller must supply the viewer's following list — we don't refetch
- * it here, the feed page already has it in scope from its native
+ * it here; the feed page already has it in scope from its native
  * feed merge.
  *
  * Returns events newer than `since` (unix seconds), oldest → newest.
@@ -149,11 +159,17 @@ export async function getListenAlongEventsForViewer(
 ): Promise<ListenAlongEvent[]> {
   if (!redis || !viewer) return [];
   try {
-    // Pull the target-side index for the viewer (who tuned into
-    // them), plus each followed user's actor-side index (what those
-    // users have tuned into recently). The two streams will overlap
-    // on entries where viewer is following the actor AND is the
-    // target — dedupe by (fromUser, toUser, created).
+    // Three index reads in parallel: viewer-as-actor, viewer-as-
+    // target, and each followed user's actor-side. Self appears in
+    // its own actor slot regardless of whether the viewer follows
+    // themselves; filter `viewer` out of `following` so the followed-
+    // actor chunk doesn't double-pull the same slot.
+    const viewerActorPromise = redis.zrange<string[]>(
+      fromKey(viewer),
+      since,
+      "+inf",
+      { byScore: true },
+    );
     const targetSidePromise = redis.zrange<string[]>(toKey(viewer), since, "+inf", {
       byScore: true,
     });
@@ -166,7 +182,8 @@ export async function getListenAlongEventsForViewer(
             .catch(() => [] as string[]),
         ),
     );
-    const [targetSide, followedActorChunks] = await Promise.all([
+    const [viewerActor, targetSide, followedActorChunks] = await Promise.all([
+      viewerActorPromise,
       targetSidePromise,
       followedActorPromise,
     ]);
@@ -191,6 +208,7 @@ export async function getListenAlongEventsForViewer(
         // skip malformed entries
       }
     };
+    for (const s of viewerActor) pushUnique(s);
     for (const s of targetSide) pushUnique(s);
     for (const chunk of followedActorChunks) {
       for (const s of chunk) pushUnique(s);

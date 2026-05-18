@@ -825,9 +825,17 @@ function ListenAlongEvent({
   const m = event.metadata as ListenAlongEventMeta | undefined;
   const fromUser = event.user_name ?? m?.from_user ?? null;
   const toUser = m?.to_user ?? null;
-  // Two framings depending on which side of the listen-along the
-  // viewer is on. "X tuned into your stream" reads more naturally
-  // when the viewer IS the target than "X listened along with you".
+  // Three framings depending on which side of the listen-along the
+  // viewer is on:
+  //   - viewer is the actor:   "You listened along with X in Parachord"
+  //   - viewer is the target:  "X tuned into your stream in Parachord"
+  //   - viewer is a follower:  "X listened along with Y in Parachord"
+  //
+  // The actor-side framing is the one that surfaces a user's own
+  // listen-along clicks in their own feed alongside their pins /
+  // loves / etc.
+  const viewerIsActor =
+    !!viewer && !!fromUser && viewer.toLowerCase() === fromUser.toLowerCase();
   const viewerIsTarget =
     !!viewer && !!toUser && viewer.toLowerCase() === toUser.toLowerCase();
   return (
@@ -835,12 +843,20 @@ function ListenAlongEvent({
       icon={<Radio className="size-4" />}
       header={
         <>
-          <UserLink name={fromUser} />{" "}
-          {viewerIsTarget ? (
-            <>tuned into your stream in Parachord</>
+          {viewerIsActor ? (
+            <>
+              <span className="text-foreground">You</span> listened along
+              with <UserLink name={toUser} /> in Parachord
+            </>
+          ) : viewerIsTarget ? (
+            <>
+              <UserLink name={fromUser} /> tuned into your stream in
+              Parachord
+            </>
           ) : (
             <>
-              listened along with <UserLink name={toUser} /> in Parachord
+              <UserLink name={fromUser} /> listened along with{" "}
+              <UserLink name={toUser} /> in Parachord
             </>
           )}
           <span className="text-muted-foreground/70">
