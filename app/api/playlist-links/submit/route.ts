@@ -47,20 +47,34 @@ function bearer(request: NextRequest): string | null {
 }
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
+  // Log every hit on this route so we can disambiguate "Parachord
+  // isn't calling us" from "Parachord is calling us but auth is
+  // failing" from "auth passes but the body is being rejected." A
+  // single log per attempt with a short tag makes the failure mode
+  // visible in `vercel logs` without needing to grep.
   const expected = process.env.PARACHORD_TRACK_LINKS_TOKEN;
   if (!expected) {
+    console.warn("[pl-links] submit: endpoint not configured (PARACHORD_TRACK_LINKS_TOKEN unset)");
     return NextResponse.json(
       { ok: true, recorded: false, reason: "endpoint not configured" },
       { status: 200, headers: NO_STORE },
     );
   }
   const presented = bearer(request);
-  if (!presented || presented !== expected) {
+  if (!presented) {
+    console.warn("[pl-links] submit: rejected (no bearer token in Authorization header)");
+    return NextResponse.json({ error: "unauthorized" }, { status: 401, headers: NO_STORE });
+  }
+  if (presented !== expected) {
+    console.warn(
+      `[pl-links] submit: rejected (bearer mismatch — presented ${presented.length}-char token, expected ${expected.length}-char)`,
+    );
     return NextResponse.json({ error: "unauthorized" }, { status: 401, headers: NO_STORE });
   }
 
   const limit = await checkRateLimit("announcement-event", request);
   if (!limit.ok) {
+    console.warn("[pl-links] submit: rate-limited");
     return NextResponse.json({ error: "rate limited" }, { status: 429, headers: NO_STORE });
   }
 
@@ -68,11 +82,15 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     body = await request.json();
   } catch {
+    console.warn("[pl-links] submit: invalid JSON");
     return NextResponse.json({ error: "invalid JSON" }, { status: 400, headers: NO_STORE });
   }
 
   const parsed = BodySchema.safeParse(body);
   if (!parsed.success) {
+    console.warn(
+      `[pl-links] submit: invalid body — ${parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ")}`,
+    );
     return NextResponse.json(
       { error: "invalid body", issues: parsed.error.issues },
       { status: 400, headers: NO_STORE },
@@ -95,5 +113,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     updatedAt: Date.now(),
   });
 
+  console.log(
+    `[pl-links] submit: mbid=${parsed.data.mbid} links=${links.length} recorded=${recorded}`,
+  );
   return NextResponse.json({ ok: true, recorded }, { headers: NO_STORE });
 }
