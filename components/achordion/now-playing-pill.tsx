@@ -3,6 +3,7 @@ import { Radio } from "lucide-react";
 import { auth } from "@/auth";
 import { CoverArt } from "./cover-art";
 import { IconTooltip } from "@/components/ui/icon-tooltip";
+import { ListenAlongLink } from "./listen-along-link";
 import { caaUrlFromListen } from "@/lib/clients/coverart";
 import { parachordListenAlong } from "@/lib/parachord";
 import { artistHref, recordingHref } from "@/lib/entity-links";
@@ -65,7 +66,8 @@ export async function NowPlayingPill({
       </div>
       {username && !isOwnUser && (
         <IconTooltip label={`Listen along with ${username} in Parachord`}>
-          <a
+          <ListenAlongLink
+            target={username}
             href={parachordListenAlong({
               service: "listenbrainz",
               user: username,
@@ -74,7 +76,7 @@ export async function NowPlayingPill({
           >
             <Radio className="size-3" />
             Listen along
-          </a>
+          </ListenAlongLink>
         </IconTooltip>
       )}
     </div>
