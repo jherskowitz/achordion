@@ -165,6 +165,12 @@ export const KNOWN_FLAGS: ReadonlyArray<FlagDefinition> = [
       "Record a synthesised `listen_along` event when a viewer clicks the Listen along pill on another user's on-air indicator AND their Parachord desktop client is confirmed connected. Followers see 'X listened along with Y' cards in their feed; the target sees 'X tuned into your stream' notifications.",
   },
   {
+    id: "playlist-published-events",
+    label: "Playlist-published feed events",
+    description:
+      "Record a synthesised `playlist_published` event when a user flips a playlist from private → public via the Edit Playlist modal or the inline visibility toggle. Followers of the owner see 'X published a playlist' cards on /feed; the reader re-checks visibility on render so a flipped-back playlist is filtered out.",
+  },
+  {
     id: "reviews",
     label: "Album reviews",
     description:

@@ -11,6 +11,7 @@ import { getLbTokenForRequest } from "@/lib/lb-token";
 import { getBskyFriendLinkEvents } from "@/lib/bsky-friend-events";
 import { getMentionEvents } from "@/lib/mention-events";
 import { getListenAlongEvents } from "@/lib/listen-along-events";
+import { getPlaylistPublishedEvents } from "@/lib/playlist-events";
 import { PageShell } from "@/components/achordion/page-shell";
 import { EmptyState } from "@/components/achordion/empty-state";
 import { FeedEventList } from "@/components/achordion/feed-event-list";
@@ -69,6 +70,7 @@ async function FeedBody({
     bskyFriendEvents,
     mentionEvents,
     listenAlongEvents,
+    playlistPublishedEvents,
   ] = await Promise.all([
     getUserFeed(name, token, { count: 50 }),
     followingPromise.then((following) => {
@@ -98,6 +100,15 @@ async function FeedBody({
         () => [] as FeedEvent[],
       ),
     ),
+    // Playlist-published synthetic events. Recorded when a followed
+    // user flips a playlist private → public. The reader re-checks
+    // visibility on render so a flipped-back playlist doesn't tease
+    // followers with a now-private link.
+    followingPromise.then((following) =>
+      getPlaylistPublishedEvents(name, following, null).catch(
+        () => [] as FeedEvent[],
+      ),
+    ),
   ]);
   if (events === null) {
     return (
@@ -122,6 +133,7 @@ async function FeedBody({
     ...bskyFriendEvents,
     ...mentionEvents,
     ...listenAlongEvents,
+    ...playlistPublishedEvents,
   ].sort((a, b) => b.created - a.created);
   const sliced = merged.slice(0, 50);
   const filtered = excludeSelf

@@ -853,6 +853,48 @@ function ListenAlongEvent({
   );
 }
 
+// ─── playlist_published ─────────────────────────────────────────────
+
+interface PlaylistPublishedEventMeta {
+  mbid?: string;
+  owner?: string;
+  title?: string;
+}
+
+function PlaylistPublishedEvent({ event }: { event: FeedEvent }) {
+  const m = event.metadata as PlaylistPublishedEventMeta | undefined;
+  const owner = event.user_name ?? m?.owner ?? null;
+  const mbid = m?.mbid ?? null;
+  const title = m?.title ?? "a playlist";
+  return (
+    <EventShell
+      icon={<Music className="size-4" />}
+      header={
+        <>
+          <UserLink name={owner} /> published a playlist
+          <span className="text-muted-foreground/70">
+            {" · "}
+            <RelativeTime value={event.created} />
+          </span>
+        </>
+      }
+    >
+      <p className="text-foreground/90 mt-1 text-sm">
+        {mbid ? (
+          <Link
+            href={`/playlist/${mbid}`}
+            className="hover:underline underline-offset-4"
+          >
+            {title}
+          </Link>
+        ) : (
+          <span>{title}</span>
+        )}
+      </p>
+    </EventShell>
+  );
+}
+
 // ─── mention ────────────────────────────────────────────────────────
 
 interface MentionEventMeta {
@@ -1082,6 +1124,8 @@ export async function FeedEventList({
             return (
               <ListenAlongEvent event={e} viewer={viewer} key={key} />
             );
+          case "playlist_published":
+            return <PlaylistPublishedEvent event={e} key={key} />;
           default:
             return null; // unknown event types — quietly skip
         }

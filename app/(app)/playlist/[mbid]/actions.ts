@@ -9,6 +9,8 @@ import {
   getPlaylist,
   type PlaylistEditFields,
 } from "@/lib/clients/listenbrainz";
+import { isFeatureEnabled } from "@/lib/flags";
+import { indexPlaylistPublished } from "@/lib/playlist-published-index";
 
 export type EditResult =
   | { ok: true }
@@ -17,7 +19,18 @@ export type EditResult =
 async function loadOwnedPlaylist(
   mbid: string,
 ): Promise<
-  | { ok: true; viewer: string; token: string; collaborators: string[] }
+  | {
+      ok: true;
+      viewer: string;
+      token: string;
+      collaborators: string[];
+      /** Pre-edit visibility, captured so callers can detect the
+       *  false → true transition for the playlist_published event. */
+      currentIsPublic: boolean;
+      /** Pre-edit title, used as the playlist_published headline
+       *  when the title doesn't change in this edit. */
+      currentTitle: string;
+    }
   | { ok: false; reason: string }
 > {
   const session = await auth();
@@ -48,7 +61,44 @@ async function loadOwnedPlaylist(
     viewer,
     token,
     collaborators: current.collaborators,
+    currentIsPublic: current.isPublic,
+    currentTitle: current.title,
   };
+}
+
+/**
+ * Fire a `playlist_published` synthetic feed event when a playlist
+ * transitions from private → public. Gated behind the
+ * `playlist-published-events` flag; fails-soft so a flag-off or
+ * Upstash outage never breaks the edit/visibility action itself.
+ *
+ * Same fan-out pattern as `loved_recording`, `mention`, and
+ * `listen_along` — `lib/playlist-events.ts` is the reader.
+ */
+async function maybeRecordPublishedEvent(opts: {
+  mbid: string;
+  owner: string;
+  title: string;
+  wasPublic: boolean;
+  isPublic: boolean;
+}): Promise<void> {
+  // Only the false → true edge fires. No-op edits, already-public
+  // edits, or true → false transitions never produce an event.
+  if (opts.wasPublic) return;
+  if (!opts.isPublic) return;
+  try {
+    if (!(await isFeatureEnabled("playlist-published-events", opts.owner))) {
+      return;
+    }
+    await indexPlaylistPublished({
+      mbid: opts.mbid,
+      owner: opts.owner,
+      title: opts.title,
+    });
+  } catch {
+    // Synthetic-event fan-out failure shouldn't break the
+    // user-visible edit. Swallow + move on.
+  }
 }
 
 function bustCache(mbid: string, viewer: string) {
@@ -102,6 +152,13 @@ export async function setPlaylistVisibilityAction(
     };
   }
   bustCache(mbid, ctx.viewer);
+  await maybeRecordPublishedEvent({
+    mbid,
+    owner: ctx.viewer,
+    title: ctx.currentTitle,
+    wasPublic: ctx.currentIsPublic,
+    isPublic,
+  });
   return { ok: true, isPublic };
 }
 
@@ -151,6 +208,16 @@ export async function editPlaylistAction(
     };
   }
   bustCache(mbid, ctx.viewer);
+  await maybeRecordPublishedEvent({
+    mbid,
+    owner: ctx.viewer,
+    // Title may have changed in this edit — use the incoming title
+    // so the feed event reflects what the playlist is called *after*
+    // the publish, not its private working title.
+    title: fields.title ?? ctx.currentTitle,
+    wasPublic: ctx.currentIsPublic,
+    isPublic: input.isPublic,
+  });
   return { ok: true };
 }
 

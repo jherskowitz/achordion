@@ -5,6 +5,7 @@ import { getFollowing, getUserFeed } from "@/lib/clients/listenbrainz";
 import { getBskyFriendLinkEvents } from "@/lib/bsky-friend-events";
 import { getMentionEvents } from "@/lib/mention-events";
 import { getListenAlongEvents } from "@/lib/listen-along-events";
+import { getPlaylistPublishedEvents } from "@/lib/playlist-events";
 
 const COOKIE = "feed_seen_ts";
 
@@ -28,26 +29,37 @@ export async function GET() {
   const cutoff = lastSeenTs ?? Math.floor(Date.now() / 1000);
 
   // Parallel-fetch every source: native LB feed + Achordion-side
-  // synthetic events (bsky-friend-linked, @-mention, listen-along).
-  // All fail-soft so any one outage doesn't suppress the others'
-  // contribution to the count. `following` is needed by the listen-
-  // along reader; fetch it once and share.
+  // synthetic events (bsky-friend-linked, @-mention, listen-along,
+  // playlist-published). All fail-soft so any one outage doesn't
+  // suppress the others' contribution to the count. `following` is
+  // needed by the listen-along and playlist-published readers;
+  // fetch it once and share.
   const followingPromise = getFollowing(viewer).catch(() => [] as string[]);
-  const [events, bskyFriendEvents, mentionEvents, listenAlongEvents] =
-    await Promise.all([
-      getUserFeed(viewer, token, { count: 50 }),
-      getBskyFriendLinkEvents(viewer, cutoff).catch(() => []),
-      getMentionEvents(viewer, cutoff).catch(() => []),
-      followingPromise.then((following) =>
-        getListenAlongEvents(viewer, following, cutoff).catch(() => []),
-      ),
-    ]);
+  const [
+    events,
+    bskyFriendEvents,
+    mentionEvents,
+    listenAlongEvents,
+    playlistPublishedEvents,
+  ] = await Promise.all([
+    getUserFeed(viewer, token, { count: 50 }),
+    getBskyFriendLinkEvents(viewer, cutoff).catch(() => []),
+    getMentionEvents(viewer, cutoff).catch(() => []),
+    followingPromise.then((following) =>
+      getListenAlongEvents(viewer, following, cutoff).catch(() => []),
+    ),
+    followingPromise.then((following) =>
+      getPlaylistPublishedEvents(viewer, following, cutoff).catch(() => []),
+    ),
+  ]);
   const syntheticCount =
-    bskyFriendEvents.length + mentionEvents.length + listenAlongEvents.length;
+    bskyFriendEvents.length +
+    mentionEvents.length +
+    listenAlongEvents.length +
+    playlistPublishedEvents.length;
   if (events === null) {
     // LB feed unreachable — fall back to the synthetic-side count so
-    // the badge still reflects new friend-link / mention / listen-
-    // along events.
+    // the badge still reflects new synthetic events.
     return Response.json(
       { count: syntheticCount, lastSeenTs },
       { status: 200 },
