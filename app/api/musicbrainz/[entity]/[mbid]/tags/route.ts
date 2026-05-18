@@ -1,7 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { revalidateTag } from "next/cache";
 import { z } from "zod";
 import { auth } from "@/auth";
 import { decode } from "next-auth/jwt";
+import { cacheTagsMB } from "@/lib/clients/musicbrainz";
 import {
   submitTagVote,
   TagApiError,
@@ -71,6 +73,22 @@ function parseEntity(value: string): TagEntity | null {
   return ALLOWED_ENTITIES.has(value as TagEntity)
     ? (value as TagEntity)
     : null;
+}
+
+/** Map the TagEntity kebab-case string to the matching MB cache-tag
+ *  helper (cacheTagsMB uses camelCase keys). Centralised here so the
+ *  post-vote revalidation doesn't drift if the cache-tag set changes. */
+function cacheTagsForEntity(entity: TagEntity, mbid: string): string {
+  switch (entity) {
+    case "release-group":
+      return cacheTagsMB.releaseGroup(mbid);
+    case "artist":
+      return cacheTagsMB.artist(mbid);
+    case "release":
+      return cacheTagsMB.release(mbid);
+    case "recording":
+      return cacheTagsMB.recording(mbid);
+  }
 }
 
 /**
@@ -245,6 +263,13 @@ export async function POST(
 
   try {
     await submitTagVote({ entity, mbid, tag, vote, accessToken });
+    // Bust our cached MB read for this entity so the new vote
+    // surfaces on the next page render. Without this, getRecording /
+    // getReleaseGroup / getArtist would keep returning the pre-vote
+    // tags+genres shape from Next's data cache for up to 24h (our
+    // default MB cache revalidate window). The genres-vs-tags union
+    // we render is still correct — the data going in is what's stale.
+    revalidateTag(cacheTagsForEntity(entity, mbid), "max");
   } catch (err) {
     if (err instanceof TagAuthError) {
       return NextResponse.json(
