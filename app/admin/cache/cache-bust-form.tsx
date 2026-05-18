@@ -66,7 +66,9 @@ export function CacheBustForm() {
         </select>
       </label>
       <label className="block">
-        <span className="text-muted-foreground mb-1 block text-xs">MBID</span>
+        <span className="text-muted-foreground mb-1 block text-xs">
+          {entity === "playlist" ? "Playlist ID" : "MBID"}
+        </span>
         <input
           type="text"
           value={mbid}
@@ -75,6 +77,13 @@ export function CacheBustForm() {
           placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
           className="border-border/60 bg-background block h-9 w-full max-w-md rounded-md border px-2 font-mono text-sm"
         />
+        {entity === "playlist" && (
+          <span className="text-muted-foreground/70 mt-1 block text-[11px]">
+            The UUID from a /playlist/&lt;id&gt; URL — ListenBrainz
+            generates these, MusicBrainz proper doesn&apos;t have
+            playlists as an entity.
+          </span>
+        )}
       </label>
       <div className="flex items-center gap-3">
         <button
