@@ -27,6 +27,7 @@ import {
   resolveArtistImage,
 } from "@/components/achordion/artist-avatar";
 import { fanartArtistUrl } from "@/lib/clients/fanart";
+import { mergeTagsAndGenres } from "@/lib/merge-tags-genres";
 import { TagChips } from "@/components/achordion/tag-chips";
 import {
   Tooltip,
@@ -156,10 +157,9 @@ async function ArtistBody({
     },
   ];
 
-  const tags = (artist.genres?.length ? artist.genres : artist.tags ?? [])
-    .filter((t) => t.count > 0)
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 8);
+  // Union genres + tags so user-added tags don't disappear behind
+  // the curated-genre list. See lib/merge-tags-genres.ts.
+  const tags = mergeTagsAndGenres(artist.tags, artist.genres);
 
   return (
     <>

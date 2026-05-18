@@ -16,6 +16,7 @@ import {
   type ReleaseGroupListeners,
 } from "@/lib/clients/listenbrainz";
 import { caaReleaseGroupUrl } from "@/lib/clients/coverart";
+import { mergeTagsAndGenres } from "@/lib/merge-tags-genres";
 import { PageHeader } from "@/components/achordion/page-header";
 import {
   EntityHeaderStats,
@@ -188,14 +189,9 @@ async function AlbumBody({ mbid }: { mbid: string }) {
       ]
     : [];
 
-  // Genre / tag chips. Mirrors the recording page — capped at 8,
-  // sorted by editor-vote count, used by TagChips for the inline
-  // chip row below the header.
-  const tagsSource = rg.genres?.length ? rg.genres : rg.tags ?? [];
-  const tags = tagsSource
-    .filter((t) => t.count > 0)
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 8);
+  // Union genres + tags so user-added tags don't get hidden behind
+  // the curated-genre list. See lib/merge-tags-genres.ts.
+  const tags = mergeTagsAndGenres(rg.tags, rg.genres);
   const year = rg["first-release-date"]?.slice(0, 4);
   const albumType =
     rg["primary-type"] ??

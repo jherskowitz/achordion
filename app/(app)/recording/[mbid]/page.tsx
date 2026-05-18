@@ -10,6 +10,7 @@ import {
 } from "@/lib/clients/musicbrainz";
 import { getRecordingPopularity } from "@/lib/clients/listenbrainz";
 import { caaReleaseUrl } from "@/lib/clients/coverart";
+import { mergeTagsAndGenres } from "@/lib/merge-tags-genres";
 import { parachordPlayAlbum, parachordPlayTrack } from "@/lib/parachord";
 import { CoverArt } from "@/components/achordion/cover-art";
 import { PlayOnHoverFab } from "@/components/achordion/play-on-hover-fab";
@@ -112,13 +113,9 @@ async function RecordingBody({ mbid }: { mbid: string }) {
       return { url: normalised, label: tooltipLabel(link), host };
     })
     .filter((x): x is { url: string; label: string; host: string } => x !== null);
-  const tags = (recording.genres?.length
-    ? recording.genres
-    : recording.tags ?? []
-  )
-    .filter((t) => t.count > 0)
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 8);
+  // Union genres + tags so user-added tags don't disappear behind
+  // the curated-genre list. See lib/merge-tags-genres.ts.
+  const tags = mergeTagsAndGenres(recording.tags, recording.genres);
   const releaseDate = recording["first-release-date"]?.slice(0, 4) ?? null;
 
   return (
