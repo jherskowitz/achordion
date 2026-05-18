@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { z } from "zod";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { setPlaylistLinks, type PlaylistLink } from "@/lib/playlist-links-store";
@@ -112,6 +113,18 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     links,
     updatedAt: Date.now(),
   });
+
+  // Bust both the LB-side playlist data cache (so getPlaylist re-
+  // fetches even though the playlist mirror-links aren't in that
+  // call's response shape — the bust is cheap and keeps the page's
+  // upstream data fresh) and the page path itself, so the new
+  // "Listen on" row appears on the next visit without waiting for
+  // the s-maxage=3600 / swr=86400 edge window. Mirrors the
+  // track-links/submit behaviour.
+  if (recorded) {
+    revalidateTag(`lb:playlist:${parsed.data.mbid}`, "max");
+    revalidatePath(`/playlist/${parsed.data.mbid}`);
+  }
 
   console.log(
     `[pl-links] submit: mbid=${parsed.data.mbid} links=${links.length} recorded=${recorded}`,

@@ -785,6 +785,10 @@ Parachord push endpoint for playlist mirror-link mappings. Accepts:
 
 Storage: per-MBID Redis key with 90-day TTL via `lib/playlist-links-store.ts`. Source is always `"parachord"`. Same bearer (`PARACHORD_TRACK_LINKS_TOKEN`) and same rate-limit class as track-links/submit.
 
+Cache busting: on successful write, the submit route calls `revalidateTag('lb:playlist:<mbid>')` + `revalidatePath('/playlist/<mbid>')` so the new "Listen on" favicon row appears on the next visit instead of waiting out the page's `s-maxage=3600, stale-while-revalidate=86400` edge cache. Without this, even a known-good submit can sit invisible on the page for up to 25 hours.
+
+Diagnostics: every attempt logs a `[pl-links] submit: …` line with the failure mode (`endpoint not configured` / `no bearer token` / `bearer mismatch` / `rate-limited` / `invalid JSON` / `invalid body` / `mbid=… recorded=…`). For one-off cache busting, `/admin/cache` accepts `entity=playlist` + a UUID and runs the same `revalidateTag` + `revalidatePath` pair. To peek at the stored entry, `GET /api/admin/playlist-links?mbid=<uuid>` returns the raw `PlaylistLinksEntry` (admin-only).
+
 Used by `/playlist/<mbid>` page to render "Listen on Spotify / Apple Music / ListenBrainz" links. Also surfaced via `/api/entity-link?type=playlist` as the canonical URL for sharing.
 
 ### Entity-link lookup (GET `/api/entity-link`)
