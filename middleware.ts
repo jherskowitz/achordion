@@ -133,14 +133,124 @@ export async function middleware(request: NextRequest) {
   if (!isPrefetch) {
     const rl = await checkRateLimit("page", request);
     if (!rl.ok) {
-      return new NextResponse("Too Many Requests", {
-        status: 429,
-        headers: { "Retry-After": "60" },
-      });
+      return rateLimitedResponse();
     }
   }
 
   return NextResponse.next();
+}
+
+/**
+ * Render a styled HTML 429 instead of plaintext "Too Many Requests".
+ *
+ * The middleware short-circuits before Next's routing, so the app's
+ * `error.tsx` boundary never sees this — we have to ship a complete
+ * HTML document ourselves. Kept minimal (inline styles, no JS) so it
+ * works the same in edge runtime as it would on any static host.
+ *
+ * Copy parity with `app/(app)/error.tsx` for the upstream-rate-limit
+ * page so users see consistent framing whether the rate-limit is on
+ * MB / LB (upstream) or on Achordion's per-IP middleware (here).
+ */
+function rateLimitedResponse(): NextResponse {
+  const body = `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex" />
+<title>Slow down a sec · Achordion</title>
+<style>
+  :root { color-scheme: dark light; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    background: #0a0a0a;
+    color: #fafafa;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+  main {
+    max-width: 640px;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+  .eyebrow {
+    font-size: 14px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: #a3a3a3;
+  }
+  h1 {
+    font-size: clamp(28px, 5vw, 40px);
+    line-height: 1.1;
+    margin: 0;
+    letter-spacing: -0.5px;
+  }
+  p { margin: 0; color: #a3a3a3; line-height: 1.5; }
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 8px;
+  }
+  a.btn, button.btn {
+    display: inline-flex;
+    align-items: center;
+    padding: 8px 14px;
+    border-radius: 8px;
+    text-decoration: none;
+    font-size: 14px;
+    cursor: pointer;
+    border: 1px solid transparent;
+    background: #7c3aed;
+    color: white;
+    font-family: inherit;
+  }
+  a.btn.outline, button.btn.outline {
+    background: transparent;
+    border-color: rgba(255, 255, 255, 0.2);
+    color: inherit;
+  }
+  a.btn:hover, button.btn:hover { opacity: 0.9; }
+  @media (prefers-color-scheme: light) {
+    body { background: #fafafa; color: #0a0a0a; }
+    p, .eyebrow { color: #525252; }
+    a.btn.outline, button.btn.outline { border-color: rgba(0, 0, 0, 0.15); }
+  }
+</style>
+</head>
+<body>
+<main>
+  <p class="eyebrow">Slow down a sec</p>
+  <h1>You're hitting Achordion a little faster than we can serve.</h1>
+  <p>
+    Our per-IP rate limiter just kicked in. This usually clears in
+    under a minute — try again shortly. If you keep seeing this on a
+    normal click, let us know on
+    <a href="https://achordion.fider.io/" style="color:inherit;text-decoration:underline;text-underline-offset:4px;">Fider</a>.
+  </p>
+  <div class="actions">
+    <button class="btn" onclick="location.reload()">Try again</button>
+    <a class="btn outline" href="/">Back to home</a>
+  </div>
+</main>
+</body>
+</html>`;
+  return new NextResponse(body, {
+    status: 429,
+    headers: {
+      "Content-Type": "text/html; charset=utf-8",
+      "Cache-Control": "no-store",
+      "Retry-After": "60",
+    },
+  });
 }
 
 export const config = {
