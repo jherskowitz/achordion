@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { toast } from "sonner";
 import {
@@ -34,6 +35,7 @@ export function PinTrackDialog({ open, onOpenChange, track }: Props) {
   const [blurb, setBlurb] = useState("");
   const [pinnedUntil, setPinnedUntil] = useState("");
   const [pending, startTransition] = useTransition();
+  const router = useRouter();
   const { data: session } = useSession();
   const viewerName = session?.user?.mbUsername;
 
@@ -82,6 +84,12 @@ export function PinTrackDialog({ open, onOpenChange, track }: Props) {
         : undefined;
       toast.success("Pinned to your profile", action ? { action } : undefined);
       onOpenChange(false);
+      // Re-render whichever profile page the viewer is currently on
+      // so the new pin appears without waiting for the next manual
+      // navigation. Server-side caches were busted by the action's
+      // revalidateTag + revalidatePath calls, so this is a cheap
+      // refetch from the now-fresh data cache.
+      router.refresh();
     });
   }
 

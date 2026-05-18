@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidateTag } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { auth } from "@/auth";
 import { getLbTokenForRequest } from "@/lib/lb-token";
 import {
@@ -70,6 +70,19 @@ export async function pinTrackAction(input: {
       blurb: input.blurb,
       pinnedUntil: input.pinnedUntil,
     });
+    // Bust both cache layers so a fresh pin shows up immediately
+    // wherever the viewer lands next:
+    //   - Data cache tag (`lb:user:<viewer>:pins`) keys every
+    //     getUserPins call regardless of `count=` (Overview uses
+    //     count=1 via getCurrentPin; Pins tab uses count=50; feed
+    //     event hydrator uses count=25). One tag bust evicts all
+    //     three URL-keyed slots.
+    //   - Route paths so the RSC caches for the profile pages bust
+    //     too; otherwise the user navigates back and Next serves a
+    //     stale render even after the data cache is fresh.
+    revalidateTag(`lb:user:${auth.viewer}:pins`, "max");
+    revalidatePath(`/user/${auth.viewer}`);
+    revalidatePath(`/user/${auth.viewer}/pins`);
     return { ok: true };
   } catch (e) {
     return {
