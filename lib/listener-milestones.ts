@@ -3,7 +3,7 @@ import "server-only";
 import { unstable_cache } from "next/cache";
 import {
   getListeningActivity,
-  getUserTopArtists,
+  getUserDistinctArtistCount,
 } from "@/lib/clients/listenbrainz";
 
 /**
@@ -32,7 +32,10 @@ export interface Milestone {
 
 interface RawData {
   totalPlays: number;
-  distinctArtists: number;
+  /** LB's `total_artist_count` — exact lifetime distinct-artist count,
+   *  or null when LB didn't include the field (older deployments) so
+   *  we skip the chip rather than render a misleading "0 artists". */
+  distinctArtists: number | null;
   currentStreakDays: number;
   /** Year of the user's first non-empty listening-activity bucket,
    *  or null when we can't determine it from the all-time data. */
@@ -40,19 +43,19 @@ interface RawData {
 }
 
 async function fetchData(name: string): Promise<RawData> {
-  const [activityAllTime, activityMonth, topArtists] = await Promise.all([
+  const [activityAllTime, activityMonth, distinctArtists] = await Promise.all([
     getListeningActivity(name, "all_time").catch(
       () => [] as Awaited<ReturnType<typeof getListeningActivity>>,
     ),
     getListeningActivity(name, "month").catch(
       () => [] as Awaited<ReturnType<typeof getListeningActivity>>,
     ),
-    // Pull a wide window of top artists — we only need the count,
-    // so a count=500 ceiling is fine. LB caps the response and the
-    // .length is our "distinct artists" floor. (The endpoint may
-    // return a `total_artist_count` field; we read the array
-    // length to avoid coupling to that optional field.)
-    getUserTopArtists(name, "all_time", 500).catch(() => []),
+    // LB exposes the exact lifetime distinct-artist count as
+    // `total_artist_count` on the top-artists payload. Use the
+    // count=1 variant so we don't pull 500 artist rows just to
+    // count them. Returns null on outage / older LB; we treat
+    // null as "unknown" and skip the chip.
+    getUserDistinctArtistCount(name, "all_time"),
   ]);
 
   // Total plays = sum of all-time bucket listen_counts. LB's
@@ -85,7 +88,7 @@ async function fetchData(name: string): Promise<RawData> {
 
   return {
     totalPlays,
-    distinctArtists: topArtists.length,
+    distinctArtists,
     currentStreakDays,
     firstListenYear,
   };
@@ -116,21 +119,13 @@ function composeMilestones(data: RawData): Milestone[] {
     });
   }
 
-  if (data.distinctArtists >= 50) {
-    // The LB top-artists fetch is capped at 500 rows — when the
-    // returned array has 500 entries the real distinct-artist
-    // count is "500 or more, we don't know how many more." Show
-    // the chip as a floor (">500 artists") rather than implying
-    // an exact count we don't have.
-    const capped = data.distinctArtists >= 500;
+  if (data.distinctArtists !== null && data.distinctArtists >= 50) {
+    // LB exposes the exact count via `total_artist_count`, so the
+    // chip is precise — no more ">500 artists" floor.
     out.push({
       id: "distinct-artists",
-      label: capped
-        ? ">500 artists"
-        : `${formatPlayCount(data.distinctArtists)} artists`,
-      why: capped
-        ? "At least 500 distinct artists in their listening history (we ask ListenBrainz for up to 500 — they have at least that many)."
-        : `${data.distinctArtists.toLocaleString()} distinct artists in their listening history.`,
+      label: `${formatPlayCount(data.distinctArtists)} artists`,
+      why: `${data.distinctArtists.toLocaleString()} distinct artists in their listening history.`,
     });
   }
 
@@ -162,11 +157,12 @@ export async function getListenerMilestones(
   if (!name) return [];
   const cached = unstable_cache(
     async () => composeMilestones(await fetchData(name)),
-    // v2 — distinct-artists chip switched to ">500 artists" /
-    // expanded `why` copy when the LB top-500 cap is hit. Older
-    // cache entries still have the v1 label/why and would render
-    // misleading "500 artists" exact-count chips otherwise.
-    ["listener-milestones-v2", name.toLowerCase()],
+    // v3 — distinct-artists chip now reads LB's exact
+    // `total_artist_count` instead of the count=500 array length.
+    // Bumping the cache key evicts older entries that may still
+    // hold the v2 ">500 artists" floor label even for users who
+    // now have an exact count available.
+    ["listener-milestones-v3", name.toLowerCase()],
     {
       revalidate: 86400,
       tags: [`listener-milestones:${name.toLowerCase()}`],

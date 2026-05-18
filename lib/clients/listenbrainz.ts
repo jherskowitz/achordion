@@ -1177,6 +1177,39 @@ export async function getUserTopArtists(
   }
 }
 
+/**
+ * Cheap fetch for "how many distinct artists has this user ever
+ * listened to" without pulling the full top-artists list. LB's
+ * top-artists response includes a `total_artist_count` field
+ * alongside the (paginated) array — request count=1 to keep the
+ * payload tiny and read just that number.
+ *
+ * Used by the listener-milestones chip to render an exact count
+ * instead of the previous ">500 artists" floor (which was a
+ * workaround for capping `getUserTopArtists` at 500 rows and
+ * reading `.length`). See issue #61.
+ *
+ * Returns `null` when LB doesn't include the field (older
+ * deployments) so callers can fall back to a less-precise chip.
+ */
+export async function getUserDistinctArtistCount(
+  name: string,
+  range: StatRange = "all_time",
+): Promise<number | null> {
+  try {
+    const params = new URLSearchParams({ range, count: "1" });
+    const result = await lbFetch(
+      `/stats/user/${encodeURIComponent(name)}/artists?${params}`,
+      StatTopArtistsSchema,
+      { revalidate: 60 * 60, tags: [cacheTagsLB.userStats(name)] },
+    );
+    return result.payload.total_artist_count ?? null;
+  } catch (err) {
+    if (err instanceof ListenBrainzError && err.status === 204) return 0;
+    return null;
+  }
+}
+
 const StatTopReleaseGroupsSchema = z.object({
   payload: z.object({
     release_groups: z.array(
