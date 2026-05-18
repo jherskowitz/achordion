@@ -184,3 +184,22 @@ export async function revalidateMbEntity(input: unknown): Promise<void> {
           : `mb:recording:${mbid}`;
   revalidateTag(key, "max");
 }
+
+/**
+ * Bust the cached playlist page so a Parachord-submitted mirror-link
+ * (or any other out-of-band Upstash update) surfaces without waiting
+ * for the s-maxage=3600 / swr=86400 window. Also busts the LB-side
+ * playlist data cache tag so getPlaylist re-fetches.
+ */
+const RevalidatePlaylistSchema = z.object({
+  mbid: z
+    .string()
+    .regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i),
+});
+
+export async function revalidatePlaylist(input: unknown): Promise<void> {
+  await requireAdmin();
+  const { mbid } = RevalidatePlaylistSchema.parse(input);
+  revalidateTag(`lb:playlist:${mbid}`, "max");
+  revalidatePath(`/playlist/${mbid}`);
+}

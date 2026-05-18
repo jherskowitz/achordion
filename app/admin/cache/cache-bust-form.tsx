@@ -2,9 +2,15 @@
 
 import { useState, useTransition } from "react";
 import { Check, AlertCircle } from "lucide-react";
-import { revalidateMbEntity } from "../actions";
+import { revalidateMbEntity, revalidatePlaylist } from "../actions";
 
-const ENTITIES = ["recording", "release-group", "artist", "release"] as const;
+const ENTITIES = [
+  "recording",
+  "release-group",
+  "artist",
+  "release",
+  "playlist",
+] as const;
 
 export function CacheBustForm() {
   const [entity, setEntity] =
@@ -24,7 +30,11 @@ export function CacheBustForm() {
     setStatus({ kind: "idle" });
     startTransition(async () => {
       try {
-        await revalidateMbEntity({ entity, mbid: trimmed });
+        if (entity === "playlist") {
+          await revalidatePlaylist({ mbid: trimmed });
+        } else {
+          await revalidateMbEntity({ entity, mbid: trimmed });
+        }
         setStatus({ kind: "ok", entity, mbid: trimmed });
       } catch (err) {
         setStatus({
