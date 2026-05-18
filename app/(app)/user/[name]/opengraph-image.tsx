@@ -2,6 +2,7 @@ import { ImageResponse } from "next/og";
 import { getUserTopArtists } from "@/lib/clients/listenbrainz";
 import { getBskyDisplayProfile } from "@/lib/bsky-display";
 import { dicebearShapesPngUrl } from "@/lib/dicebear-shapes";
+import { OgBrand } from "@/app/_og-brand";
 
 /**
  * Dynamic Open Graph image for `/user/<name>`.
@@ -146,36 +147,11 @@ export default async function UserOg({ params }: OgProps) {
             )}
           </div>
 
-          <Brand />
+          <OgBrand />
         </div>
       </div>
     ),
     size,
-  );
-}
-
-function Brand() {
-  return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 10,
-        fontSize: 20,
-        color: "#a3a3a3",
-      }}
-    >
-      <span
-        style={{
-          width: 12,
-          height: 12,
-          borderRadius: 999,
-          backgroundColor: "#7c3aed",
-        }}
-      />
-      <span style={{ fontWeight: 600, color: "#fafafa" }}>achordion</span>
-      <span>· People-powered music discovery</span>
-    </div>
   );
 }
 

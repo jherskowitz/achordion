@@ -2,6 +2,7 @@ import { ImageResponse } from "next/og";
 import { getArtist } from "@/lib/clients/musicbrainz";
 import { resolveArtistImage } from "@/components/achordion/artist-avatar";
 import { dicebearShapesPngUrl } from "@/lib/dicebear-shapes";
+import { OgBrand } from "@/app/_og-brand";
 
 /**
  * Dynamic Open Graph image for `/artist/<mbid>`.
@@ -142,7 +143,7 @@ export default async function ArtistOg({ params }: OgProps) {
               </span>
             )}
           </div>
-          <Brand />
+          <OgBrand />
         </div>
       </div>
     ),
@@ -156,31 +157,6 @@ function pickTopName(
   if (!entries || entries.length === 0) return null;
   const sorted = [...entries].sort((a, b) => b.count - a.count);
   return sorted[0]?.name ?? null;
-}
-
-function Brand() {
-  return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 10,
-        fontSize: 20,
-        color: "#a3a3a3",
-      }}
-    >
-      <span
-        style={{
-          width: 12,
-          height: 12,
-          borderRadius: 999,
-          backgroundColor: "#7c3aed",
-        }}
-      />
-      <span style={{ fontWeight: 600, color: "#fafafa" }}>achordion</span>
-      <span>· People-powered music discovery</span>
-    </div>
-  );
 }
 
 function fallback() {
@@ -197,12 +173,14 @@ function fallback() {
           backgroundColor: "#0a0a0a",
           color: "#fafafa",
           fontFamily: "system-ui",
+          // Wordmark + tagline get a touch larger in the centered
+          // fallback layout so the empty slot doesn't read as a
+          // miniature card. OgBrand's intrinsic sizing carries the
+          // rhythm; the wrapper just provides centering.
+          gap: 8,
         }}
       >
-        <span style={{ fontSize: 72, fontWeight: 700 }}>achordion</span>
-        <span style={{ fontSize: 28, color: "#a3a3a3", marginTop: 16 }}>
-          People-powered music discovery
-        </span>
+        <OgBrand />
       </div>
     ),
     size,

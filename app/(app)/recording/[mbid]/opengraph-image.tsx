@@ -5,6 +5,7 @@ import {
   type RecordingRelease,
 } from "@/lib/clients/musicbrainz";
 import { caaReleaseUrl } from "@/lib/clients/coverart";
+import { OgBrand } from "@/app/_og-brand";
 
 /**
  * Dynamic Open Graph image for `/recording/<mbid>`.
@@ -151,7 +152,7 @@ export default async function RecordingOg({ params }: OgProps) {
               </span>
             )}
           </div>
-          <Brand />
+          <OgBrand />
         </div>
       </div>
     ),
@@ -181,31 +182,6 @@ function formatLength(ms: number | null | undefined): string | null {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
-function Brand() {
-  return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 10,
-        fontSize: 20,
-        color: "#a3a3a3",
-      }}
-    >
-      <span
-        style={{
-          width: 12,
-          height: 12,
-          borderRadius: 999,
-          backgroundColor: "#7c3aed",
-        }}
-      />
-      <span style={{ fontWeight: 600, color: "#fafafa" }}>achordion</span>
-      <span>· People-powered music discovery</span>
-    </div>
-  );
-}
-
 function fallback() {
   return new ImageResponse(
     (
@@ -220,12 +196,10 @@ function fallback() {
           backgroundColor: "#0a0a0a",
           color: "#fafafa",
           fontFamily: "system-ui",
+          gap: 8,
         }}
       >
-        <span style={{ fontSize: 72, fontWeight: 700 }}>achordion</span>
-        <span style={{ fontSize: 28, color: "#a3a3a3", marginTop: 16 }}>
-          People-powered music discovery
-        </span>
+        <OgBrand />
       </div>
     ),
     size,
