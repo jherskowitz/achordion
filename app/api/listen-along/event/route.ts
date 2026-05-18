@@ -43,27 +43,30 @@ const NO_STORE = {
 };
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
+  // Log every attempt so "I clicked Listen along but nothing shows
+  // up" can be debugged from `vercel logs` without guessing whether
+  // the beacon landed. Each branch tags its outcome.
   const session = await auth();
   const viewer = session?.user?.mbUsername;
   if (!viewer) {
+    console.warn("[listen-along] beacon: rejected (no session)");
     return NextResponse.json(
       { error: "not signed in" },
       { status: 401, headers: NO_STORE },
     );
   }
   if (!(await isFeatureEnabled("listen-along-events", viewer))) {
-    // Flag-off → silently accept the beacon (200) and drop. The
-    // client doesn't need to know the feature isn't on — beacons
-    // are fire-and-forget anyway.
+    console.warn(
+      `[listen-along] beacon: dropped (flag off for viewer=${viewer})`,
+    );
     return NextResponse.json({ ok: true, recorded: false }, { headers: NO_STORE });
   }
 
   let body: unknown;
   try {
-    // sendBeacon usually ships as `application/json` when given a
-    // Blob; tolerate either content-type by routing through .json().
     body = await request.json();
   } catch {
+    console.warn(`[listen-along] beacon: invalid JSON viewer=${viewer}`);
     return NextResponse.json(
       { error: "invalid body" },
       { status: 400, headers: NO_STORE },
@@ -71,15 +74,19 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
   const parsed = BodySchema.safeParse(body);
   if (!parsed.success) {
+    console.warn(
+      `[listen-along] beacon: invalid payload viewer=${viewer} — ${parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ")}`,
+    );
     return NextResponse.json(
       { error: "invalid payload" },
       { status: 400, headers: NO_STORE },
     );
   }
   const { target } = parsed.data;
-  // No self-listen-along — same rule the indexer enforces, but
-  // surfacing it here saves the Redis roundtrip on the obvious case.
   if (target.toLowerCase() === viewer.toLowerCase()) {
+    console.warn(
+      `[listen-along] beacon: self-target dropped viewer=${viewer}`,
+    );
     return NextResponse.json({ ok: true, recorded: false }, { headers: NO_STORE });
   }
 
@@ -87,5 +94,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     fromUser: viewer,
     toUser: target,
   });
+  console.log(
+    `[listen-along] beacon: viewer=${viewer} target=${target} recorded=${recorded}`,
+  );
   return NextResponse.json({ ok: true, recorded }, { headers: NO_STORE });
 }
