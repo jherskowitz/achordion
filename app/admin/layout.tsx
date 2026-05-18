@@ -61,6 +61,7 @@ export default async function AdminLayout({
             <AdminNavLink href="/admin">Overview</AdminNavLink>
             <AdminNavLink href="/admin/flags">Feature flags</AdminNavLink>
             <AdminNavLink href="/admin/announcements">Announcements</AdminNavLink>
+            <AdminNavLink href="/admin/cache">Cache</AdminNavLink>
           </nav>
           {children}
         </PageShell>

@@ -149,3 +149,38 @@ export async function saveAnnouncements(items: unknown): Promise<void> {
   revalidatePath("/api/announcements");
   revalidatePath("/", "layout");
 }
+
+// ─── Manual MB / LB cache busts ─────────────────────────────────────
+
+/**
+ * Bust a single MB entity cache slot. Useful when a MB-side write
+ * (e.g. a tag vote made before we wired revalidate-on-vote, or an
+ * edit performed directly on musicbrainz.org) hasn't surfaced on
+ * Achordion because the Next data cache is still holding the
+ * pre-write response.
+ *
+ * Entity strings match the TagEntity union: `artist`, `release-group`,
+ * `recording`, `release`. Wrapper around `revalidateTag` so the admin
+ * UI / a quick API hit can target by MBID without juggling the cache-
+ * tag string format directly.
+ */
+const RevalidateEntitySchema = z.object({
+  entity: z.enum(["artist", "release-group", "recording", "release"]),
+  mbid: z
+    .string()
+    .regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i),
+});
+
+export async function revalidateMbEntity(input: unknown): Promise<void> {
+  await requireAdmin();
+  const { entity, mbid } = RevalidateEntitySchema.parse(input);
+  const key =
+    entity === "release-group"
+      ? `mb:release-group:${mbid}`
+      : entity === "artist"
+        ? `mb:artist:${mbid}`
+        : entity === "release"
+          ? `mb:release:${mbid}`
+          : `mb:recording:${mbid}`;
+  revalidateTag(key, "max");
+}
