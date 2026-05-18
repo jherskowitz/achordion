@@ -389,17 +389,19 @@ DEL announcements:json         # clear every banner
 
 LB's feed endpoint emits pins / loves / recommendations / follows from the viewer's network. Anything OUTSIDE that — bsky-friend linkages, @-mention pings, future Achordion-specific surfaces — gets merged into `/feed` as **synthetic FeedEvent objects** that share the LB FeedEvent shape so `<FeedEventList>` can branch on `event_type` and render them in one pass.
 
-Three live today, all following the same pattern:
+Five live today, all following the same pattern:
 
-| Helper | Source | Event type |
-|---|---|---|
-| `getLovedRecordingEvents()` | fan-out over viewer's following → each user's recent feedback | `loved_recording` |
-| `getBskyFriendLinkEvents()` | reverse `bsky-link-by-did` lookup against viewer's Bluesky follows | `bsky_friend_linked` |
-| `getMentionEvents()` | Upstash mention-index (sorted set per mentioned user) | `mention` |
+| Helper | Source | Event type | Flag |
+|---|---|---|---|
+| `getLovedRecordingEvents()` | fan-out over viewer's following → each user's recent feedback | `loved_recording` | _(unflagged)_ |
+| `getBskyFriendLinkEvents()` | reverse `bsky-link-by-did` lookup against viewer's Bluesky follows | `bsky_friend_linked` | `bsky-link` |
+| `getMentionEvents()` | Upstash mention-index (sorted set per mentioned user) | `mention` | `mentions` |
+| `getListenAlongEvents()` | Upstash listen-along index (dual-keyed actor + target), beacon-driven from `<LiveOnAirIndicator>` only when `useParachordPresence()` confirms connected | `listen_along` | `listen-along-events` |
+| `getPlaylistPublishedEvents()` | Upstash playlist-published index (sorted set per owner), recorded on the false→true `isPublic` edge inside `setPlaylistVisibilityAction` / `editPlaylistAction`. Reader re-checks visibility on render so a flipped-back playlist filters out | `playlist_published` | `playlist-published-events` |
 
 **Where they get merged**:
-- `app/(app)/feed/page.tsx` — fetches LB's `getUserFeed` + all three synthetics in parallel, merges, sorts by `created` desc, slices to 50, hands the array to `<FeedEventList>`.
-- `app/api/me/feed-unread/route.ts` — same three synthetics counted alongside LB events for the badge + browser-notification trigger. All fail-soft (Promise.all with .catch fallbacks) so any single source going down doesn't suppress the others.
+- `app/(app)/feed/page.tsx` — fetches LB's `getUserFeed` + all five synthetics in parallel, merges, sorts by `created` desc, slices to 50, hands the array to `<FeedEventList>`. The `following` list is resolved once at the top and shared with the readers that need it (`loved_recording`, `listen_along`, `playlist_published`) so we don't fan out N parallel `getFollowing()` calls.
+- `app/api/me/feed-unread/route.ts` — same synthetics counted alongside LB events for the badge + browser-notification trigger. All fail-soft (Promise.all with .catch fallbacks) so any single source going down doesn't suppress the others.
 
 **Each renderer in `feed-event-list.tsx`** is a small function that takes the FeedEvent + reads its `metadata` payload as a typed shape; renderers branch via the central `switch (e.event_type)` block at the bottom of the file. Adding a fourth event type is the smallest possible PR: add a helper that returns `FeedEvent[]`, register a constant for the event-type string, write a renderer function, add a case to the switch.
 
@@ -536,6 +538,12 @@ When an action mutates data that's surfaced by both a server-rendered page AND a
 Call `revalidatePath(...)` on every affected path in addition to the tag bust. Reference implementation: `bustCache()` in `app/(app)/playlist/[mbid]/actions.ts` — busts `lb:playlist:<mbid>` and `lb:user:<viewer>:playlists` tags, and revalidates the four affected paths (`/user/<viewer>/playlists`, `/user/<viewer>`, `/api/user/<viewer>/playlists`, `/api/playlist/<mbid>/preview`).
 
 Rule of thumb: every URL that surfaces the mutated data should be in the `revalidatePath` list. Skipping the API-route paths is the easy miss — they don't show up in `git grep` for the page route.
+
+### Manual cache bust via the admin Cache tab
+
+For stale slots that happen out of band — a tag vote performed before `revalidateTag` was wired in, an edit made directly on musicbrainz.org, a Parachord-side write whose submit auto-bust failed quietly — the `/admin/cache` page exposes a manual revalidate. Accepts entity = `recording` / `release-group` / `artist` / `release` (MB cache tags) or `playlist` (busts the `lb:playlist:<mbid>` tag + `/playlist/<mbid>` page path) + a UUID. Backed by the `revalidateMbEntity` / `revalidatePlaylist` server actions in `app/admin/actions.ts`. Admin-only; useful when you don't want to wait out the 24h MB-cache / 60-min playlist-page revalidate window.
+
+Companion read-through: `GET /api/admin/playlist-links?mbid=<uuid>` returns the raw `PlaylistLinksEntry` from Upstash so you can confirm whether Parachord's submit landed before deciding the page render is the bug.
 
 ---
 

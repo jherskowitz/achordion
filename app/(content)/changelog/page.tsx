@@ -27,6 +27,25 @@ interface ChangelogEntry {
 
 const ENTRIES: ChangelogEntry[] = [
   {
+    date: "2026-05-18",
+    intro:
+      "Playlist pages get a real second life — a browsable playlists tab with filter, sort, and inline edit; mirror links from Parachord; exact stats; and two new kinds of activity events: 'listened along with' and 'published a playlist'.",
+    highlights: [
+      "Playlists tab on every profile is now a full browser. Search-as-you-type filter, sort by Modified / Created / Title, lazy-loaded 2×2 cover mosaics that stream in as you scroll, Load more to walk past the first hundred entries, and (on your own profile) a Public / Private / All pill so you can scope the list down. Mosaic covers come from a tagged cache so revisiting feels instant.",
+      "Inline Public/Private toggle on every playlist card on your own profile — flip visibility from the row without opening each playlist. Each card is now its own click target with a stretched-link pattern, so the toggle pill captures its clicks independently of the navigation.",
+      "Delete Playlist in the per-playlist overflow menu (owner-only). Confirmation dialog, then redirects to your Playlists tab.",
+      "External links for playlists. When Parachord syncs a playlist to Spotify / Apple Music / wherever, those mirror URLs render as favicon tiles right next to the playlist's overflow menu — same shape as recording and album pages. ListenBrainz links are filtered out (Achordion is already a LB mirror), and Parachord-side updates surface immediately on the page now that the submit endpoint busts the page cache on success.",
+      "Radio Rewind station pages picked up the same overflow menu as playlists, so XSPF download / share / open-in-Parachord actions live in the consistent spot.",
+      "Distinct-artist chip on profiles now shows the exact lifetime count (e.g. '8.6k artists') instead of capping at '>500 artists'. Reads the dedicated total straight from ListenBrainz's stats payload.",
+      "Activity feed picks up two new event kinds — both behind a flag during early rollout: 'X listened along with Y in Parachord' (fires when a viewer with Parachord open clicks the Listen along pill on someone's on-air widget), and 'X published a playlist' (fires when a followed user flips a playlist from private to public). Privacy gate on the playlist event re-checks visibility on render, so a flipped-back playlist quietly drops out.",
+      "Pinned songs appear on your profile instantly after you pin. The pin action now busts the right cache slots and refreshes the page in place — no more 'why isn't my new pin showing up' delay across the Overview vs Pins tab.",
+      "Open Graph cards across every entity now use the real Achordion wordmark with the tagline stacked beneath it, instead of the prior bullet-and-text row. Profile cards without a linked Bluesky get a colourful DiceBear avatar in the preview; artist cards without a hero photo also get a DiceBear stand-in seeded by the artist MBID — same visual their in-app avatar already uses.",
+      "Tag voting on track / album / artist pages: tags you add show up immediately and stay across refreshes (the genres list and the user-tags list now merge into one chip row, instead of the genres list hiding any non-curated tags you added). The vote also busts our cached read of the entity so the new chip appears on the next render rather than a day later.",
+      "When ListenBrainz rate-limits us mid-page-load, the page now shows a clear 'ListenBrainz is rate-limiting us' message with retry guidance instead of dumping the raw 429 string. Per-IP rate-limit hits on our own middleware show a styled 'Slow down a sec' page with Try again / Back to home buttons instead of plaintext 'Too Many Requests'.",
+      "Profile-tab nav no longer renders a phantom vertical scrollbar on hover (an active-tab underline was protruding 1px past the nav's content box).",
+    ],
+  },
+  {
     date: "2026-05-12",
     intro:
       "Rich preview cards when you share Achordion links anywhere, @mentions in pin comments, and a tidier Settings page.",
