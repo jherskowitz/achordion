@@ -9,6 +9,7 @@ import { OpenInParachordButton } from "@/components/achordion/open-in-parachord-
 import { PageShell } from "@/components/achordion/page-shell";
 import { RadioRewindRow } from "@/components/achordion/radio-rewind-row";
 import { StationCover } from "@/components/achordion/station-cover";
+import { TrackListActionsMenu } from "@/components/achordion/track-list-actions-menu";
 
 // User asked for "refreshes on each load" — opt every render of this
 // route into dynamic mode, even with future caching changes upstream.
@@ -119,13 +120,22 @@ export default async function RewindStationPage({ params }: PageProps) {
                 url={station.xspfUrl}
               />
             )}
-            <a
-              href={station.xspfUrl}
-              className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs underline-offset-4 hover:underline"
-            >
-              Download XSPF
-              <ExternalLink className="size-3" />
-            </a>
+            {tracks.length > 0 && (
+              // Same overflow menu as the playlist page so Rewind
+              // stations expose the same set of actions (copy XSPF
+              // URL, download XSPF, share, etc.). The station's
+              // upstream XSPF is the canonical playlist artifact;
+              // pipe it through `xspfUrl` so the menu's download
+              // entry hits the source directly.
+              <TrackListActionsMenu
+                title={`${station.name} Rewind`}
+                creator={station.name}
+                tracks={parachordTracks}
+                xspfUrl={station.xspfUrl}
+                xspfFilename={`${station.id}-rewind`}
+                triggerLabel="Rewind actions"
+              />
+            )}
           </div>
         </div>
       </header>

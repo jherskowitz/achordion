@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
-import { ExternalLink, Globe, Lock, Users } from "lucide-react";
+import { Globe, Lock, Users } from "lucide-react";
 import { faviconUrl } from "@/lib/favicon";
 import { canonicalHost } from "@/lib/host";
 import { auth } from "@/auth";
@@ -288,79 +288,68 @@ async function PlaylistBody({ mbid }: { mbid: string }) {
                   triggerLabel="Playlist actions"
                 />
               ))}
+            {/* External streaming favicon tiles, inline with the
+                action row (matches the recording / release-group page
+                pattern). Sources merged:
+                  - LB playlist's `external_urls.spotify` (Spotify
+                    sets this when the playlist syncs from there).
+                  - Parachord-submitted mirror-link mappings stored
+                    under `pl-links:<mbid>` in Upstash.
+                Dedupe by canonical host so the two sources don't
+                double up if both produced a Spotify URL. Drop
+                listenbrainz.org because Achordion *is* the LB
+                mirror — linking back to LB from a LB-backed page
+                would be redundant. */}
             {(() => {
-              const spotifyHref = safeHttpUrl(data.externalUrls?.spotify);
-              if (!spotifyHref) return null;
-              return (
-                <a
-                  href={spotifyHref}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-xs underline-offset-4 hover:underline"
-                >
-                  Open on Spotify
-                  <ExternalLink className="size-3" />
-                </a>
-              );
+              type Tile = { href: string; host: string; label: string };
+              const tiles: Tile[] = [];
+              const seenHosts = new Set<string>();
+              const tryAdd = (url: string | null | undefined, label: string) => {
+                const href = safeHttpUrl(url ?? undefined);
+                if (!href) return;
+                let host: string;
+                try {
+                  host = canonicalHost(new URL(href).hostname);
+                } catch {
+                  return;
+                }
+                // Achordion mirrors LB — don't link back to LB from
+                // an LB-backed playlist page.
+                if (host.includes("listenbrainz.org")) return;
+                if (seenHosts.has(host)) return;
+                seenHosts.add(host);
+                tiles.push({ href, host, label });
+              };
+              tryAdd(data.externalUrls?.spotify, "Open on Spotify");
+              for (const link of mirrorLinks?.links ?? []) {
+                tryAdd(link.url, link.label);
+              }
+              if (tiles.length === 0) return null;
+              return tiles.map(({ href, host, label }) => (
+                <IconTooltip key={href} label={label}>
+                  <a
+                    href={href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label={label}
+                    className="border-border/60 hover:border-foreground/40 hover:bg-muted/40 inline-flex size-9 items-center justify-center rounded-md border transition-colors pointer-coarse:size-11"
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={faviconUrl(host)}
+                      alt=""
+                      width={16}
+                      height={16}
+                      loading="lazy"
+                      className="size-4 opacity-80 hover:opacity-100"
+                    />
+                  </a>
+                </IconTooltip>
+              ));
             })()}
           </div>
         </div>
       </header>
-
-      {mirrorLinks && mirrorLinks.links.length > 0 && (
-        <section className="mb-8">
-          <h2 className="text-muted-foreground mb-2 text-xs tracking-wide uppercase">
-            Listen on
-          </h2>
-          {/* Favicon-tile row — matches the StreamingLinksRow pattern
-              used on /recording and /release-group. Each tile is a
-              service favicon under an IconTooltip carrying the label
-              (e.g. "Open on Spotify"). Dedupe by canonical host so
-              two Parachord submissions of the same playlist on the
-              same service collapse to one tile. */}
-          <ul className="flex flex-wrap items-center gap-2">
-            {(() => {
-              const seenHosts = new Set<string>();
-              return mirrorLinks.links
-                .map((link) => {
-                  const href = safeHttpUrl(link.url);
-                  if (!href) return null;
-                  const host = canonicalHost(link.host);
-                  if (seenHosts.has(host)) return null;
-                  seenHosts.add(host);
-                  return { href, host, label: link.label };
-                })
-                .filter(
-                  (x): x is { href: string; host: string; label: string } =>
-                    x !== null,
-                )
-                .map(({ href, host, label }) => (
-                  <li key={href}>
-                    <IconTooltip label={label}>
-                      <a
-                        href={href}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        aria-label={label}
-                        className="border-border/60 hover:border-foreground/40 hover:bg-muted/40 inline-flex size-9 items-center justify-center rounded-md border transition-colors pointer-coarse:size-11"
-                      >
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={faviconUrl(host)}
-                          alt=""
-                          width={16}
-                          height={16}
-                          loading="lazy"
-                          className="size-4 opacity-80 hover:opacity-100"
-                        />
-                      </a>
-                    </IconTooltip>
-                  </li>
-                ));
-            })()}
-          </ul>
-        </section>
-      )}
 
       {data.tracks.length === 0 ? (
         <p className="text-muted-foreground text-sm">
