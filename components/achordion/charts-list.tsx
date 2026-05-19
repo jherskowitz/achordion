@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Play } from "lucide-react";
-import { FadeInImage } from "./fade-in-image";
+import { CoverArt } from "./cover-art";
 import { InlineTrackLinks } from "./inline-track-links";
 import { LazyAlbumCover } from "./lazy-album-cover";
 import {
@@ -20,9 +20,9 @@ import type { AppleChartItem } from "@/lib/clients/apple-charts";
 
 /**
  * Songs chart — numbered list row, cover + title + artist, play button
- * launches Parachord. Apple's artwork URLs are absolute and CORS-clean,
- * but they're not in next.config.ts's image allowlist. Plain <img> for
- * now (we can move to Image later by adding the host pattern).
+ * launches Parachord. Routes through `<CoverArt>` so the no-artwork
+ * fallback matches the rest of the app (Disc3 vinyl placeholder on
+ * `bg-muted`) instead of an empty grey square.
  */
 export function ChartsSongsList({ items }: { items: AppleChartItem[] }) {
   if (items.length === 0) {
@@ -46,18 +46,12 @@ export function ChartsSongsList({ items }: { items: AppleChartItem[] }) {
             title="Play in Parachord"
             className="group/cover relative shrink-0 overflow-hidden rounded-md"
           >
-            {t.artworkUrl ? (
-              <FadeInImage
-                src={t.artworkUrl}
-                alt={t.name}
-                width={48}
-                height={48}
-                className="size-12 object-cover"
-                unoptimized
-              />
-            ) : (
-              <div className="bg-muted size-12" />
-            )}
+            <CoverArt
+              src={t.artworkUrl ?? null}
+              alt={t.name}
+              size={48}
+              className="size-12"
+            />
             <span
               aria-hidden
               className="absolute inset-0 flex items-center justify-center bg-black/55 opacity-0 transition-opacity group-hover/cover:opacity-100"
@@ -115,18 +109,22 @@ function ChartsAlbumCard({ item }: { item: AppleChartItem }) {
     ? parachordPlayAlbum({ mbid: resolvedMbid })
     : parachordPlayAlbum({ artist: item.artistName, title: item.name });
 
-  const cover = item.artworkUrl ? (
+  // Always render through `<LazyAlbumCover>`: when Apple ships an
+  // artworkUrl we paint it instantly via `initialSrc` and let the
+  // parallel /api/track-cover lookup resolve the MBID. When Apple
+  // doesn't (rare for charts, but happens), LazyAlbumCover falls
+  // through to its MB-side lookup + Disc3 placeholder — matching
+  // the no-artwork fallback every other chart subroute uses.
+  const cover = (
     <LazyAlbumCover
       artist={item.artistName}
       album={item.name}
       alt={item.name}
-      initialSrc={item.artworkUrl}
+      initialSrc={item.artworkUrl ?? undefined}
       onResolved={({ mbid }) => {
         if (mbid) setResolvedMbid(mbid);
       }}
     />
-  ) : (
-    <div className="bg-muted aspect-square w-full" />
   );
 
   return (
