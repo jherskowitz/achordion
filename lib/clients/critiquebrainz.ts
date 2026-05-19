@@ -5,6 +5,155 @@ import { z } from "zod";
 const CB_BASE = "https://critiquebrainz.org/ws/1";
 const USER_AGENT = "Achordion/0.1 (jherskow@gmail.com)";
 
+const UserLookupSchema = z
+  .object({
+    user: z
+      .object({
+        id: z.string(),
+        musicbrainz_username: z.string().optional(),
+        display_name: z.string().optional(),
+      })
+      .passthrough(),
+  })
+  .passthrough();
+
+/**
+ * Resolve a MusicBrainz username to its CritiqueBrainz user UUID.
+ * CB exposes `/ws/1/user/<mb-username>` which returns the user
+ * record directly — much cheaper than walking the paginated
+ * `/ws/1/user/` listing.
+ *
+ * Cached for 30 days at the Next data-cache layer because the
+ * mapping is effectively immutable (users don't churn CB UUIDs).
+ * Returns null when the user doesn't exist on CB OR when CB
+ * temporarily 5xx's — null is the universal "no reviews to splice
+ * in for this user" signal downstream, so a CB outage degrades
+ * gracefully to an empty feed contribution.
+ */
+export async function getCbUserIdByMbUsername(
+  mbUsername: string,
+): Promise<string | null> {
+  if (!mbUsername) return null;
+  try {
+    const res = await fetch(
+      `${CB_BASE}/user/${encodeURIComponent(mbUsername)}`,
+      {
+        headers: { "User-Agent": USER_AGENT, Accept: "application/json" },
+        next: {
+          revalidate: 60 * 60 * 24 * 30,
+          tags: [`cb:user:${mbUsername.toLowerCase()}`],
+        },
+      },
+    );
+    if (!res.ok) return null;
+    const data = UserLookupSchema.parse(await res.json());
+    return data.user.id;
+  } catch {
+    return null;
+  }
+}
+
+const ReviewListItemSchema = z
+  .object({
+    id: z.string(),
+    entity_id: z.string(),
+    entity_type: z.enum(["recording", "release_group", "artist"]).optional(),
+    rating: z.number().nullable().optional(),
+    text: z.string().nullable().optional(),
+    last_updated: z.string().optional(),
+    published_on: z.string().optional(),
+    created: z.string().optional(),
+    last_revision: z
+      .object({ rating: z.number().nullable().optional() })
+      .partial()
+      .optional(),
+  })
+  .passthrough();
+
+const UserReviewListSchema = z
+  .object({
+    count: z.number().optional(),
+    reviews: z.array(ReviewListItemSchema).optional(),
+  })
+  .passthrough();
+
+export interface CritiqueBrainzAuthoredReview {
+  reviewId: string;
+  entityId: string;
+  entityType: "recording" | "release_group" | "artist" | null;
+  rating: number | null;
+  text: string;
+  /** Unix seconds — derived from `published_on` (preferred) or the
+   *  last revision's timestamp, whichever's present. */
+  publishedTs: number;
+}
+
+/** Parse one of CB's RFC-2822 date strings to unix seconds. Returns 0
+ *  when the string isn't recognizable — the caller can sort 0s to the
+ *  bottom without crashing. */
+function parseCbTimestamp(raw: string | null | undefined): number {
+  if (!raw) return 0;
+  const t = Date.parse(raw);
+  return Number.isFinite(t) ? Math.floor(t / 1000) : 0;
+}
+
+/**
+ * Fetch the most recent reviews authored by a CB user.
+ *
+ * CB's `/ws/1/review/?user_id=<uuid>&limit=N` returns the user's
+ * full review list newest-first. We trim to `limit` and drop
+ * empty-text drafts.
+ *
+ * Cached for 1 hour — reviews are written far slower than that, and
+ * the LB feed already lives behind a no-store data-cache for the
+ * window in which freshness matters most (immediately after a write).
+ */
+export async function getCbReviewsByUserId(
+  userId: string,
+  limit = 5,
+): Promise<CritiqueBrainzAuthoredReview[]> {
+  if (!userId) return [];
+  try {
+    const res = await fetch(
+      `${CB_BASE}/review/?user_id=${encodeURIComponent(userId)}&limit=${limit}`,
+      {
+        headers: { "User-Agent": USER_AGENT, Accept: "application/json" },
+        next: {
+          revalidate: 60 * 60,
+          tags: [`cb:reviews-by-user:${userId}`],
+        },
+      },
+    );
+    if (!res.ok) return [];
+    const data = UserReviewListSchema.parse(await res.json());
+    const items = data.reviews ?? [];
+    const out: CritiqueBrainzAuthoredReview[] = [];
+    for (const r of items) {
+      const text = (r.text ?? "").trim();
+      if (text.length === 0) continue;
+      out.push({
+        reviewId: r.id,
+        entityId: r.entity_id,
+        entityType: r.entity_type ?? null,
+        rating:
+          typeof r.rating === "number"
+            ? r.rating
+            : typeof r.last_revision?.rating === "number"
+              ? r.last_revision.rating
+              : null,
+        text,
+        publishedTs:
+          parseCbTimestamp(r.published_on) ||
+          parseCbTimestamp(r.last_updated) ||
+          parseCbTimestamp(r.created),
+      });
+    }
+    return out;
+  } catch {
+    return [];
+  }
+}
+
 /**
  * CritiqueBrainz reviews — MetaBrainz's open review database, keyed
  * on the same release-group MBIDs we already use. Free, no auth.

@@ -12,6 +12,7 @@ import { getBskyFriendLinkEvents } from "@/lib/bsky-friend-events";
 import { getMentionEvents } from "@/lib/mention-events";
 import { getListenAlongEvents } from "@/lib/listen-along-events";
 import { getPlaylistPublishedEvents } from "@/lib/playlist-events";
+import { getReviewEvents } from "@/lib/review-events";
 import { PageShell } from "@/components/achordion/page-shell";
 import { EmptyState } from "@/components/achordion/empty-state";
 import { FeedEventList } from "@/components/achordion/feed-event-list";
@@ -71,6 +72,7 @@ async function FeedBody({
     mentionEvents,
     listenAlongEvents,
     playlistPublishedEvents,
+    reviewEvents,
   ] = await Promise.all([
     getUserFeed(name, token, { count: 50 }),
     followingPromise.then((following) => {
@@ -109,6 +111,17 @@ async function FeedBody({
         () => [] as FeedEvent[],
       ),
     ),
+    // CritiqueBrainz review fan-out. LB does emit `review` events in
+    // its native feed, but caps the response to ~50 events across
+    // all types, so a review from a few weeks ago routinely falls
+    // off the bottom on busy feeds. Same fan-out shape as the
+    // loved-recording splice — fetch each followed user's recent
+    // reviews directly from CB so the merge sees them.
+    followingPromise.then((following) =>
+      getReviewEvents([name, ...following.filter((u) => u !== name)]).catch(
+        () => [] as FeedEvent[],
+      ),
+    ),
   ]);
   if (events === null) {
     return (
@@ -127,6 +140,28 @@ async function FeedBody({
   // it in follow-list dedup elsewhere). Without this normalisation,
   // a viewer's own loves can leak past the "Hide my own" filter.
   const nameLc = name.toLowerCase();
+  // Dedupe review events against the LB feed: if LB happened to
+  // include the same review in the recent window, prefer the LB-
+  // native one (it's the canonical source). Match by `review_mbid`
+  // on metadata, which is the CB review UUID and is stable across
+  // both sources.
+  const seenReviewIds = new Set<string>();
+  for (const e of events) {
+    if (
+      (e.event_type === "review" || e.event_type === "critiquebrainz_review") &&
+      typeof (e.metadata as { review_mbid?: string } | undefined)
+        ?.review_mbid === "string"
+    ) {
+      seenReviewIds.add(
+        (e.metadata as { review_mbid: string }).review_mbid,
+      );
+    }
+  }
+  const dedupedReviewEvents = reviewEvents.filter((e) => {
+    const id = (e.metadata as { review_mbid?: string } | undefined)
+      ?.review_mbid;
+    return !id || !seenReviewIds.has(id);
+  });
   const merged = [
     ...events,
     ...lovedEvents,
@@ -134,6 +169,7 @@ async function FeedBody({
     ...mentionEvents,
     ...listenAlongEvents,
     ...playlistPublishedEvents,
+    ...dedupedReviewEvents,
   ].sort((a, b) => b.created - a.created);
   const sliced = merged.slice(0, 50);
   const filtered = excludeSelf
