@@ -499,7 +499,19 @@ function PersonalRecommendationEvent({
   );
 }
 
-// ─── critiquebrainz_review ──────────────────────────────────────────
+// ─── review (CritiqueBrainz) ────────────────────────────────────────
+
+/**
+ * LB's feed endpoint emits CritiqueBrainz reviews as `event_type:
+ * "review"`. We originally guessed the type string would be
+ * `"critiquebrainz_review"` and dispatched on that, which meant the
+ * renderer existed but never matched a real event — reviews from
+ * followed users silently dropped out of /feed. Match both strings
+ * so we're forward-compatible with any LB rename.
+ */
+function isReviewEvent(e: FeedEvent): boolean {
+  return e.event_type === "review" || e.event_type === "critiquebrainz_review";
+}
 
 interface ReviewMeta {
   entity_id?: string;
@@ -1024,7 +1036,7 @@ async function resolveReviewCovers(
   const recordingIds = new Set<string>();
 
   for (const e of events) {
-    if (e.event_type !== "critiquebrainz_review") continue;
+    if (!isReviewEvent(e)) continue;
     const m = e.metadata as ReviewMeta | undefined;
     const id = m?.entity_id;
     if (!id) continue;
@@ -1113,6 +1125,7 @@ export async function FeedEventList({
                 key={key}
               />
             );
+          case "review":
           case "critiquebrainz_review": {
             const m = e.metadata as ReviewMeta | undefined;
             const cover = m?.entity_id
