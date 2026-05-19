@@ -549,6 +549,8 @@ function CritiqueBrainzReviewEvent({
   event,
   coverUrl,
   entityName: resolvedName,
+  artistCredit,
+  artistMbid,
 }: {
   event: FeedEvent;
   /** Pre-resolved CAA URL for the reviewed entity. null when no
@@ -559,9 +561,21 @@ function CritiqueBrainzReviewEvent({
    *  metadata-supplied name when both exist. null when no resolution
    *  succeeded — falls through to "an entity" then. */
   entityName?: string | null;
+  /** Pre-resolved artist-credit display string. Rendered as
+   *  "by <artist>" after the entity name for recording / release-
+   *  group reviews so the header doesn't read as "reviewed
+   *  *Untitled*" with no artist context. Undefined for artist
+   *  reviews and when the upstream payload didn't carry credit. */
+  artistCredit?: string | null;
+  /** Optional MBID for the first artist in the credit — lets the
+   *  rendered artist name deep-link to /artist/<mbid> instead of
+   *  click-time lookup. */
+  artistMbid?: string | null;
 }) {
   const m = event.metadata as ReviewMeta | undefined;
   const entityName = resolvedName ?? m?.entity_name ?? "an entity";
+  const showArtistCredit =
+    !!artistCredit && m?.entity_type !== "artist";
   const entityHref = entityHrefFor(m?.entity_type, m?.entity_id, m?.entity_name);
   const rating = m?.rating ?? null;
   // Reviews can be long; truncate to a single visible chunk and let
@@ -580,6 +594,20 @@ function CritiqueBrainzReviewEvent({
             </Link>
           ) : (
             <span className="text-foreground">{entityName}</span>
+          )}
+          {showArtistCredit && (
+            <>
+              {" by "}
+              <Link
+                href={artistHref({
+                  mbid: artistMbid ?? null,
+                  name: artistCredit ?? "",
+                })}
+                className="text-foreground hover:underline"
+              >
+                {artistCredit}
+              </Link>
+            </>
           )}
           <span className="text-muted-foreground/70">
             {" · "}
@@ -1056,6 +1084,16 @@ const NAME_LOOKUP_CAP = 8;
 export interface ReviewEntityResolution {
   coverUrl?: string;
   name?: string;
+  /** Display string for the artist credit (e.g. "The Beatles" or
+   *  "Run the Jewels feat. Killer Mike"). Resolved for recording +
+   *  release_group reviews where artist context disambiguates the
+   *  entity name; omitted for artist reviews (the entity IS the
+   *  artist) and when the upstream payload doesn't carry credit. */
+  artistCredit?: string;
+  /** First artist MBID from the credit, used to deep-link the
+   *  artist's name in the rendered header without a click-time
+   *  lookup. Undefined when none of the credit entries carry an MBID. */
+  artistMbid?: string;
 }
 
 async function resolveReviewEntities(
@@ -1114,9 +1152,29 @@ async function resolveReviewEntities(
           coverUrl = `https://coverartarchive.org/release/${r.mbid}/front-250`;
         }
         const name = entry?.recording?.name?.trim();
+        // Build the artist-credit display string from LB's
+        // multi-artist split (artist.name + join_phrase). Falls back
+        // to the flat artist.name when the multi-artist breakdown is
+        // missing.
+        const artists = entry?.artist?.artists ?? [];
+        let artistCredit: string | undefined;
+        let artistMbid: string | undefined;
+        if (artists.length > 0) {
+          artistCredit = artists
+            .map((a) => `${a.name ?? ""}${a.join_phrase ?? ""}`)
+            .join("")
+            .trim();
+          artistMbid = artists.find((a) => a.artist_mbid)?.artist_mbid;
+        } else if (entry?.artist?.name) {
+          artistCredit = entry.artist.name;
+        }
         const merged: ReviewEntityResolution = { ...(out.get(id) ?? {}) };
         if (coverUrl) merged.coverUrl = coverUrl;
         if (name && !merged.name) merged.name = name;
+        if (artistCredit && !merged.artistCredit) {
+          merged.artistCredit = artistCredit;
+        }
+        if (artistMbid && !merged.artistMbid) merged.artistMbid = artistMbid;
         out.set(id, merged);
       }
     }
@@ -1138,6 +1196,19 @@ async function resolveReviewEntities(
         const rg = await getReleaseGroup(id);
         const merged: ReviewEntityResolution = { ...(out.get(id) ?? {}) };
         if (rg?.title && !merged.name) merged.name = rg.title;
+        const credit = rg?.["artist-credit"];
+        if (credit && credit.length > 0) {
+          const joined = credit
+            .map(
+              (c) =>
+                `${c.name ?? c.artist?.name ?? ""}${c.joinphrase ?? ""}`,
+            )
+            .join("")
+            .trim();
+          if (joined && !merged.artistCredit) merged.artistCredit = joined;
+          const firstMbid = credit.find((c) => c.artist?.id)?.artist?.id;
+          if (firstMbid && !merged.artistMbid) merged.artistMbid = firstMbid;
+        }
         out.set(id, merged);
       } catch {
         // best-effort — the renderer's fallback name handles this.
@@ -1214,6 +1285,8 @@ export async function FeedEventList({
                 event={e}
                 coverUrl={resolved?.coverUrl ?? null}
                 entityName={resolved?.name ?? null}
+                artistCredit={resolved?.artistCredit ?? null}
+                artistMbid={resolved?.artistMbid ?? null}
                 key={key}
               />
             );
