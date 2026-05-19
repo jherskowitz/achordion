@@ -4,6 +4,7 @@ import { z } from "zod";
 import { auth } from "@/auth";
 import { decode } from "next-auth/jwt";
 import { cacheTagsMB } from "@/lib/clients/musicbrainz";
+import { maybeRefreshMbToken } from "@/lib/mb-token-refresh";
 import {
   submitTagVote,
   TagApiError,
@@ -105,7 +106,15 @@ function cacheTagsForEntity(entity: TagEntity, mbid: string): string {
  */
 async function readJwtMbAuth(
   request: NextRequest,
-): Promise<{ accessToken: string | null; scope: string }> {
+): Promise<{
+  accessToken: string | null;
+  scope: string;
+  /** Set when the JWT carries `mbRefreshError`. The vote route
+   *  surfaces this as `scope_required` so the client triggers
+   *  re-auth, but the log line makes the distinction (refresh
+   *  failed vs. truly missing scope) visible in Vercel logs. */
+  refreshError: "no_refresh_token" | "refresh_failed" | null;
+}> {
   const secureCookie =
     request.url.startsWith("https://") ||
     request.headers.get("x-forwarded-proto") === "https";
@@ -113,22 +122,56 @@ async function readJwtMbAuth(
     ? "__Secure-authjs.session-token"
     : "authjs.session-token";
   const cookie = request.cookies.get(cookieName)?.value;
-  if (!cookie) return { accessToken: null, scope: "" };
+  if (!cookie) {
+    return { accessToken: null, scope: "", refreshError: null };
+  }
   const secret = process.env.AUTH_SECRET;
-  if (!secret) return { accessToken: null, scope: "" };
+  if (!secret) {
+    return { accessToken: null, scope: "", refreshError: null };
+  }
   try {
     const token = await decode({
       token: cookie,
       secret,
       salt: cookieName,
     });
-    return {
+    const refreshError =
+      token?.mbRefreshError === "no_refresh_token" ||
+      token?.mbRefreshError === "refresh_failed"
+        ? token.mbRefreshError
+        : null;
+    // Refresh inline. The jwt callback also refreshes on every
+    // request, but only the *response* cookie gets the new token —
+    // the request cookie we just decoded still carries the old
+    // (about-to-expire) value. Without this inline refresh, the
+    // very first vote in any 1-hour window would 401 even though
+    // the refresh token's perfectly good.
+    const outcome = await maybeRefreshMbToken({
       accessToken:
         typeof token?.mbAccessToken === "string" ? token.mbAccessToken : null,
+      refreshToken:
+        typeof token?.mbRefreshToken === "string"
+          ? token.mbRefreshToken
+          : null,
+      expiresAt:
+        typeof token?.mbAccessTokenExpiresAt === "number"
+          ? token.mbAccessTokenExpiresAt
+          : null,
+    });
+    if (!outcome.ok) {
+      return {
+        accessToken: null,
+        scope: typeof token?.mbScope === "string" ? token.mbScope : "",
+        refreshError: outcome.reason,
+      };
+    }
+    return {
+      accessToken: outcome.snapshot.accessToken ?? null,
       scope: typeof token?.mbScope === "string" ? token.mbScope : "",
+      refreshError,
     };
   } catch {
-    return { accessToken: null, scope: "" };
+    return { accessToken: null, scope: "", refreshError: null };
   }
 }
 
@@ -253,8 +296,18 @@ export async function POST(
       { status: 403, headers: NO_STORE },
     );
   }
-  const { accessToken } = await readJwtMbAuth(request);
+  const { accessToken, refreshError } = await readJwtMbAuth(request);
   if (!accessToken) {
+    // Log the distinction between "MB rejected our refresh" and
+    // "user just isn't signed in" so the noisy re-auth loops in
+    // production are debuggable from vercel logs. Both surface to
+    // the client as the same scope_required path so the existing
+    // re-auth UI fires.
+    if (refreshError) {
+      console.warn(
+        `[mb-tag-vote] no access token (refresh-error: ${refreshError}) user=${session.user.mbUsername}`,
+      );
+    }
     return NextResponse.json(
       { error: "no MB access token", reason: "scope_required" },
       { status: 401, headers: NO_STORE },
