@@ -799,6 +799,33 @@ Diagnostics: every attempt logs a `[pl-links] submit: …` line with the failure
 
 Used by `/playlist/<mbid>` page to render "Listen on Spotify / Apple Music / ListenBrainz" links. Also surfaced via `/api/entity-link?type=playlist` as the canonical URL for sharing.
 
+### `POST /api/listen-along/event`
+
+Records one listen-along event in the Upstash `listen-along:from:<actor>` + `listen-along:to:<target>` sorted-set pair, which the `getListenAlongEvents()` reader fans out into `/feed` as a synthetic `listen_along` event (see "Synthesised feed events"). Same flag gate (`listen-along-events`), same dedupe (60s per actor → target pair), same indexer regardless of who's calling.
+
+Two auth surfaces share the same body+gate+indexer:
+
+**Surface A — browser beacon (session-cookie auth).** Used by `<ListenAlongLink>` when a signed-in viewer clicks the Listen along pill anywhere on Achordion AND `useParachordPresence()` confirms Parachord is connected. Fire-and-forget via `navigator.sendBeacon` so the `parachord://` navigation never blocks.
+
+  Body: `{ "target": "<lb-username>" }`
+  Auth: Auth.js session cookie — viewer = `session.user.mbUsername`.
+
+**Surface B — Parachord apps (bearer-token auth).** Use when the user starts a listen-along session inside Parachord desktop / mobile directly (not via the Achordion pill) so the event still lands in Achordion feeds — the target sees "X tuned into your stream in Parachord," the actor's followers see "X listened along with Y in Parachord," and X themselves sees "You listened along with Y in Parachord" in their own feed.
+
+  Body: `{ "viewer": "<lb-username>", "target": "<lb-username>" }`
+  Auth: `Authorization: Bearer <PARACHORD_TRACK_LINKS_TOKEN>` — the same env var used by `/api/track-links/submit` and `/api/playlist-links/submit`, since this is one logical writer (Parachord) writing through one bearer.
+
+Both surfaces respond with `{ "ok": true, "recorded": <bool> }`. `recorded=false` means the request was accepted but dropped (flag off, self-target, dedupe window, or storage outage). Fire-and-forget callers can ignore the field; richer clients can use it to surface "tuned in" UI.
+
+When to call from the apps: at the moment a user actually starts a listen-along session in Parachord (i.e. the point at which audio begins playing along to the target's stream). Don't call on UI-open / hover / preview — the event represents a real "I'm listening with you right now" intent, the same threshold the Achordion-side pill represents.
+
+Diagnostics:
+
+- Every attempt logs a `[listen-along] <source>: …` line where `<source>` is `beacon` (session-cookie path) or `submit` (bearer path). Failure modes are tagged: `no session, no bearer` / `bearer mismatch` / `invalid payload` / `dropped (flag off …)` / `self-target dropped` / success-with-recorded.
+- `GET /api/admin/listen-along?user=<lb-username>` returns the raw `from` + `to` Upstash entries for that user (admin-only) so you can confirm a submit landed without grepping logs.
+
+Used by the `/feed` page and the `/api/me/feed-unread` count (alongside the other synthetic events) — no other downstream surface today.
+
 ### Entity-link lookup (GET `/api/entity-link`)
 
 Parachord can ask Achordion for the canonical Achordion URL for any artist / album / track MBID. Use this instead of hard-coding our URL convention — if Achordion ever moves a route (e.g. `/release-group/<mbid>` → somewhere else), the change ships through this endpoint without any client update.
