@@ -1,14 +1,38 @@
 /**
- * Helpers for constructing parachord:// protocol URLs.
- * Spec: parachord-desktop/docs/protocol-schema.md
+ * Helpers for constructing Parachord deep-link URLs.
  *
+ * As of 2026-05-21, every URL we emit uses the HTTPS Universal Link /
+ * App Link form (`https://parachord.com/<verb>`) instead of the
+ * legacy custom scheme (`parachord://<verb>`):
+ *
+ *   - **App installed (any OS)** — the OS routes the HTTPS URL to
+ *     Parachord via the verified `assetlinks.json` / AASA association,
+ *     and the in-app deep-link handler (`DeepLinkHandler.parseParachordHttps`
+ *     on Android, equivalent shim on iOS) rewrites it back into the
+ *     same `parachord://` shape the existing protocol parser already
+ *     understands.
+ *   - **App not installed (mobile)** — the browser loads
+ *     `parachord.com/<verb>?<query>`, which server-renders a "Get
+ *     Parachord" pitch with the destination context preserved. No
+ *     OS-level "Cannot Open Page" alert.
+ *   - **Desktop browser** — same fallback page as above; the legacy
+ *     `parachord://` form is still handled by the desktop client when
+ *     it's running, but the HTTPS form gets us a clean preview card
+ *     in Slack / Discord / iMessage and a useful page when shared as
+ *     a plain link.
+ *
+ * The custom `parachord://` scheme stays valid (in-app webviews,
+ * OAuth callbacks, native share intents) — Parachord side accepts
+ * both. Only the URL Achordion *emits* changes here.
+ *
+ * Spec / context: [issue #63](https://github.com/jherskowitz/achordion/issues/63).
  * The play/{album,playlist,radio} family was added in
- * Parachord/parachord#755 — a single URL hands a tracklist (or seed) to
- * Parachord without mutating the user's library, so callers no longer
- * need the play-then-queue HTTP-shim dance.
+ * Parachord/parachord#755 — a single URL hands a tracklist (or seed)
+ * to Parachord without mutating the user's library, so callers no
+ * longer need the play-then-queue HTTP-shim dance.
  */
 
-const PROTOCOL = "parachord://";
+const PROTOCOL = "https://parachord.com/";
 
 export interface ParachordTrack {
   /** Track title (required). */

@@ -10,7 +10,7 @@ Achordion mirrors every functional page that listenbrainz.org offers, with a fre
 
 Achordion is **the data view**; [Parachord](https://github.com/Parachord/parachord) is **the player**. They're designed to feel like one product across desktop, mobile, and web.
 
-Every playable thing on Achordion — every track row, every album cover, every chart entry, every Radio Rewind cover, every Critical Darling pick, every LB Radio station, every "now playing" pin in your friends' feeds — has a `parachord://` deep link that hands the tracklist off to Parachord without disrupting your library. Parachord wakes up if it isn't running, plays the track, and routes through whichever streaming service or local source the listener is set up with — so the same click does the right thing on every device.
+Every playable thing on Achordion — every track row, every album cover, every chart entry, every Radio Rewind cover, every Critical Darling pick, every LB Radio station, every "now playing" pin in your friends' feeds — has a `https://parachord.com/…` deep link (registered as a Universal Link on iOS and an App Link on Android, with `parachord://` as a parallel fallback for in-app webviews and share intents) that hands the tracklist off to Parachord without disrupting your library. Parachord wakes up if it isn't running, plays the track, and routes through whichever streaming service or local source the listener is set up with — so the same click does the right thing on every device. Tapping the same URL on a device *without* Parachord installed lands on the parachord.com pitch page instead of an OS error.
 
 ### Multi-source playback through one click
 
@@ -30,16 +30,16 @@ If you scrobble from somewhere else — Spotify direct, a Pano Scrobbler on Andr
 
 ### Protocol surface used by Achordion
 
-The deep links Achordion emits, all defined by the parachord:// protocol ([PR #755](https://github.com/Parachord/parachord/pull/755)):
+The deep links Achordion emits, all defined by the parachord protocol ([PR #755](https://github.com/Parachord/parachord/pull/755)). Each verb is reachable under both the HTTPS Universal-Link form (what Achordion ships today) and the legacy `parachord://` custom scheme (Parachord-side parsers accept both):
 
 | Achordion action | URL |
 | --- | --- |
-| Play a single track | `parachord://play?artist=…&title=…` |
-| Play an album | `parachord://play/album?mbid=…` (or `?artist=…&title=…`) |
-| Play a hosted playlist (XSPF / JSPF) | `parachord://play/playlist?url=…` |
-| Play LB Radio | `parachord://play/radio?url=…&refill=…` |
-| Listen along with a friend | `parachord://listen-along?service=listenbrainz&user=…` |
-| Import a playlist into the library | `parachord://import?url=…` |
+| Play a single track | `https://parachord.com/play?artist=…&title=…` |
+| Play an album | `https://parachord.com/play/album?mbid=…` (or `?artist=…&title=…`) |
+| Play a hosted playlist (XSPF / JSPF) | `https://parachord.com/play/playlist?url=…` |
+| Play LB Radio | `https://parachord.com/play/radio?url=…&refill=…` |
+| Listen along with a friend | `https://parachord.com/listen-along?service=listenbrainz&user=…` |
+| Import a playlist into the library | `https://parachord.com/import?url=…` |
 
 Parachord handles SSRF protection on the URL inputs and never mutates the user's library unless the link is `import`. Achordion never auto-fires any of these — every link is a user-initiated click.
 

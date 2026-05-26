@@ -277,11 +277,11 @@ function Step3Parachord() {
           Under the hood: Achordion is the data layer; Parachord is the
           player. Every Play button hands a tracklist off via a{" "}
           <code className="bg-muted text-foreground rounded px-1 py-0.5 text-[12px]">
-            parachord://
+            parachord.com
           </code>{" "}
-          deep link — Parachord wakes (if it isn&apos;t running), resolves
-          the tracks against your authorized services, and plays from
-          whichever source ranks highest in your priority order.
+          Universal Link — Parachord wakes (if it isn&apos;t running),
+          resolves the tracks against your authorized services, and plays
+          from whichever source ranks highest in your priority order.
         </p>
 
         <div className="mt-5 flex flex-wrap items-center gap-3">
@@ -325,12 +325,13 @@ function Step3Parachord() {
           </p>
           <p className="text-muted-foreground/90 mt-2 text-sm leading-6">
             The first time you click a Play button on Achordion, your browser
-            asks <em>&ldquo;achordion.xyz wants to access other apps and
-            services on this device.&rdquo;</em> That&apos;s the browser&apos;s
-            generic phrasing — what it&apos;s actually asking is whether
-            Achordion can hand <code className="bg-muted text-foreground rounded px-1 py-0.5 text-[11px]">parachord://</code>{" "}
-            links off to Parachord. Click <strong>Allow</strong> and Play
-            buttons work site-wide from then on.
+            may ask <em>&ldquo;achordion.xyz wants to open this in
+            Parachord?&rdquo;</em> (or, on iOS / Android, the OS may show its
+            own &ldquo;Open in Parachord&rdquo; pill). That&apos;s the
+            Universal-Link handoff — click <strong>Allow</strong> / open and
+            Play buttons work site-wide from then on. On devices without
+            Parachord installed the same link drops you on the
+            parachord.com pitch page instead of an error.
           </p>
         </div>
       </div>

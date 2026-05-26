@@ -699,9 +699,11 @@ Don't try to use `parachord://play/radio?url=<lb-radio-api-url>` (Mode C, URL-on
 
 ### Mobile (iOS / Android) — Universal Links + App Links
 
+As of 2026-05-21 (issue #63), every Parachord URL Achordion emits is the HTTPS Universal Link / App Link form (`https://parachord.com/<verb>`) — not the legacy `parachord://` custom scheme. The constant lives at `lib/parachord.ts` (`PROTOCOL`); the rest of the builder is verb-agnostic so the change cascaded automatically across every play surface.
+
 The desktop WS-presence story doesn't translate to phones: Parachord-mobile is a sandboxed app, not a process running a localhost listener, and iOS/Safari blocks `ws://127.0.0.1` from web pages anyway. So `useParachordPresence` short-circuits to `true` on `(pointer: coarse)` clients and trusts the OS to dispatch the deep-link.
 
-For that trust to be earned, **Parachord-mobile needs to register Universal Links (iOS) and App Links (Android)** for every `parachord://` URL shape Achordion produces:
+For that trust to be earned, **Parachord-mobile registers Universal Links (iOS) and App Links (Android)** for every Parachord URL shape Achordion produces:
 
 - **iOS — Universal Links**
   - Pick a host you control for the universal version of the protocol — typically `https://parachord.com/play`, `https://parachord.com/play/album`, `https://parachord.com/listen-along`, etc., one path per protocol verb. Mirror the existing `parachord://` query-string shape verbatim so the same URL works in both forms.

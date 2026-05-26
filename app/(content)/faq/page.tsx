@@ -162,7 +162,8 @@ export default function FaqPage() {
               every play to ListenBrainz with full MBIDs and ISRCs. It&apos;s
               the player Achordion is built to pair with: every Play button on
               every page hands off to it via{" "}
-              <code>parachord://</code> deep links.
+              <code>parachord.com</code> Universal Links (with{" "}
+              <code>parachord://</code> as a parallel fallback).
             </li>
             <li>
               <Out href="https://web-scrobbler.com">Web Scrobbler</Out> —

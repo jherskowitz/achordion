@@ -11,8 +11,18 @@ export default function GoPage() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const raw = params.get("uri") ?? "";
-    // Only accept parachord:// links — anything else is a protocol-injection attempt
-    if (!raw.startsWith("parachord://")) return;
+    // Accept either the HTTPS Universal Link / App Link form (the
+    // shape Achordion emits as of issue #63) OR the legacy
+    // `parachord://` custom scheme (still valid for in-app webviews,
+    // share intents, and any stored bookmarks / RSS feeds that
+    // pre-date the switch). Anything else is a protocol-injection
+    // attempt.
+    if (
+      !raw.startsWith("parachord://") &&
+      !raw.startsWith("https://parachord.com/")
+    ) {
+      return;
+    }
     setUri(raw);
     // Attempt the deep-link. If a registered handler exists, the page is
     // replaced; if not, this is a no-op and the user sees the fallback UI.
@@ -26,7 +36,7 @@ export default function GoPage() {
         <h1 className="text-2xl font-semibold mb-4">Open in Parachord</h1>
         <p className="text-muted-foreground">
           This link is missing or malformed. Did you mean to share a
-          <code className="px-1">parachord://</code> URI?
+          <code className="px-1">https://parachord.com/…</code> URL?
         </p>
       </main>
     );

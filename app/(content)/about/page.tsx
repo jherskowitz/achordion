@@ -98,11 +98,17 @@ export default function AboutPage() {
             That last part is where Parachord comes in. Every playable thing
             on Achordion — every track row, every album cover, every chart
             entry, every Critical Darling, every &quot;now playing&quot; pin
-            in a friend&apos;s feed — has a <code>parachord://</code> deep
-            link that hands the tracklist to Parachord without disrupting
-            your library. Parachord wakes if it isn&apos;t running, plays
-            the track, and routes through whichever streaming service or
-            local source the listener is set up with.
+            in a friend&apos;s feed — has a <code>parachord.com</code>{" "}
+            Universal Link that hands the tracklist to Parachord without
+            disrupting your library. Parachord wakes if it isn&apos;t
+            running, plays the track, and routes through whichever streaming
+            service or local source the listener is set up with.
+          </p>
+          <p>
+            Same link on a device without Parachord installed drops you on
+            the parachord.com pitch page instead of an OS error — and the
+            same link shared in Slack / Discord / iMessage renders a clean
+            preview card rather than raw URL text.
           </p>
         </ContentSection>
 

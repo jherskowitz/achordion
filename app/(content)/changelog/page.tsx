@@ -27,6 +27,16 @@ interface ChangelogEntry {
 
 const ENTRIES: ChangelogEntry[] = [
   {
+    date: "2026-05-21",
+    intro:
+      "Mobile Play buttons now Just Work — every Parachord hand-off uses Universal Links / App Links instead of the custom scheme, so installed users tap straight into the app and non-installed users land on a useful page instead of an OS error.",
+    highlights: [
+      "Every Play / Open in Parachord / Listen along link across Achordion (track rows, album covers, chart entries, Critical Darlings, Radio Rewinds, friend's-pin embeds, the welcome demo, the on-air pill) now emits https://parachord.com/<verb> URLs. Installed Parachord-mobile users (iOS + Android with verified App Links) open the app directly; non-installed users land on a parachord.com pitch page that preserves the destination context — no more OS-level 'Cannot Open Page' alert.",
+      "Same URLs shared in Slack, Discord, iMessage, or pasted in a tweet now render a clean preview card from parachord.com instead of raw 'parachord://...' text — way nicer to share.",
+      "Custom-scheme parachord:// URLs still work for any contexts that don't go through a browser (in-app webviews, OAuth callbacks, native share intents). Both forms route to the same Parachord-side handler.",
+    ],
+  },
+  {
     date: "2026-05-18",
     intro:
       "Playlist pages get a real second life — a browsable playlists tab with filter, sort, and inline edit; mirror links from Parachord; exact stats; and two new kinds of activity events: 'listened along with' and 'published a playlist'.",
