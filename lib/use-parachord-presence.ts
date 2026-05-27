@@ -124,9 +124,39 @@ function isCoarsePointer(): boolean {
  * render returns `false` deterministically so SSR and hydration
  * agree; the value flips once the WebSocket opens (desktop) or once
  * the post-mount media-query check confirms a coarse pointer (touch).
+ *
+ * For URL emission (deciding whether to use the parachord:// custom
+ * scheme or the https://parachord.com Universal Link), see
+ * `useParachordPreferredHref` below — it draws the distinction the
+ * collapsed boolean here intentionally hides.
  */
 export function useParachordPresence(): boolean {
-  const [running, setRunning] = useState(false);
+  return useParachordPresenceSource() !== null;
+}
+
+/**
+ * Same singleton as `useParachordPresence`, but exposes *why* we
+ * think Parachord is present:
+ *
+ *   - `"desktop-ws"` — the localhost WS handshake completed; we can
+ *     deep-link via `parachord://` and the OS will route to the
+ *     running app without opening a browser tab.
+ *   - `"mobile-assumed"` — coarse-pointer device; we don't know for
+ *     sure whether Parachord-mobile is installed, but the universal
+ *     `https://parachord.com/<verb>` URL handles both cases (app
+ *     installed → OS routes via App Link / Universal Link; not
+ *     installed → browser lands on the fallback pitch page).
+ *   - `null` — neither signal fired; we should still emit the HTTPS
+ *     URL so the user gets a useful page rather than a dead click.
+ *
+ * Same singleton + same subscription as `useParachordPresence`, just
+ * a richer return shape for callers that want to distinguish the
+ * two cases.
+ */
+export type ParachordPresenceSource = "desktop-ws" | "mobile-assumed";
+
+export function useParachordPresenceSource(): ParachordPresenceSource | null {
+  const [source, setSource] = useState<ParachordPresenceSource | null>(null);
 
   // Subscribes to an external (WebSocket) presence singleton — the
   // canonical "sync to external store" shape that the lint rule
@@ -140,23 +170,75 @@ export function useParachordPresence(): boolean {
     // with the deep-link instead.
     if (isCoarsePointer()) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      setRunning(true);
+      setSource("mobile-assumed");
       return;
     }
 
-    listeners.add(setRunning);
+    const adapter: Listener = (running) =>
+      setSource(running ? "desktop-ws" : null);
+    listeners.add(adapter);
     // Sync the new subscriber to whatever the singleton already
     // knows so they don't get a stale `false` after the connection
     // already opened for an earlier component.
-    setRunning(currentRunning);
+    setSource(currentRunning ? "desktop-ws" : null);
     // Kick off a connection if this is the first subscriber.
     if (listeners.size === 1 && !socket && !retry) connect();
 
     return () => {
-      listeners.delete(setRunning);
+      listeners.delete(adapter);
       teardownIfIdle();
     };
   }, []);
 
-  return running;
+  return source;
+}
+
+/**
+ * Returns the URL a play-surface anchor should actually navigate to,
+ * given the canonical HTTPS form emitted by `lib/parachord.ts`.
+ *
+ *   - **Desktop WS confirmed** → rewrite `https://parachord.com/<verb>`
+ *     to `parachord://<verb>`. The desktop app's protocol handler
+ *     takes the click directly, with no browser tab opened and no
+ *     parachord.com page-load round-trip. This is the case the
+ *     "Play in Parachord" button is gated on anyway, so when the
+ *     button shows up at all, the rewrite happens.
+ *   - **Mobile (coarse pointer) or unknown** → return the HTTPS URL
+ *     unchanged. The OS routes installed-app users via the verified
+ *     App Link / Universal Link; non-installed users land on the
+ *     parachord.com fallback page with the destination context
+ *     preserved (better than an OS-level "Cannot Open Page" alert).
+ *
+ * Use this for any anchor whose href is built by `lib/parachord.ts`.
+ * The rewrite is a string operation (no React state in the link
+ * itself), so middle-click / right-click "Open in new tab" still
+ * gets the rewritten URL — which is the right thing, since the user
+ * who can deep-link straight into the app doesn't want a stray
+ * parachord.com tab from a stray middle-click either.
+ */
+export function useParachordPreferredHref(httpsUrl: string): string {
+  const source = useParachordPresenceSource();
+  if (source !== "desktop-ws") return httpsUrl;
+  return rewriteToCustomScheme(httpsUrl);
+}
+
+/** Eager (non-hook) variant for callers in event handlers / closures
+ *  that don't have a hook in scope. Reads the current singleton
+ *  state without subscribing. */
+export function preferredParachordHref(httpsUrl: string): string {
+  if (typeof window === "undefined") return httpsUrl;
+  // If the WS singleton is live and the desktop app responded, the
+  // custom scheme is the right form. Coarse pointer / unknown both
+  // fall through to the HTTPS form.
+  if (currentRunning && !isCoarsePointer()) {
+    return rewriteToCustomScheme(httpsUrl);
+  }
+  return httpsUrl;
+}
+
+function rewriteToCustomScheme(httpsUrl: string): string {
+  // Only rewrite our own host; leave anything else alone so a
+  // caller can't accidentally redirect a foreign URL through
+  // parachord://.
+  return httpsUrl.replace(/^https:\/\/parachord\.com\//, "parachord://");
 }

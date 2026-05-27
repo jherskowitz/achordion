@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Providers } from "@/components/providers";
+import { ParachordLinkRewriter } from "@/components/achordion/parachord-link-rewriter";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
@@ -88,6 +89,16 @@ export default function RootLayout({
           range of page lengths we have. */}
       <body className="bg-background text-foreground">
         <Providers>{children}</Providers>
+        {/* Single document-level capture for Parachord deep-links.
+            Rewrites https://parachord.com/<verb> anchor clicks into
+            the parachord:// custom scheme when the desktop WS-
+            presence check confirms the app is running, so a left-
+            click navigates straight into Parachord instead of opening
+            a parachord.com tab. Middle-click / cmd-click / mobile
+            all keep the HTTPS form so share / new-tab / fallback
+            UX is unchanged. See component for the full behaviour
+            matrix. */}
+        <ParachordLinkRewriter />
         {/* Vercel Web Analytics — privacy-focused (no cookies, no
             individual tracking, IP-derived geo discarded after
             aggregation). Edge-injected script only when deployed
