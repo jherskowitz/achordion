@@ -111,15 +111,78 @@ export async function removeFlagUser(
  */
 const AnnouncementsArraySchema = z.array(AnnouncementSchema).max(20);
 
-export async function saveAnnouncements(items: unknown): Promise<void> {
+export type SaveAnnouncementsResult =
+  | { ok: true; count: number }
+  | { ok: false; reason: string };
+
+/** Turn a ZodError into a single human-readable line. Field path
+ *  first ("cta.label"), then the validator's message, comma-joined
+ *  across issues. Plain text — the editor renders it inline. */
+function formatZodIssues(err: z.ZodError): string {
+  return err.issues
+    .map((i) => `${i.path.join(".") || "(root)"}: ${i.message}`)
+    .join("; ");
+}
+
+/**
+ * Returns a typed result instead of throwing. Server Actions that
+ * throw on user-input-validation in production end up as a sanitized
+ * 500 from React's error boundary — the editor's `.catch` block sees
+ * an opaque "Server Components render" error rather than the actual
+ * "label is required" message. Returning a result lets the editor
+ * surface the underlying reason inline.
+ *
+ * True server faults (Redis unreachable) still throw — the admin
+ * error boundary at /admin/error.tsx surfaces those with the digest
+ * so they're greppable from vercel logs.
+ */
+export async function saveAnnouncements(
+  items: unknown,
+): Promise<SaveAnnouncementsResult> {
+  // Every branch logs so the failure mode of a future
+  // "saveAnnouncements crashed" report is greppable from vercel logs.
+  // The action's success path also logs a single confirmation line.
   await requireAdmin();
-  const validated = AnnouncementsArraySchema.parse(items);
-  const r = requireRedis();
-  if (validated.length === 0) {
-    await r.del(ANNOUNCEMENTS_KEY);
-  } else {
-    await r.set(ANNOUNCEMENTS_KEY, JSON.stringify(validated));
+  let validated: z.infer<typeof AnnouncementsArraySchema>;
+  try {
+    validated = AnnouncementsArraySchema.parse(items);
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      const reason = formatZodIssues(err);
+      console.warn(
+        `[admin] saveAnnouncements: schema validation failed — ${reason}`,
+      );
+      return { ok: false, reason };
+    }
+    console.error(
+      `[admin] saveAnnouncements: schema validation threw non-ZodError — ${err instanceof Error ? err.message : String(err)}`,
+    );
+    throw err;
   }
+  let r: ReturnType<typeof requireRedis>;
+  try {
+    r = requireRedis();
+  } catch (err) {
+    console.error(
+      `[admin] saveAnnouncements: redis unavailable — ${err instanceof Error ? err.message : String(err)}`,
+    );
+    throw err;
+  }
+  try {
+    if (validated.length === 0) {
+      await r.del(ANNOUNCEMENTS_KEY);
+    } else {
+      await r.set(ANNOUNCEMENTS_KEY, JSON.stringify(validated));
+    }
+  } catch (err) {
+    console.error(
+      `[admin] saveAnnouncements: redis write failed — ${err instanceof Error ? err.message : String(err)}`,
+    );
+    throw err;
+  }
+  console.log(
+    `[admin] saveAnnouncements: ok count=${validated.length}`,
+  );
   // Bust three caching layers so admin edits surface immediately:
   //   1. The in-process `unstable_cache` slot in lib/announcements.ts
   //      (server-component re-renders read fresh from Redis).
@@ -148,6 +211,7 @@ export async function saveAnnouncements(items: unknown): Promise<void> {
   revalidatePath("/admin/announcements");
   revalidatePath("/api/announcements");
   revalidatePath("/", "layout");
+  return { ok: true, count: validated.length };
 }
 
 // ─── Manual MB / LB cache busts ─────────────────────────────────────

@@ -123,36 +123,22 @@ function AnnouncementRow({
           />
         </Field>
 
-        <Field label="CTA label (optional)">
-          <input
-            value={item.cta?.label ?? ""}
-            onChange={(e) => {
-              const label = e.target.value;
-              if (!label) {
-                patch("cta", undefined);
-                return;
-              }
-              patch("cta", { label, url: item.cta?.url ?? "" });
-            }}
-            className={inputClass}
-          />
-        </Field>
+        {/*
+         * CTA fields. Both label AND url are required when either is
+         * non-empty — the schema rejects { label: "", url: "..." } /
+         * { label: "...", url: "" } with a min(1) / http-regex error.
+         *
+         * The pair commits to the underlying item ONLY when both
+         * fields are filled in; partial typing is held in local
+         * draft state so the user can edit either field first
+         * without producing an invalid CTA object that would fail
+         * on save. Clearing both fields removes the CTA entirely.
+         * The hint line below tells the user this contract so they
+         * don't wonder why a half-filled CTA doesn't persist.
+         */}
+        <CtaPair item={item} patch={patch} />
 
-        <Field label="CTA URL (optional, http/https)">
-          <input
-            value={item.cta?.url ?? ""}
-            onChange={(e) => {
-              const url = e.target.value;
-              if (!url && !item.cta?.label) {
-                patch("cta", undefined);
-                return;
-              }
-              patch("cta", { label: item.cta?.label ?? "", url });
-            }}
-            className={inputClass}
-            placeholder="https://"
-          />
-        </Field>
+        {/* (placeholder removed — handled by <CtaPair> above) */}
 
         <Field label="Expires at (ISO-8601, optional)">
           <input
@@ -212,6 +198,83 @@ const inputClass =
   "border-border/60 bg-background placeholder:text-muted-foreground/60 focus:ring-ring/30 block w-full rounded-md border px-2.5 py-1.5 text-sm outline-none focus:ring-2";
 
 /**
+ * Two-input CTA pair (label + URL). Holds local draft state until
+ * BOTH fields are filled — then commits to the underlying item as
+ * a complete `cta` object. Clearing either field below this
+ * threshold removes the cta entirely.
+ *
+ * Why a separate component: the row-level `patch` function only
+ * sees one field at a time, so the previous shape produced
+ * `{ label: "X", url: "" }` (invalid against AnnouncementSchema)
+ * whenever the user typed into one input without the other. The
+ * resulting save 500'd with a "label: too small" ZodError instead
+ * of a graceful inline message.
+ */
+function CtaPair({
+  item,
+  patch,
+}: {
+  item: Announcement;
+  patch: <K extends keyof Announcement>(
+    key: K,
+    value: Announcement[K] | undefined,
+  ) => void;
+}) {
+  // Initialize drafts from the committed cta (if any). Subsequent
+  // typing keeps state local until both halves are non-empty.
+  const [labelDraft, setLabelDraft] = useState(item.cta?.label ?? "");
+  const [urlDraft, setUrlDraft] = useState(item.cta?.url ?? "");
+
+  function commit(label: string, url: string) {
+    const lt = label.trim();
+    const ut = url.trim();
+    if (lt && ut) {
+      patch("cta", { label: lt, url: ut });
+    } else {
+      // Either or both empty → no cta on the committed item.
+      patch("cta", undefined);
+    }
+  }
+
+  const incomplete =
+    (labelDraft.trim() && !urlDraft.trim()) ||
+    (!labelDraft.trim() && urlDraft.trim());
+
+  return (
+    <>
+      <Field label="CTA label (optional)">
+        <input
+          value={labelDraft}
+          onChange={(e) => {
+            setLabelDraft(e.target.value);
+            commit(e.target.value, urlDraft);
+          }}
+          className={inputClass}
+        />
+      </Field>
+
+      <Field label="CTA URL (optional, http/https)">
+        <input
+          value={urlDraft}
+          onChange={(e) => {
+            setUrlDraft(e.target.value);
+            commit(labelDraft, e.target.value);
+          }}
+          className={inputClass}
+          placeholder="https://"
+        />
+        {incomplete && (
+          <p className="text-muted-foreground/80 mt-1 text-[11px]">
+            CTA needs both a label AND a URL — fill in the other
+            field to commit the call-to-action.
+          </p>
+        )}
+      </Field>
+    </>
+  );
+}
+
+/**
  * Top-level editor: holds the array state, renders one row per
  * announcement, exposes add / save. Save is whole-array — schema
  * validation happens server-side via `AnnouncementSchema.array()`.
@@ -241,7 +304,18 @@ export function AnnouncementsEditor({
     setStatus({ kind: "idle" });
     startTransition(() => {
       saveAnnouncements(next)
-        .then(() => setStatus({ kind: "saved" }))
+        .then((result) => {
+          // Action returns a result type — user-input validation
+          // failures (most commonly: a CTA with a label but no URL,
+          // or vice versa) come back as { ok: false, reason } so the
+          // editor can render the underlying zod message inline
+          // instead of dropping the user on a generic 500.
+          if (result.ok) {
+            setStatus({ kind: "saved" });
+          } else {
+            setStatus({ kind: "error", message: result.reason });
+          }
+        })
         .catch((e: unknown) => {
           setStatus({
             kind: "error",
