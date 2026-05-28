@@ -100,4 +100,4 @@ Don't forget to add the production callback URL to your MusicBrainz OAuth applic
 
 ## License
 
-TBD.
+[MIT](LICENSE) © Jason Herskowitz
