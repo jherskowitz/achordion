@@ -1,21 +1,13 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import { auth } from "@/auth";
-import {
-  getFollowing,
-  getLovedRecordingEvents,
-  getUserFeed,
-  type FeedEvent,
-} from "@/lib/clients/listenbrainz";
+import { getUserFeed } from "@/lib/clients/listenbrainz";
 import { getLbTokenForRequest } from "@/lib/lb-token";
-import { getBskyFriendLinkEvents } from "@/lib/bsky-friend-events";
-import { getMentionEvents } from "@/lib/mention-events";
-import { getListenAlongEvents } from "@/lib/listen-along-events";
-import { getPlaylistPublishedEvents } from "@/lib/playlist-events";
-import { getReviewEvents } from "@/lib/review-events";
+import { mergeFeedEvents } from "@/lib/feed-merge";
 import { PageShell } from "@/components/achordion/page-shell";
 import { EmptyState } from "@/components/achordion/empty-state";
 import { FeedEventList } from "@/components/achordion/feed-event-list";
+import { FeedStream } from "@/components/achordion/feed-stream";
 import { FilterPills } from "@/components/achordion/filter-pills";
 import { TrackListActionsMenu } from "@/components/achordion/track-list-actions-menu";
 import { OpenInParachordButton } from "@/components/achordion/open-in-parachord-button";
@@ -51,79 +43,19 @@ async function FeedBody({
       />
     );
   }
-  // Fetch native feed + the love-events fan-out in parallel. LB's
-  // feed endpoint doesn't emit loves natively, so we splice them in
-  // by walking the viewer's following list AND the viewer themself,
-  // then pulling each user's recent feedback. The viewer's own loves
-  // matter for "did the love I just sent land in the feed" parity
-  // with the rest of the activity (pins, recommendations, etc.).
-  // The page's `excludeSelf` filter still hides own activity when
-  // requested. Cached at the LB-client layer; steady-state cost is
-  // mostly cache hits.
-  // Resolve `following` once at the top so both loved-events and
-  // listen-along-events can reuse it. Without this, both code paths
-  // would fire their own getFollowing() call, doubling the LB read
-  // cost for the merge.
-  const followingPromise = getFollowing(name).catch(() => [] as string[]);
-  const [
-    events,
-    lovedEvents,
-    bskyFriendEvents,
-    mentionEvents,
-    listenAlongEvents,
-    playlistPublishedEvents,
-    reviewEvents,
-  ] = await Promise.all([
-    getUserFeed(name, token, { count: 50 }),
-    followingPromise.then((following) => {
-      const targets = [name, ...following.filter((u) => u !== name)];
-      return getLovedRecordingEvents(targets).catch(
-        () => [] as FeedEvent[],
-      );
-    }),
-    // Bluesky-friend-linked synthetic events. Passing `null` for
-    // `sinceUnix` so the feed shows every match (the unread-count
-    // endpoint applies its own cutoff for the badge). Fails-soft
-    // to an empty list — Bluesky outage or feature-flag-off
-    // returns nothing and the rest of the feed still renders.
-    getBskyFriendLinkEvents(name, null).catch(() => [] as FeedEvent[]),
-    // @-mention synthetic events. Anyone who pinned a track and
-    // tagged this viewer with `@<viewer>` in the blurb. Same
-    // shape contract as the bsky events above — fails-soft on
-    // Upstash or flag-off.
-    getMentionEvents(name, null).catch(() => [] as FeedEvent[]),
-    // Listen-along synthetic events. Recorded server-side when an
-    // actor (viewer or followed user) clicks "Listen along" with a
-    // confirmed-connected Parachord client. We pull events where
-    // the actor is in viewer's following list OR the viewer is the
-    // target. Same fails-soft contract as the others.
-    followingPromise.then((following) =>
-      getListenAlongEvents(name, following, null).catch(
-        () => [] as FeedEvent[],
-      ),
-    ),
-    // Playlist-published synthetic events. Recorded when a followed
-    // user flips a playlist private → public. The reader re-checks
-    // visibility on render so a flipped-back playlist doesn't tease
-    // followers with a now-private link.
-    followingPromise.then((following) =>
-      getPlaylistPublishedEvents(name, following, null).catch(
-        () => [] as FeedEvent[],
-      ),
-    ),
-    // CritiqueBrainz review fan-out. LB does emit `review` events in
-    // its native feed, but caps the response to ~50 events across
-    // all types, so a review from a few weeks ago routinely falls
-    // off the bottom on busy feeds. Same fan-out shape as the
-    // loved-recording splice — fetch each followed user's recent
-    // reviews directly from CB so the merge sees them.
-    followingPromise.then((following) =>
-      getReviewEvents([name, ...following.filter((u) => u !== name)]).catch(
-        () => [] as FeedEvent[],
-      ),
-    ),
-  ]);
-  if (events === null) {
+
+  // Merge pipeline (LB native + all five synthetic event sources +
+  // CB reviews + dedupe + sort) lives in `lib/feed-merge.ts` so the
+  // /api/me/feed polling endpoint reuses the exact same code path.
+  // That way a poll's response is a strict subset of what the page
+  // render produces — no risk of "this only shows up if you reload"
+  // or "this only shows up if you wait for a poll" inconsistencies.
+  const { events: filtered, error } = await mergeFeedEvents(name, token, {
+    limit: 50,
+    excludeSelf,
+  });
+
+  if (error === "lb-down" && filtered.length === 0) {
     return (
       <EmptyState
         title="Couldn't load feed"
@@ -131,54 +63,21 @@ async function FeedBody({
       />
     );
   }
-  // Merge native feed + synthetic loves, sort by `created` desc, and
-  // re-cap at the same 50 the page started with so adding loves
-  // doesn't unbounded-grow the list. Self-loves are filtered with
-  // the same excludeSelf logic the rest of the feed uses.
-  // Comparison is case-insensitive: LB occasionally returns usernames
-  // with different casing than `session.user.mbUsername` (we've seen
-  // it in follow-list dedup elsewhere). Without this normalisation,
-  // a viewer's own loves can leak past the "Hide my own" filter.
-  const nameLc = name.toLowerCase();
-  // Dedupe review events against the LB feed: if LB happened to
-  // include the same review in the recent window, prefer the LB-
-  // native one (it's the canonical source). Match by `review_mbid`
-  // on metadata, which is the CB review UUID and is stable across
-  // both sources.
-  const seenReviewIds = new Set<string>();
-  for (const e of events) {
-    if (
-      (e.event_type === "review" || e.event_type === "critiquebrainz_review") &&
-      typeof (e.metadata as { review_mbid?: string } | undefined)
-        ?.review_mbid === "string"
-    ) {
-      seenReviewIds.add(
-        (e.metadata as { review_mbid: string }).review_mbid,
-      );
-    }
-  }
-  const dedupedReviewEvents = reviewEvents.filter((e) => {
-    const id = (e.metadata as { review_mbid?: string } | undefined)
-      ?.review_mbid;
-    return !id || !seenReviewIds.has(id);
-  });
-  const merged = [
-    ...events,
-    ...lovedEvents,
-    ...bskyFriendEvents,
-    ...mentionEvents,
-    ...listenAlongEvents,
-    ...playlistPublishedEvents,
-    ...dedupedReviewEvents,
-  ].sort((a, b) => b.created - a.created);
-  const sliced = merged.slice(0, 50);
-  const filtered = excludeSelf
-    ? sliced.filter((e) => (e.user_name ?? "").toLowerCase() !== nameLc)
-    : sliced;
-  // viewer = current user's mbUsername — lets FeedEventList hide the
-  // Thanks button on the viewer's own pins / recs (LB 403s in that
-  // case) while still rendering it for everyone else's.
-  return <FeedEventList events={filtered} viewer={name} />;
+
+  // `latestCreated` seeds the polling client island's ceiling — it
+  // only asks the API for events newer than this. 0 is fine for a
+  // first-paint empty feed: the next poll requests everything.
+  const latestCreated = filtered[0]?.created ?? 0;
+
+  return (
+    <FeedStream
+      viewerName={name}
+      excludeSelf={excludeSelf}
+      latestCreated={latestCreated}
+    >
+      <FeedEventList events={filtered} viewer={name} />
+    </FeedStream>
+  );
 }
 
 async function FeedCta({
