@@ -29,10 +29,18 @@ export const REVIEW_EVENT_TYPE = "review";
 /** Max reviews to splice in per followed user. CB's API will go up
  *  to 50; 5 is plenty for the feed merge to find the freshest one. */
 const REVIEWS_PER_USER = 5;
-/** Cap on parallel CB fan-out — same shape as the loved-recording
- *  fan-out's maxUsers. Bounds per-render cost for users with very
- *  large follow lists. */
-const MAX_USERS = 50;
+/** Cap on parallel CB fan-out. Was 50, but CB latency per-request
+ *  is unpredictable (multi-second on cold cache) and the slowest
+ *  user gates the whole Promise.all — wall time of the source.
+ *  20 still covers the realistic active-reviewer tail; reviews
+ *  from rarely-reviewed users 20+ deep in the follow list show up
+ *  via the next /api/me/feed poll instead of blocking first paint. */
+const MAX_USERS = 20;
+/** Per-user budget. CB sometimes accepts a request and stalls. Each
+ *  user's lookup races a 2s deadline so one slow user can't gate
+ *  the whole fan-out. The user's reviews just get omitted from this
+ *  render — they'll show up on the next poll. */
+const PER_USER_TIMEOUT_MS = 2_000;
 
 /**
  * Fan out over `following` to fetch each user's recent CB reviews
@@ -49,15 +57,35 @@ export async function getReviewEvents(
 ): Promise<FeedEvent[]> {
   if (following.length === 0) return [];
   const targets = following.slice(0, MAX_USERS);
+  // Race each per-user lookup against PER_USER_TIMEOUT_MS so the
+  // slowest CB hit can't gate the fan-out's wall time.
+  function raceUser(
+    work: Promise<Array<{ mbUsername: string; r: ReviewItem }>>,
+  ): Promise<Array<{ mbUsername: string; r: ReviewItem }>> {
+    return Promise.race([
+      work,
+      new Promise<Array<{ mbUsername: string; r: ReviewItem }>>((resolve) =>
+        setTimeout(() => resolve([]), PER_USER_TIMEOUT_MS),
+      ),
+    ]);
+  }
   const fanOut = await Promise.all(
-    targets.map(async (mbUsername) => {
-      const userId = await getCbUserIdByMbUsername(mbUsername).catch(
-        () => null,
-      );
-      if (!userId) return [] as Array<{ mbUsername: string; r: ReviewItem }>;
-      const reviews = await getCbReviewsByUserId(userId, REVIEWS_PER_USER);
-      return reviews.map((r) => ({ mbUsername, r }));
-    }),
+    targets.map((mbUsername) =>
+      raceUser(
+        (async () => {
+          const userId = await getCbUserIdByMbUsername(mbUsername).catch(
+            () => null,
+          );
+          if (!userId)
+            return [] as Array<{ mbUsername: string; r: ReviewItem }>;
+          const reviews = await getCbReviewsByUserId(
+            userId,
+            REVIEWS_PER_USER,
+          ).catch(() => [] as ReviewItem[]);
+          return reviews.map((r) => ({ mbUsername, r }));
+        })(),
+      ),
+    ),
   );
   const events: FeedEvent[] = [];
   for (const chunk of fanOut) {
