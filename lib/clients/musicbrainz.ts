@@ -7,6 +7,17 @@ const USER_AGENT = "Achordion/0.1 (jherskow@gmail.com)";
 
 const MIN_INTERVAL_MS = 1000;
 
+// Hard ceiling on a single MB HTTP round-trip. MB normally answers
+// sub-second to ~2s; when it degrades it can sit on a connection for
+// 40s+ (observed in prod). Without an abort, a slow MB response keeps
+// the serverless function alive until Vercel's execution limit kills
+// it with a 504 — and a 504 means the calling route's try/catch
+// fallback (e.g. lookup routes' graceful 302 to /search) never runs,
+// because a hung request never throws. Aborting at 8s converts that
+// silent hang into a thrown TimeoutError the callers already handle,
+// well under the function limit and far above MB's healthy latency.
+const MB_FETCH_TIMEOUT_MS = 8000;
+
 class MusicBrainzError extends Error {
   // Next.js preserves `digest` across the server→client error boundary
   // even in production (where the message is sanitized), so we tag
@@ -87,13 +98,31 @@ async function mbFetch<T>(
   return queue(async () => {
     const sep = path.includes("?") ? "&" : "?";
     const url = `${MB_BASE}${path}${sep}fmt=json`;
-    const res = await fetch(url, {
-      headers: { "User-Agent": USER_AGENT, Accept: "application/json" },
-      next: {
-        revalidate: opts.revalidate ?? 60 * 60 * 24,
-        tags: opts.tags,
-      },
-    });
+    let res: Response;
+    try {
+      res = await fetch(url, {
+        headers: { "User-Agent": USER_AGENT, Accept: "application/json" },
+        signal: AbortSignal.timeout(MB_FETCH_TIMEOUT_MS),
+        next: {
+          revalidate: opts.revalidate ?? 60 * 60 * 24,
+          tags: opts.tags,
+        },
+      });
+    } catch (e) {
+      // AbortSignal.timeout fires a TimeoutError DOMException; network
+      // failures throw TypeError. Normalize both into a MusicBrainzError
+      // so callers get the consistent `digest` and we never let a raw
+      // hang/abort escape as an unhandled 504. 504 here is "we gave up
+      // on MB", not "we crashed".
+      const aborted =
+        e instanceof DOMException && e.name === "TimeoutError";
+      throw new MusicBrainzError(
+        504,
+        aborted
+          ? `MB timeout after ${MB_FETCH_TIMEOUT_MS}ms: ${path}`
+          : `MB fetch failed: ${e instanceof Error ? e.message : String(e)}`,
+      );
+    }
     if (!res.ok) {
       const body = await res.text().catch(() => "");
       throw new MusicBrainzError(res.status, `MB ${res.status}: ${body.slice(0, 200)}`);
