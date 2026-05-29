@@ -76,6 +76,19 @@ export async function mergeFeedEvents(
   // round-trips.
   const followingPromise = getFollowing(viewer).catch(() => [] as string[]);
 
+  // Guarantee no single source can wedge the whole merge. Each is
+  // already wrapped in a .catch — the timeout race covers the case
+  // where a promise just hangs (LB sometimes accepts a request and
+  // then sits on it past Vercel's function timeout). 20s leaves
+  // plenty of headroom under the platform's 60s cap while still
+  // letting the page show *something* even on a flaky upstream.
+  function withTimeout<T>(p: Promise<T>, fallback: T, ms = 20_000): Promise<T> {
+    return Promise.race([
+      p,
+      new Promise<T>((resolve) => setTimeout(() => resolve(fallback), ms)),
+    ]);
+  }
+
   const [
     nativeEvents,
     lovedEvents,
@@ -85,30 +98,53 @@ export async function mergeFeedEvents(
     playlistPublishedEvents,
     reviewEvents,
   ] = await Promise.all([
-    getUserFeed(viewer, token, { count: limit }),
-    followingPromise.then((following) => {
-      const targets = [viewer, ...following.filter((u) => u !== viewer)];
-      return getLovedRecordingEvents(targets).catch(
-        () => [] as FeedEvent[],
-      );
-    }),
-    getBskyFriendLinkEvents(viewer, null).catch(() => [] as FeedEvent[]),
-    getMentionEvents(viewer, null).catch(() => [] as FeedEvent[]),
-    followingPromise.then((following) =>
-      getListenAlongEvents(viewer, following, null).catch(
-        () => [] as FeedEvent[],
+    withTimeout(
+      getUserFeed(viewer, token, { count: limit }).catch(
+        () => null as Awaited<ReturnType<typeof getUserFeed>>,
       ),
+      null,
     ),
-    followingPromise.then((following) =>
-      getPlaylistPublishedEvents(viewer, following, null).catch(
-        () => [] as FeedEvent[],
+    withTimeout(
+      followingPromise.then((following) => {
+        const targets = [viewer, ...following.filter((u) => u !== viewer)];
+        return getLovedRecordingEvents(targets).catch(
+          () => [] as FeedEvent[],
+        );
+      }),
+      [] as FeedEvent[],
+    ),
+    withTimeout(
+      getBskyFriendLinkEvents(viewer, null).catch(() => [] as FeedEvent[]),
+      [] as FeedEvent[],
+    ),
+    withTimeout(
+      getMentionEvents(viewer, null).catch(() => [] as FeedEvent[]),
+      [] as FeedEvent[],
+    ),
+    withTimeout(
+      followingPromise.then((following) =>
+        getListenAlongEvents(viewer, following, null).catch(
+          () => [] as FeedEvent[],
+        ),
       ),
+      [] as FeedEvent[],
     ),
-    followingPromise.then((following) =>
-      getReviewEvents([
-        viewer,
-        ...following.filter((u) => u !== viewer),
-      ]).catch(() => [] as FeedEvent[]),
+    withTimeout(
+      followingPromise.then((following) =>
+        getPlaylistPublishedEvents(viewer, following, null).catch(
+          () => [] as FeedEvent[],
+        ),
+      ),
+      [] as FeedEvent[],
+    ),
+    withTimeout(
+      followingPromise.then((following) =>
+        getReviewEvents([
+          viewer,
+          ...following.filter((u) => u !== viewer),
+        ]).catch(() => [] as FeedEvent[]),
+      ),
+      [] as FeedEvent[],
     ),
   ]);
 
