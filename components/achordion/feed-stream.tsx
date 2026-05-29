@@ -4,7 +4,14 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { ChevronUp } from "lucide-react";
-import type { FeedEvent } from "@/lib/clients/listenbrainz";
+// NOTE: do NOT `import type { FeedEvent } from "@/lib/clients/listenbrainz"`
+// here. That module starts with `import "server-only"`, and even a
+// type-only import has historically pulled the server-only chain into
+// the client bundle under some build configs (see the playlists-browser
+// refactor). FeedStream only ever reads `events.length` off the poll
+// response, so a minimal local shape is enough — we don't need the
+// renderer's view of an event here.
+type FeedEventShape = { created: number };
 
 /**
  * Client island wrapper for the server-rendered feed.
@@ -42,7 +49,7 @@ import type { FeedEvent } from "@/lib/clients/listenbrainz";
 const POLL_INTERVAL_MS = 60_000;
 
 interface FeedStreamResponse {
-  events: FeedEvent[];
+  events: FeedEventShape[];
   error: "no-token" | "lb-down" | null;
 }
 
