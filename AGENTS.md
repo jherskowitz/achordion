@@ -1026,7 +1026,7 @@ Footer link is in `components/layout/site-footer.tsx`.
 
 ## Workflow notes
 
-- `npm run dev` for local. **The dev server uses webpack, not Turbopack.** See the next subsection for the why.
+- `npm run dev` for local. **Both dev AND the production build use webpack, not Turbopack.** See the next subsection for the why.
 - **Typecheck before committing:** `npx --no-install tsc --noEmit`. The project ships TS strict.
 - **Lint:** `npx --no-install eslint <files>`.
 - **Smoke tests:** `npm run e2e` runs the Playwright suite under `tests/e2e/` against a fresh `next build && next start` boot. The same suite runs against an arbitrary deployment via `E2E_BASE_URL=https://… npm run e2e` (skips the local web server). CI runs it on every PR + push to main via `.github/workflows/e2e.yml`. Coverage is intentionally a small surface area: static pages, charts, one canonical artist/release-group/recording, and the utility routes (robots, sitemap, OG image, auth providers). Add to it when you find a regression class the existing specs would have caught.
@@ -1034,20 +1034,24 @@ Footer link is in `components/layout/site-footer.tsx`.
 - Do not amend commits unless explicitly requested.
 - Production deploy is Vercel from `main`; the WS-to-localhost approach works in production because Chrome / Edge / Firefox treat `ws://127.0.0.1` as a "potentially trustworthy origin" exception from mixed-content blocks.
 
-### Why local dev runs webpack, not Turbopack
+### Why both dev and the prod build run webpack, not Turbopack
 
-Turbopack + Tailwind v4 + Next 16 had a recurring dev-cache class drop: a fresh utility (`sm:inline-flex`, `z-30`, `max-w-[24ch]`, `lg:grid-cols-[minmax(0,1fr)_280px]`, etc.) would be missing from the served CSS even though the class string was right there in the TSX file. Symptom: ships fine in production (where `next build` does a clean full scan), broken on localhost. Fixing each occurrence cost a stop-server / `rm -rf .next` / restart cycle, and that *still* didn't always evict the bad scan state.
+There are **two independent** Turbopack-on-Next-16 problems behind this. Either one alone justifies the `--webpack` flag; together they make it non-negotiable for now.
 
-Two changes that, together, ended the dance:
+**Problem 1 — dev-cache class drop (affects `next dev`).** Turbopack + Tailwind v4 + Next 16 had a recurring dev-cache class drop: a fresh utility (`sm:inline-flex`, `z-30`, `max-w-[24ch]`, `lg:grid-cols-[minmax(0,1fr)_280px]`, etc.) would be missing from the served CSS even though the class string was right there in the TSX file. Symptom: ships fine in production, broken on localhost. Fixing each occurrence cost a stop-server / `rm -rf .next` / restart cycle, and that *still* didn't always evict the bad scan state.
 
-1. **`npm run dev` uses `--webpack`.** Slower initial compile (~5–10s) but the bundler/Tailwind v4 interop is consistent, so a new class string in a TSX file is in the served CSS the moment the dev server has rebuilt. `npm run dev:turbo` is still wired up if you specifically want Turbopack's speed and accept the dance.
-2. **`globals.css` pins `@source "../app"`, `@source "../components"`, `@source "../lib"`.** Default Tailwind v4 source detection is heuristic-based and would occasionally miss our edits; explicit paths force a deterministic scan tree.
+**Problem 2 — dead RSC chunk references (affects `next build`).** The Turbopack *production* build emitted dead chunk references: the streamed RSC payload told React to load a chunk filename (e.g. `0y_u54ge.f3ju.js`) that the bundler never wrote to disk on **any** deployment. The browser 404s the chunk (served as `text/plain`, so also "Refused to execute script" + CORB noise), React's loader retries with exponential backoff, and page hydration stalls ~7s before falling through. This was misdiagnosed twice as a server-only type-import leak and then as Vercel deploy skew — it is neither. Confirmed by curling the failing chunk against every recent deployment ID (404 everywhere, including the deploy that served the HTML; Skew Protection was already on). The `turbopack-*.js` runtime chunk in the page source was the tell that the prod artifact was Turbopack-built.
 
-If you ever do hit the symptom again on webpack:
+The fixes, together:
+
+1. **`npm run dev` uses `--webpack`** and **`npm run build` uses `--webpack`.** `npm run dev:turbo` / `npm run build:turbo` stay wired up for testing whether a future Next release has fixed either bug — when both are confirmed fixed upstream, flip `build`/`dev` back to Turbopack for the faster builds. Trade-off today: webpack prod builds take ~2-3× longer on Vercel (~1m vs ~40s), which is an easy trade against 7-second user hydration stalls.
+2. **`globals.css` pins `@source "../app"`, `@source "../components"`, `@source "../lib"`.** Default Tailwind v4 source detection is heuristic-based and would occasionally miss edits; explicit paths force a deterministic scan tree (helps Problem 1).
+
+**Gotcha when flipping the build flag:** Turbopack's build was *not* running the same route-type check webpack does. The switch surfaced a latent error — `app/api/search/route.ts` exported a helper (`parseSearchQuery`) alongside its `GET` handler, which makes the file fail Next's "Route does not match the required types" check under webpack. `route.ts` files may only export route handlers (`GET`/`POST`/…) and known route config; move any helper to a sibling module (or unexport it if only used in-file). If you re-enable Turbopack later and then switch back, watch for this class of error reappearing.
+
+If you ever hit the **dev** class-drop symptom again on webpack:
 
 1. Stop the dev server.
 2. `rm -rf .next` (plus `.turbo` and `node_modules/.cache` if either exists).
 3. Restart.
 4. Hard-reload the browser.
-
-Production `next build` has been unaffected throughout — that pipeline always did a clean full scan and produced correct CSS regardless.
