@@ -66,7 +66,12 @@ const CSP = [
   // Iframe whitelist — empty for now since we don't embed anything,
   // but keeping `frame-src 'none'` would block any future LB review
   // embed without warning. Allow same-origin only.
-  "frame-src 'self'",
+  // `https://vercel.live` is the Vercel Toolbar feedback widget,
+  // which loads its UI inside an iframe from vercel.live. Without
+  // it the script (already allowlisted in script-src above) loads
+  // but can't render its panel. Same rationale as the script-src
+  // entry — team-member-only, cosmetic if absent.
+  "frame-src 'self' https://vercel.live",
   "frame-ancestors 'self'",
   // No <object>/<embed>/<applet>; closes a small XSS surface.
   "object-src 'none'",
