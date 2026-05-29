@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "next dev --webpack",
     "dev:turbo": "next dev --turbopack",
-    "build": "next build",
+    "build": "next build --webpack",
+    "build:turbo": "next build --turbopack",
     "start": "next start",
     "lint": "eslint",
     "e2e": "playwright test",
