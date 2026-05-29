@@ -44,3 +44,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Transient lock for the scheduled-tasks MCP server
+.claude/scheduled_tasks.lock
