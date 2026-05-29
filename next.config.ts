@@ -29,7 +29,12 @@ const CSP = [
   // covers Turbopack/webpack dev runtimes (no-op effect in prod since
   // bundled output doesn't eval). Vercel telemetry script lives at
   // va.vercel-scripts.com.
-  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://va.vercel-scripts.com",
+  // `https://vercel.live` is the Vercel Toolbar feedback widget
+  // (`/_next-live/feedback/feedback.js`). Only injected for
+  // logged-in Vercel team members viewing the Production deploy;
+  // without it the toolbar's comment / feedback button silently
+  // CSP-blocks. No user-facing functionality lost without it.
+  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://va.vercel-scripts.com https://vercel.live",
   // Tailwind v4 + Radix style props inject runtime inline styles.
   "style-src 'self' 'unsafe-inline'",
   // Fonts: Geist comes via next/font (served from /_next/static, so
@@ -57,7 +62,7 @@ const CSP = [
   // the app is running. Browsers treat 127.0.0.1 as a "potentially
   // trustworthy origin" so the mixed-content (https → ws) rule
   // doesn't apply, but CSP is separate — explicit allowance needed.
-  "connect-src 'self' ws://127.0.0.1:9876 https://api.listenbrainz.org https://labs.api.listenbrainz.org https://listenbrainz.org https://musicbrainz.org https://api.musicbrainz.org https://www.wikidata.org https://en.wikipedia.org https://commons.wikimedia.org https://upload.wikimedia.org https://api.dicebear.com https://api.song.link https://archive.org https://*.archive.org https://coverartarchive.org https://rss.applemarketingtools.com https://www.earshot-online.com https://jherskowitz.github.io https://va.vercel-scripts.com https://vitals.vercel-insights.com https://webservice.fanart.tv",
+  "connect-src 'self' ws://127.0.0.1:9876 https://api.listenbrainz.org https://labs.api.listenbrainz.org https://listenbrainz.org https://musicbrainz.org https://api.musicbrainz.org https://www.wikidata.org https://en.wikipedia.org https://commons.wikimedia.org https://upload.wikimedia.org https://api.dicebear.com https://api.song.link https://archive.org https://*.archive.org https://coverartarchive.org https://rss.applemarketingtools.com https://www.earshot-online.com https://jherskowitz.github.io https://va.vercel-scripts.com https://vitals.vercel-insights.com https://webservice.fanart.tv https://vercel.live wss://ws-us3.pusher.com",
   // Iframe whitelist — empty for now since we don't embed anything,
   // but keeping `frame-src 'none'` would block any future LB review
   // embed without warning. Allow same-origin only.
