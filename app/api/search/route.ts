@@ -40,7 +40,12 @@ interface ParsedQuery {
  * MB's `query=` param verbatim, so quoted phrases and operators
  * still work).
  */
-export function parseSearchQuery(raw: string): ParsedQuery {
+// NOT exported: route.ts files may only export route handlers
+// (GET/POST/…) and known route config. Exporting an arbitrary
+// helper makes the file fail Next's route-type check under the
+// webpack builder (Turbopack's build was silently permitting it).
+// This helper is only used within this file anyway.
+function parseSearchQuery(raw: string): ParsedQuery {
   const m = raw.match(/^([a-z]+):\s*(.+)$/i);
   if (m) {
     const kind = KIND_PREFIXES[m[1].toLowerCase()];
