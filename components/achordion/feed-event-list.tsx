@@ -36,10 +36,6 @@ import {
   getUserPins,
   type FeedEvent,
 } from "@/lib/clients/listenbrainz";
-import {
-  getArtist,
-  getReleaseGroup,
-} from "@/lib/clients/musicbrainz";
 import { PinnedTrackCard } from "./pinned-track-card";
 
 function stripHtml(s: string): string {
@@ -503,19 +499,7 @@ function PersonalRecommendationEvent({
   );
 }
 
-// ─── review (CritiqueBrainz) ────────────────────────────────────────
-
-/**
- * LB's feed endpoint emits CritiqueBrainz reviews as `event_type:
- * "review"`. We originally guessed the type string would be
- * `"critiquebrainz_review"` and dispatched on that, which meant the
- * renderer existed but never matched a real event — reviews from
- * followed users silently dropped out of /feed. Match both strings
- * so we're forward-compatible with any LB rename.
- */
-function isReviewEvent(e: FeedEvent): boolean {
-  return e.event_type === "review" || e.event_type === "critiquebrainz_review";
-}
+// ─── critiquebrainz_review ──────────────────────────────────────────
 
 interface ReviewMeta {
   entity_id?: string;
@@ -548,34 +532,15 @@ function entityHrefFor(
 function CritiqueBrainzReviewEvent({
   event,
   coverUrl,
-  entityName: resolvedName,
-  artistCredit,
-  artistMbid,
 }: {
   event: FeedEvent;
   /** Pre-resolved CAA URL for the reviewed entity. null when no
    *  cover is available (artist reviews, or recordings whose
    *  release-group lookup didn't return CAA hints). */
   coverUrl: string | null;
-  /** Pre-resolved entity name (from MB / LB), overrides the
-   *  metadata-supplied name when both exist. null when no resolution
-   *  succeeded — falls through to "an entity" then. */
-  entityName?: string | null;
-  /** Pre-resolved artist-credit display string. Rendered as
-   *  "by <artist>" after the entity name for recording / release-
-   *  group reviews so the header doesn't read as "reviewed
-   *  *Untitled*" with no artist context. Undefined for artist
-   *  reviews and when the upstream payload didn't carry credit. */
-  artistCredit?: string | null;
-  /** Optional MBID for the first artist in the credit — lets the
-   *  rendered artist name deep-link to /artist/<mbid> instead of
-   *  click-time lookup. */
-  artistMbid?: string | null;
 }) {
   const m = event.metadata as ReviewMeta | undefined;
-  const entityName = resolvedName ?? m?.entity_name ?? "an entity";
-  const showArtistCredit =
-    !!artistCredit && m?.entity_type !== "artist";
+  const entityName = m?.entity_name ?? "an entity";
   const entityHref = entityHrefFor(m?.entity_type, m?.entity_id, m?.entity_name);
   const rating = m?.rating ?? null;
   // Reviews can be long; truncate to a single visible chunk and let
@@ -594,20 +559,6 @@ function CritiqueBrainzReviewEvent({
             </Link>
           ) : (
             <span className="text-foreground">{entityName}</span>
-          )}
-          {showArtistCredit && (
-            <>
-              {" by "}
-              <Link
-                href={artistHref({
-                  mbid: artistMbid ?? null,
-                  name: artistCredit ?? "",
-                })}
-                className="text-foreground hover:underline"
-              >
-                {artistCredit}
-              </Link>
-            </>
           )}
           <span className="text-muted-foreground/70">
             {" · "}
@@ -1057,81 +1008,33 @@ function NotificationEvent({ event }: { event: FeedEvent }) {
 // ─── List ───────────────────────────────────────────────────────────
 
 /**
- * Pre-resolve cover-art URLs + entity names for every CritiqueBrainz
- * review in the batch so the renderer can show a thumbnail and the
- * actual entity name ("X reviewed *Sgt. Pepper's*") instead of the
- * fallback "an entity" label.
- *
- * Cover-art resolution:
- *   - release_group reviews map directly to a CAA URL (no fetch).
- *   - recording reviews need a single LB metadata batch call to
- *     learn the recording's release-group + CAA hints.
- *   - artist reviews don't get a cover slot.
- *
- * Name resolution:
- *   - recording reviews get the name + artist credit free from the
- *     same LB metadata batch we already do for covers.
- *   - release_group + artist reviews need bounded parallel MB calls.
- *     Capped at NAME_LOOKUP_CAP to keep first-paint latency sane on
- *     feeds with many reviews. MB calls beyond the cap are skipped;
- *     those events render with the "an entity" fallback as before.
- *
- * Result is one map keyed by entity_id with `{ coverUrl?, name? }`
- * so the dispatch case can look up both in one read.
+ * Pre-resolve cover-art URLs for every CritiqueBrainz review in the
+ * batch so the renderer can show a thumbnail without an extra round-
+ * trip per row. release_group reviews resolve to a direct CAA URL
+ * synchronously; recording reviews need a single LB metadata batch
+ * call (`getRecordingMetadata` accepts an MBID array) to learn the
+ * recording's release-group and CAA hints. Artist reviews don't get
+ * a cover — Wikidata photos are a separate lookup chain we don't pay
+ * for in feed context.
  */
-const NAME_LOOKUP_CAP = 8;
-
-export interface ReviewEntityResolution {
-  coverUrl?: string;
-  name?: string;
-  /** Display string for the artist credit (e.g. "The Beatles" or
-   *  "Run the Jewels feat. Killer Mike"). Resolved for recording +
-   *  release_group reviews where artist context disambiguates the
-   *  entity name; omitted for artist reviews (the entity IS the
-   *  artist) and when the upstream payload doesn't carry credit. */
-  artistCredit?: string;
-  /** First artist MBID from the credit, used to deep-link the
-   *  artist's name in the rendered header without a click-time
-   *  lookup. Undefined when none of the credit entries carry an MBID. */
-  artistMbid?: string;
-}
-
-async function resolveReviewEntities(
+async function resolveReviewCovers(
   events: FeedEvent[],
-): Promise<Map<string, ReviewEntityResolution>> {
-  const out = new Map<string, ReviewEntityResolution>();
+): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
   const recordingIds = new Set<string>();
-  const releaseGroupIds = new Set<string>();
-  const artistIds = new Set<string>();
 
   for (const e of events) {
-    if (!isReviewEvent(e)) continue;
+    if (e.event_type !== "critiquebrainz_review") continue;
     const m = e.metadata as ReviewMeta | undefined;
     const id = m?.entity_id;
     if (!id) continue;
-    // Prefer the entity_name LB ships natively when present — it
-    // saves a per-entity MB call. Synthetic events from our CB
-    // fan-out (`lib/review-events.ts`) don't include the name, so
-    // those need the lookup below.
-    const nativeName = m?.entity_name?.trim() || undefined;
-    if (nativeName) {
-      out.set(id, { ...(out.get(id) ?? {}), name: nativeName });
-    }
     if (m?.entity_type === "release_group") {
-      out.set(id, {
-        ...(out.get(id) ?? {}),
-        coverUrl: caaReleaseGroupUrl(id, 250),
-      });
-      if (!nativeName) releaseGroupIds.add(id);
+      out.set(id, caaReleaseGroupUrl(id, 250));
     } else if (m?.entity_type === "recording") {
       recordingIds.add(id);
-    } else if (m?.entity_type === "artist") {
-      if (!nativeName) artistIds.add(id);
     }
   }
 
-  // Recordings: one LB metadata batch call covers both cover-art
-  // hints and the recording + artist names.
   if (recordingIds.size > 0) {
     let metadata;
     try {
@@ -1141,90 +1044,26 @@ async function resolveReviewEntities(
     }
     if (metadata) {
       for (const id of recordingIds) {
-        const entry = metadata.get(id);
-        const r = entry?.release;
-        let coverUrl: string | undefined;
-        if (r?.caa_release_mbid && r.caa_id) {
-          coverUrl = `https://archive.org/download/mbid-${r.caa_release_mbid}/mbid-${r.caa_release_mbid}-${r.caa_id}_thumb250.jpg`;
-        } else if (r?.release_group_mbid) {
-          coverUrl = caaReleaseGroupUrl(r.release_group_mbid, 250);
-        } else if (r?.mbid) {
-          coverUrl = `https://coverartarchive.org/release/${r.mbid}/front-250`;
+        const r = metadata.get(id)?.release;
+        if (!r) continue;
+        if (r.caa_release_mbid && r.caa_id) {
+          out.set(
+            id,
+            `https://archive.org/download/mbid-${r.caa_release_mbid}/mbid-${r.caa_release_mbid}-${r.caa_id}_thumb250.jpg`,
+          );
+        } else if (r.release_group_mbid) {
+          out.set(id, caaReleaseGroupUrl(r.release_group_mbid, 250));
+        } else if (r.mbid) {
+          // Fall back to the release-level CAA URL — slightly less
+          // canonical but still resolves for most well-known albums.
+          out.set(
+            id,
+            `https://coverartarchive.org/release/${r.mbid}/front-250`,
+          );
         }
-        const name = entry?.recording?.name?.trim();
-        // Build the artist-credit display string from LB's
-        // multi-artist split (artist.name + join_phrase). Falls back
-        // to the flat artist.name when the multi-artist breakdown is
-        // missing.
-        const artists = entry?.artist?.artists ?? [];
-        let artistCredit: string | undefined;
-        let artistMbid: string | undefined;
-        if (artists.length > 0) {
-          artistCredit = artists
-            .map((a) => `${a.name ?? ""}${a.join_phrase ?? ""}`)
-            .join("")
-            .trim();
-          artistMbid = artists.find((a) => a.artist_mbid)?.artist_mbid;
-        } else if (entry?.artist?.name) {
-          artistCredit = entry.artist.name;
-        }
-        const merged: ReviewEntityResolution = { ...(out.get(id) ?? {}) };
-        if (coverUrl) merged.coverUrl = coverUrl;
-        if (name && !merged.name) merged.name = name;
-        if (artistCredit && !merged.artistCredit) {
-          merged.artistCredit = artistCredit;
-        }
-        if (artistMbid && !merged.artistMbid) merged.artistMbid = artistMbid;
-        out.set(id, merged);
       }
     }
   }
-
-  // Release-group + artist names: bounded parallel MB calls. MB's
-  // 1 req/sec rate limiter queues these inside `mbFetch`, so capping
-  // at NAME_LOOKUP_CAP keeps the worst-case first-paint cost ~8s
-  // (and steady-state cost zero, thanks to the 24h MB tag cache).
-  // Events that hit the cap render with the metadata-supplied or
-  // "an entity" fallback name — link target is still correct.
-  const rgsToLookup = Array.from(releaseGroupIds).slice(0, NAME_LOOKUP_CAP);
-  const remaining = Math.max(0, NAME_LOOKUP_CAP - rgsToLookup.length);
-  const artistsToLookup = Array.from(artistIds).slice(0, remaining);
-
-  await Promise.all([
-    ...rgsToLookup.map(async (id) => {
-      try {
-        const rg = await getReleaseGroup(id);
-        const merged: ReviewEntityResolution = { ...(out.get(id) ?? {}) };
-        if (rg?.title && !merged.name) merged.name = rg.title;
-        const credit = rg?.["artist-credit"];
-        if (credit && credit.length > 0) {
-          const joined = credit
-            .map(
-              (c) =>
-                `${c.name ?? c.artist?.name ?? ""}${c.joinphrase ?? ""}`,
-            )
-            .join("")
-            .trim();
-          if (joined && !merged.artistCredit) merged.artistCredit = joined;
-          const firstMbid = credit.find((c) => c.artist?.id)?.artist?.id;
-          if (firstMbid && !merged.artistMbid) merged.artistMbid = firstMbid;
-        }
-        out.set(id, merged);
-      } catch {
-        // best-effort — the renderer's fallback name handles this.
-      }
-    }),
-    ...artistsToLookup.map(async (id) => {
-      try {
-        const a = await getArtist(id);
-        const merged: ReviewEntityResolution = { ...(out.get(id) ?? {}) };
-        if (a?.name && !merged.name) merged.name = a.name;
-        out.set(id, merged);
-      } catch {
-        // ditto
-      }
-    }),
-  ]);
 
   return out;
 }
@@ -1246,7 +1085,7 @@ export async function FeedEventList({
       </p>
     );
   }
-  const reviewEntities = await resolveReviewEntities(events);
+  const reviewCovers = await resolveReviewCovers(events);
   return (
     <ul className="border-border/60 divide-border/60 divide-y rounded-xl border px-4">
       {events.map((e, i) => {
@@ -1274,19 +1113,15 @@ export async function FeedEventList({
                 key={key}
               />
             );
-          case "review":
           case "critiquebrainz_review": {
             const m = e.metadata as ReviewMeta | undefined;
-            const resolved = m?.entity_id
-              ? reviewEntities.get(m.entity_id)
-              : undefined;
+            const cover = m?.entity_id
+              ? (reviewCovers.get(m.entity_id) ?? null)
+              : null;
             return (
               <CritiqueBrainzReviewEvent
                 event={e}
-                coverUrl={resolved?.coverUrl ?? null}
-                entityName={resolved?.name ?? null}
-                artistCredit={resolved?.artistCredit ?? null}
-                artistMbid={resolved?.artistMbid ?? null}
+                coverUrl={cover}
                 key={key}
               />
             );

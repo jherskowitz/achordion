@@ -6,7 +6,6 @@ import { getBskyFriendLinkEvents } from "@/lib/bsky-friend-events";
 import { getMentionEvents } from "@/lib/mention-events";
 import { getListenAlongEvents } from "@/lib/listen-along-events";
 import { getPlaylistPublishedEvents } from "@/lib/playlist-events";
-import { getReviewEvents } from "@/lib/review-events";
 
 const COOKIE = "feed_seen_ts";
 
@@ -42,7 +41,6 @@ export async function GET() {
     mentionEvents,
     listenAlongEvents,
     playlistPublishedEvents,
-    reviewEvents,
   ] = await Promise.all([
     getUserFeed(viewer, token, { count: 50 }),
     getBskyFriendLinkEvents(viewer, cutoff).catch(() => []),
@@ -53,22 +51,12 @@ export async function GET() {
     followingPromise.then((following) =>
       getPlaylistPublishedEvents(viewer, following, cutoff).catch(() => []),
     ),
-    followingPromise.then((following) =>
-      getReviewEvents([
-        viewer,
-        ...following.filter((u) => u !== viewer),
-      ]).catch(() => []),
-    ),
   ]);
-  // Count only newer-than-cutoff reviews — the helper doesn't filter
-  // by timestamp itself (it pulls a small fixed window per user).
-  const newerReviews = reviewEvents.filter((e) => e.created > cutoff);
   const syntheticCount =
     bskyFriendEvents.length +
     mentionEvents.length +
     listenAlongEvents.length +
-    playlistPublishedEvents.length +
-    newerReviews.length;
+    playlistPublishedEvents.length;
   if (events === null) {
     // LB feed unreachable — fall back to the synthetic-side count so
     // the badge still reflects new synthetic events.
