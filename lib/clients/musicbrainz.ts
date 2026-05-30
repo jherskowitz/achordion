@@ -77,6 +77,38 @@ async function queue<T>(fn: () => Promise<T>): Promise<T> {
   return localQueue(fn);
 }
 
+// Overall wall-clock budget for a single name→MBID *lookup* request.
+//
+// MB_FETCH_TIMEOUT_MS (8s) bounds one HTTP round-trip, but the
+// /artist|recording|release-group/lookup route handlers go through the
+// per-instance 1-req/sec `localQueue`: under a burst (chart cards fire
+// many release-group lookups per page load) a request can sit in the
+// queue for many seconds *before* its fetch even starts, then take up to
+// another 8s. The combined queue-wait + fetch time can blow past Vercel's
+// function limit, at which point the platform kills the invocation with a
+// 5xx — and each route's graceful `catch { /* fall through */ } → 302
+// /search` never runs, because a killed function never returns.
+//
+// `withLookupDeadline` caps the *whole* operation (queue wait + fetch) so
+// the handler always returns in time to fall through to its 302 /search
+// fallback instead of being reaped as a 504. Kept under the platform
+// limit with margin. The thrown deadline lands in the existing catch.
+export const LOOKUP_DEADLINE_MS = 7000;
+
+export function withLookupDeadline<T>(
+  promise: Promise<T>,
+  ms = LOOKUP_DEADLINE_MS,
+): Promise<T> {
+  let timer: ReturnType<typeof setTimeout>;
+  const deadline = new Promise<never>((_, reject) => {
+    timer = setTimeout(
+      () => reject(new Error(`MB lookup exceeded ${ms}ms`)),
+      ms,
+    );
+  });
+  return Promise.race([promise, deadline]).finally(() => clearTimeout(timer));
+}
+
 export const cacheTagsMB = {
   artist: (mbid: string) => `mb:artist:${mbid}`,
   releaseGroup: (mbid: string) => `mb:release-group:${mbid}`,

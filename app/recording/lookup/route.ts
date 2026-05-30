@@ -1,4 +1,7 @@
-import { searchRecordings } from "@/lib/clients/musicbrainz";
+import {
+  searchRecordings,
+  withLookupDeadline,
+} from "@/lib/clients/musicbrainz";
 
 /**
  * Resolve `?artist=…&title=…` to a MusicBrainz recording MBID and
@@ -28,7 +31,7 @@ export async function GET(request: Request) {
   }
   try {
     const q = `recording:"${title.replace(/"/g, '\\"')}" AND artist:"${artist.replace(/"/g, '\\"')}"`;
-    const results = await searchRecordings(q, 5);
+    const results = await withLookupDeadline(searchRecordings(q, 5));
     const top = results[0];
     if (top?.id) {
       return Response.redirect(

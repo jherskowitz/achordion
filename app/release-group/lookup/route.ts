@@ -1,4 +1,7 @@
-import { searchReleaseGroups } from "@/lib/clients/musicbrainz";
+import {
+  searchReleaseGroups,
+  withLookupDeadline,
+} from "@/lib/clients/musicbrainz";
 
 /**
  * Resolve `?artist=…&title=…` to a MusicBrainz release-group MBID and
@@ -29,7 +32,7 @@ export async function GET(request: Request) {
   }
   try {
     const q = `release:"${title.replace(/"/g, '\\"')}" AND artist:"${artist.replace(/"/g, '\\"')}"`;
-    const results = await searchReleaseGroups(q, 8);
+    const results = await withLookupDeadline(searchReleaseGroups(q, 8));
     const album = results.find((r) => r["primary-type"] === "Album");
     const ep = results.find((r) => r["primary-type"] === "EP");
     const top = album ?? ep ?? results[0];
