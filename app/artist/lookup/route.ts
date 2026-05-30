@@ -1,4 +1,4 @@
-import { searchArtists } from "@/lib/clients/musicbrainz";
+import { searchArtists, withLookupDeadline } from "@/lib/clients/musicbrainz";
 
 /**
  * Resolve `?name=…` to a MusicBrainz artist MBID and redirect to
@@ -25,7 +25,7 @@ export async function GET(request: Request) {
     // matches (otherwise common-word names fan out to a long list of
     // unrelated artists ranked higher by token overlap).
     const q = `artist:"${name.replace(/"/g, '\\"')}"`;
-    const results = await searchArtists(q, 5);
+    const results = await withLookupDeadline(searchArtists(q, 5));
     const top = results[0];
     if (top?.id) {
       return Response.redirect(
