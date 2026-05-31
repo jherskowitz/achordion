@@ -745,21 +745,37 @@ This is the contract for **any** Parachord client (notably **parachord-mobile / 
 **Golden rule: a playlist that already exists on LB must be UPDATED in place, never re-created.** LB playlists are keyed by MBID. Sync must persist a local→LB MBID mapping and drive everything off it.
 
 1. **First upload** of a local playlist: `POST /1/playlist/create`, then **store the returned `playlist_mbid`** against that local playlist's stable id. This mapping is the source of truth for every later sync.
-2. **Subsequent syncs**: look up the stored MBID and update in place —
+2. **Subsequent syncs**: look up the stored MBID and update in place. LB exposes three distinct edit endpoints, all keyed by MBID — pick the right one for the operation:
    - metadata (title / description / visibility): `POST /1/playlist/edit/{mbid}`
-   - tracks: LB's playlist-item add / move / delete endpoints
-   - **never** call `/playlist/create` for a playlist that already has a mapping.
-3. **Missing on LB** (stored MBID 404s because the user deleted it server-side): treat as gone — create once and re-map. Don't keep recreating on every sync.
-4. **Idempotency is a hard requirement**: running sync twice with no local changes must produce **zero** new playlists and zero metadata churn. Add a test that runs sync → sync → asserts the LB playlist count is unchanged.
-5. **Never touch `dateCreated`** — it's immutable on LB and only *stays* correct if you never re-create. A reset creation date is the canary that something is recreating.
+   - **add** tracks: `POST /1/playlist/{mbid}/item/add`
+   - **remove** tracks: `POST /1/playlist/{mbid}/item/delete`
 
-**Visibility — always send an explicit `public` flag; default private.**
+   Don't conflate these — `/edit/{mbid}` does NOT accept a track list and a track-mutation call to `/edit/{mbid}` 400s. And **never** call `/playlist/create` for a playlist that already has a mapping.
+3. **Mapping persistence must survive any save bug.** Don't store the local→MBID mapping as a single field on the playlist data shape — that field gets stripped by save paths that forget to forward it, and stranding the mapping triggers re-creation on the next sync. Parachord-desktop learned this the hard way and now keeps the mapping in a separate, main-process-owned key (`sync_playlist_links`) that's written independently of the playlist object. Any client doing LB sync needs an equivalent: a storage layer where dropping the mapping requires *two* simultaneous bugs, not one.
+4. **A failed fetch is not a confirmed-empty result.** Before deciding "the stored MBID is gone, recreate it" the sync must have a *successful* response from LB confirming the playlist is missing. Distinguish three states:
+   - HTTP success, MBID present in response → reuse mapping ✓
+   - HTTP success, MBID definitively absent (404 on direct lookup, or a complete paginated `/1/user/{user}/playlists` walk with no match) → handle per rule 5
+   - HTTP error / timeout / 5xx / 429 / malformed body / partial pagination → **abort the sync cycle for this playlist; preserve the mapping**; retry next cycle.
 
-- **ListenBrainz defaults a playlist whose JSPF extension has no `public` field to public.** (Achordion's own reader mirrors this: `isPublic: ext?.public ?? true` in `lib/clients/listenbrainz.ts`.) So **omitting** visibility on create = silently publishing everything — that's exactly why the incident made every playlist public. The Android sync almost certainly sent no `public` field (or didn't map local visibility), and LB filled in `public: true`.
-- Every create/edit payload must set `extension["https://musicbrainz.org/doc/jspf#playlist"].public` **explicitly**, derived from the local playlist's real visibility.
-- When the local visibility is unknown, default to **private** (`public: false`). Publishing is a deliberate user action, never a sync side-effect.
+   Treating transient unreachability as confirmed-empty is exactly how the 2026-05 incident compounded to 6,397 duplicates — the dedup repeatedly "discovered" the remote was gone every time LB had a hiccup.
+5. **Missing on LB** (a *successful* lookup confirmed the stored MBID 404s, because the user deleted it server-side): treat as gone — create once and re-map. Don't keep recreating on every sync.
+6. **Idempotency is a hard requirement, and it's stronger than "count unchanged."** Running sync twice with no local changes must produce **identical remote state** — same MBIDs, same `dateCreated`, same titles, same track lists. Counting playlists alone misses the failure mode where a buggy sync deletes-then-recreates with the same count (net zero in cardinality, but every MBID is fresh and every `dateCreated` is reset). The test: diff `GET /1/user/{user}/playlists` before/after a no-op sync and assert the diff is empty.
+7. **Never touch `dateCreated`** — it's immutable on LB and only *stays* correct if you never re-create. A reset creation date is the canary that something is recreating; bake it into the idempotency test above.
 
-Reference payload shapes: `createPlaylistOnLb` and `editPlaylist` in [`lib/clients/listenbrainz.ts`](./lib/clients/listenbrainz.ts) — Achordion always passes an explicit `public` value, which is why its create path never had this bug.
+**Visibility — always send an explicit `public` flag derived from the local playlist; default private; never use `true` as a sync-side default.**
+
+There are two related ways a sync can publish playlists the user didn't ask to publish:
+
+- **Omitting the flag.** ListenBrainz defaults a playlist whose JSPF extension has no `public` field to public. (Achordion's own reader mirrors this: `isPublic: ext?.public ?? true` in `lib/clients/listenbrainz.ts`.) So a create payload that doesn't set `extension["https://musicbrainz.org/doc/jspf#playlist"].public` at all is silently publishing everything.
+- **Explicitly defaulting to `true`.** The Parachord-Android sync that caused the 2026-05 incident wasn't omitting the field — its `ListenBrainzSyncProvider.createPlaylist` literally passed `isPublic = true` as a hard-coded constant to the LB client, ignoring the local playlist's real visibility. An "always send explicit" rule alone would not have caught that; the implementer wrote `true` deliberately. Both failure modes need closing.
+
+Rules:
+
+1. Every create/edit payload must set `extension["https://musicbrainz.org/doc/jspf#playlist"].public` **explicitly**, derived from the local playlist's real visibility state.
+2. When the local visibility is unknown or unset, default to **private** (`public: false`). Publishing is a deliberate user action, never a sync side-effect.
+3. Never pass `public: true` (or `isPublic = true`, `visibility: "public"`, etc.) as a default in any sync-provider call. The only place `public: true` may appear in sync code is reading a *user-set* explicit-public flag off the local playlist and forwarding it unchanged. Grep for `true` literals in any LB create/edit construction during review — that's the smell.
+
+Reference payload shapes: `createPlaylistOnLb` and `editPlaylist` in [`lib/clients/listenbrainz.ts`](./lib/clients/listenbrainz.ts) — Achordion always passes an explicit `public` value derived from the user action that opened the create surface (single-track favicon click), which is why its create path never had this bug.
 
 ### What Parachord expects from Achordion
 
