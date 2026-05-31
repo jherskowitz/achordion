@@ -654,7 +654,7 @@ When adding a new entity page, copy the pattern from `app/(app)/recording/[mbid]
 
 ## Parachord interop contract
 
-This section is for **Parachord agents** modifying the `parachord-desktop` / `parachord-website` / `parachord-browser-extension` codebases who need to keep Achordion in sync.
+This section is for **Parachord agents** modifying the `parachord-desktop` / `parachord-mobile` / `parachord-website` / `parachord-browser-extension` codebases who need to keep Achordion in sync.
 
 ### What Achordion expects from Parachord
 
@@ -735,6 +735,31 @@ If they aren't yet:
 - Tapping a play affordance on mobile from a non-installed user opens the OS's "Cannot Open Page" alert (iOS) or does nothing visible (Android).
 - The `parachord://` URL is still valid for installed users — they get correct behaviour.
 - We accept that as a bridging trade-off; the install pitch lives at the homepage / `/apps` Marketplace until the Universal-Link path is live.
+
+### Playlist sync — reconcile against existing LB playlists, never re-create
+
+This is the contract for **any** Parachord client (notably **parachord-mobile / Android**) that syncs the user's local playlists up to ListenBrainz. Achordion is a read-mirror of the user's LB playlists; a sync that gets this wrong corrupts the library Achordion displays.
+
+**Context — the 2026-05 incident.** Parachord-Android's sync duplicated the user's entire LB playlist library: every playlist reappeared as a brand-new record with a new MBID, `dateCreated` reset to the sync day, and **all public**. Achordion was confirmed *not* the cause (its only create path is the user-initiated single-track "new playlist" button; it has no bulk-create or sync). The duplication + date reset is the unmistakable signature of a sync that **re-creates** playlists instead of updating the existing ones, with visibility left unset.
+
+**Golden rule: a playlist that already exists on LB must be UPDATED in place, never re-created.** LB playlists are keyed by MBID. Sync must persist a local→LB MBID mapping and drive everything off it.
+
+1. **First upload** of a local playlist: `POST /1/playlist/create`, then **store the returned `playlist_mbid`** against that local playlist's stable id. This mapping is the source of truth for every later sync.
+2. **Subsequent syncs**: look up the stored MBID and update in place —
+   - metadata (title / description / visibility): `POST /1/playlist/edit/{mbid}`
+   - tracks: LB's playlist-item add / move / delete endpoints
+   - **never** call `/playlist/create` for a playlist that already has a mapping.
+3. **Missing on LB** (stored MBID 404s because the user deleted it server-side): treat as gone — create once and re-map. Don't keep recreating on every sync.
+4. **Idempotency is a hard requirement**: running sync twice with no local changes must produce **zero** new playlists and zero metadata churn. Add a test that runs sync → sync → asserts the LB playlist count is unchanged.
+5. **Never touch `dateCreated`** — it's immutable on LB and only *stays* correct if you never re-create. A reset creation date is the canary that something is recreating.
+
+**Visibility — always send an explicit `public` flag; default private.**
+
+- **ListenBrainz defaults a playlist whose JSPF extension has no `public` field to public.** (Achordion's own reader mirrors this: `isPublic: ext?.public ?? true` in `lib/clients/listenbrainz.ts`.) So **omitting** visibility on create = silently publishing everything — that's exactly why the incident made every playlist public. The Android sync almost certainly sent no `public` field (or didn't map local visibility), and LB filled in `public: true`.
+- Every create/edit payload must set `extension["https://musicbrainz.org/doc/jspf#playlist"].public` **explicitly**, derived from the local playlist's real visibility.
+- When the local visibility is unknown, default to **private** (`public: false`). Publishing is a deliberate user action, never a sync side-effect.
+
+Reference payload shapes: `createPlaylistOnLb` and `editPlaylist` in [`lib/clients/listenbrainz.ts`](./lib/clients/listenbrainz.ts) — Achordion always passes an explicit `public` value, which is why its create path never had this bug.
 
 ### What Parachord expects from Achordion
 
