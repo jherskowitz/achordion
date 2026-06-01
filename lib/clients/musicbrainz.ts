@@ -130,30 +130,48 @@ async function mbFetch<T>(
   return queue(async () => {
     const sep = path.includes("?") ? "&" : "?";
     const url = `${MB_BASE}${path}${sep}fmt=json`;
-    let res: Response;
-    try {
-      res = await fetch(url, {
-        headers: { "User-Agent": USER_AGENT, Accept: "application/json" },
-        signal: AbortSignal.timeout(MB_FETCH_TIMEOUT_MS),
-        next: {
-          revalidate: opts.revalidate ?? 60 * 60 * 24,
-          tags: opts.tags,
-        },
-      });
-    } catch (e) {
-      // AbortSignal.timeout fires a TimeoutError DOMException; network
-      // failures throw TypeError. Normalize both into a MusicBrainzError
-      // so callers get the consistent `digest` and we never let a raw
-      // hang/abort escape as an unhandled 504. 504 here is "we gave up
-      // on MB", not "we crashed".
-      const aborted =
-        e instanceof DOMException && e.name === "TimeoutError";
-      throw new MusicBrainzError(
-        504,
-        aborted
-          ? `MB timeout after ${MB_FETCH_TIMEOUT_MS}ms: ${path}`
-          : `MB fetch failed: ${e instanceof Error ? e.message : String(e)}`,
+    const doFetch = async (): Promise<Response> => {
+      try {
+        return await fetch(url, {
+          headers: { "User-Agent": USER_AGENT, Accept: "application/json" },
+          signal: AbortSignal.timeout(MB_FETCH_TIMEOUT_MS),
+          next: {
+            revalidate: opts.revalidate ?? 60 * 60 * 24,
+            tags: opts.tags,
+          },
+        });
+      } catch (e) {
+        // AbortSignal.timeout fires a TimeoutError DOMException; network
+        // failures throw TypeError. Normalize both into a
+        // MusicBrainzError so callers get the consistent `digest` and we
+        // never let a raw hang/abort escape as an unhandled 504. 504
+        // here is "we gave up on MB", not "we crashed".
+        const aborted = e instanceof DOMException && e.name === "TimeoutError";
+        throw new MusicBrainzError(
+          504,
+          aborted
+            ? `MB timeout after ${MB_FETCH_TIMEOUT_MS}ms: ${path}`
+            : `MB fetch failed: ${e instanceof Error ? e.message : String(e)}`,
+        );
+      }
+    };
+
+    let res = await doFetch();
+    // 429 resilience. The 1-req/sec throttle is per-instance, so N warm
+    // Vercel instances can collectively exceed MB's rate limit and get
+    // a 429. Rather than surface the rate-limit error page on a
+    // transient spike, honor MB's Retry-After (capped) and retry ONCE.
+    // Bounded so worst-case latency (≤2s wait + one 8s fetch) stays
+    // well under the function limit. A second 429 falls through to the
+    // throw below → the MB_RATE_LIMITED error page, as before.
+    if (res.status === 429) {
+      const retryAfter = Number(res.headers.get("Retry-After"));
+      const waitMs = Math.min(
+        Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1000 : 1000,
+        2000,
       );
+      await new Promise((r) => setTimeout(r, waitMs));
+      res = await doFetch();
     }
     if (!res.ok) {
       const body = await res.text().catch(() => "");
