@@ -52,6 +52,7 @@ async function CurrentlyInto({ username }: { username: string }) {
               mbid: a.artist_mbid ?? null,
               name: a.artist_name,
             })}
+            prefetch={false}
             className="hover:text-foreground inline-block underline-offset-4 hover:underline pointer-coarse:px-1 pointer-coarse:py-1"
           >
             {a.artist_name}
@@ -115,6 +116,7 @@ export function UserCard({
         <div className="flex items-baseline justify-between gap-2">
           <Link
             href={linkHref}
+            prefetch={false}
             className="block min-w-0 py-0.5 pointer-coarse:py-1"
           >
             <p className="truncate text-sm font-medium pointer-coarse:text-base">

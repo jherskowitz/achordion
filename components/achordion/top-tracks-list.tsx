@@ -65,7 +65,7 @@ export function TopTracksList({ tracks }: { tracks: TrackEntry[] }) {
                     artist: t.artist_name,
                     title: t.track_name,
                   })}
-                  className="hover:underline"
+                  prefetch={false} className="hover:underline"
                 >
                   {t.track_name}
                 </Link>
@@ -73,7 +73,7 @@ export function TopTracksList({ tracks }: { tracks: TrackEntry[] }) {
               <p className="text-muted-foreground truncate text-xs">
                 <Link
                   href={artistHref({ mbid: artistMbid, name: t.artist_name })}
-                  className="hover:text-foreground"
+                  prefetch={false} className="hover:text-foreground"
                 >
                   {t.artist_name}
                 </Link>

@@ -34,7 +34,7 @@ function CollegeAlbumCard({ item }: { item: EarshotChartItem }) {
   return (
     <li className="min-w-0">
       <div className="group relative overflow-hidden rounded-md">
-        <Link href={albumHref} className="block">
+        <Link href={albumHref} prefetch={false} className="block">
           <LazyAlbumCover
             artist={item.artist}
             album={item.album}
@@ -57,14 +57,14 @@ function CollegeAlbumCard({ item }: { item: EarshotChartItem }) {
         />
       </div>
       <p className="mt-2 truncate text-sm font-medium">
-        <Link href={albumHref} className="italic hover:underline">
+        <Link href={albumHref} prefetch={false} className="italic hover:underline">
           {item.album}
         </Link>
       </p>
       <p className="text-muted-foreground truncate text-xs">
         <Link
           href={artistHref({ name: item.artist })}
-          className="hover:text-foreground hover:underline"
+          prefetch={false} className="hover:text-foreground hover:underline"
         >
           {item.artist}
         </Link>

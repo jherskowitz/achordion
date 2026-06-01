@@ -121,7 +121,7 @@ function renderTile(r: FreshRelease) {
   return (
     <article key={r.release_mbid} className="min-w-0">
       <div className="group relative overflow-hidden rounded-md">
-        <Link href={target} className="block">
+        <Link href={target} prefetch={false} className="block">
           <CoverArt
             src={cover}
             alt={r.release_name}
@@ -143,7 +143,7 @@ function renderTile(r: FreshRelease) {
         />
       </div>
       <p className="mt-2 truncate text-sm font-medium">
-        <Link href={target} className="hover:underline">
+        <Link href={target} prefetch={false} className="hover:underline">
           {r.release_name}
         </Link>
       </p>
@@ -153,6 +153,7 @@ function renderTile(r: FreshRelease) {
             mbid: artistMbid,
             name: r.artist_credit_name,
           })}
+          prefetch={false}
           className="hover:text-foreground"
         >
           {r.artist_credit_name}

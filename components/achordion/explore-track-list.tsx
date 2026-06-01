@@ -63,6 +63,7 @@ export function ExploreTrackList({
               <p className="truncate text-sm font-medium">
                 <Link
                   href={`/recording/${r.recording_mbid}`}
+                  prefetch={false}
                   className="hover:underline"
                 >
                   {title}
@@ -72,6 +73,7 @@ export function ExploreTrackList({
                 {artistMbid ? (
                   <Link
                     href={`/artist/${artistMbid}`}
+                    prefetch={false}
                     className="hover:text-foreground"
                   >
                     {artistName}
@@ -88,6 +90,7 @@ export function ExploreTrackList({
                         artist: artistName,
                         title: releaseName,
                       })}
+                      prefetch={false}
                       className="hover:text-foreground italic"
                     >
                       {releaseName}

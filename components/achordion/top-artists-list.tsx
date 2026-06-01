@@ -53,7 +53,7 @@ export function TopArtistsList({ artists }: { artists: ArtistEntry[] }) {
                     mbid: a.artist_mbid,
                     name: a.artist_name,
                   })}
-                  className="hover:underline"
+                  prefetch={false} className="hover:underline"
                 >
                   {a.artist_name}
                 </Link>

@@ -53,7 +53,7 @@ export function TopListenersList({
                   feel detached from the avatar. */}
               <Link
                 href={`/user/${encodeURIComponent(l.user_name)}`}
-                className="flex min-w-0 items-center gap-2"
+                prefetch={false} className="flex min-w-0 items-center gap-2"
               >
                 <span className="text-muted-foreground/70 w-4 shrink-0 text-xs tabular-nums">
                   {i + 1}
@@ -108,7 +108,7 @@ export function TopListenersList({
           >
             <Link
               href={`/user/${encodeURIComponent(l.user_name)}`}
-              className="block"
+              prefetch={false} className="block"
             >
               <div className="flex items-center gap-2">
                 <span className="text-muted-foreground/70 w-4 shrink-0 text-xs tabular-nums">

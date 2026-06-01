@@ -95,6 +95,7 @@ export function RecommendedArtistsList({
           <li key={a.mbid}>
             <Link
               href={`/artist/${a.mbid}`}
+              prefetch={false}
               className="hover:bg-muted/40 group flex min-w-0 items-center gap-2 rounded-md px-2 py-1.5"
             >
               <Suspense
@@ -121,6 +122,7 @@ export function RecommendedArtistsList({
         <li key={a.mbid}>
           <Link
             href={`/artist/${a.mbid}`}
+            prefetch={false}
             className="border-border/60 hover:border-foreground/30 hover:bg-muted/30 group flex min-w-0 items-center gap-3 rounded-xl border p-4 transition-colors"
           >
             <Suspense

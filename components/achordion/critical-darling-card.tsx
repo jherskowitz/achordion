@@ -50,7 +50,7 @@ export function CriticalDarlingCard({
           in on hover — same treatment used on chart / discography /
           fresh-releases grids. */}
       <div className="group relative overflow-hidden rounded-md">
-        <Link href={albumLink} className="block">
+        <Link href={albumLink} prefetch={false} className="block">
           <LazyAlbumCover
             artist={album.artist}
             album={album.title}
@@ -64,13 +64,14 @@ export function CriticalDarlingCard({
       </div>
       <div>
         <p className="truncate text-sm font-medium">
-          <Link href={albumLink} className="hover:underline">
+          <Link href={albumLink} prefetch={false} className="hover:underline">
             {album.title}
           </Link>
         </p>
         <p className="text-muted-foreground truncate text-xs">
           <Link
             href={artistHref({ name: album.artist })}
+            prefetch={false}
             className="hover:text-foreground hover:underline"
           >
             {album.artist}

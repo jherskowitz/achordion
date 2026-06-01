@@ -80,7 +80,7 @@ function LbAlbumCard({
   return (
     <li className="min-w-0">
       <div className="group relative overflow-hidden rounded-md">
-        <Link href={albumLink} className="block">
+        <Link href={albumLink} prefetch={false} className="block">
           <LazyAlbumCover
             artist={item.artist_name}
             album={item.release_group_name}
@@ -110,7 +110,7 @@ function LbAlbumCard({
         />
       </div>
       <p className="mt-2 truncate text-sm font-medium">
-        <Link href={albumLink} className="italic hover:underline">
+        <Link href={albumLink} prefetch={false} className="italic hover:underline">
           {item.release_group_name}
         </Link>
       </p>
@@ -120,7 +120,7 @@ function LbAlbumCard({
             mbid: item.artist_mbids[0],
             name: item.artist_name,
           })}
-          className="hover:text-foreground hover:underline"
+          prefetch={false} className="hover:text-foreground hover:underline"
         >
           {item.artist_name}
         </Link>
@@ -199,7 +199,7 @@ export function LbSongsChartList({
             )}
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-medium">
-                <Link href={trackLink} className="hover:underline">
+                <Link href={trackLink} prefetch={false} className="hover:underline">
                   {item.track_name}
                 </Link>
               </p>
@@ -209,7 +209,7 @@ export function LbSongsChartList({
                     mbid: item.artist_mbids[0],
                     name: item.artist_name,
                   })}
-                  className="hover:text-foreground hover:underline"
+                  prefetch={false} className="hover:text-foreground hover:underline"
                 >
                   {item.artist_name}
                 </Link>

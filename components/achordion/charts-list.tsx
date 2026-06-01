@@ -63,7 +63,7 @@ export function ChartsSongsList({ items }: { items: AppleChartItem[] }) {
             <p className="truncate text-sm font-medium">
               <Link
                 href={recordingHref({ artist: t.artistName, title: t.name })}
-                className="hover:underline"
+                prefetch={false} className="hover:underline"
               >
                 {t.name}
               </Link>
@@ -71,7 +71,7 @@ export function ChartsSongsList({ items }: { items: AppleChartItem[] }) {
             <p className="text-muted-foreground truncate text-xs">
               <Link
                 href={artistHref({ name: t.artistName })}
-                className="hover:text-foreground hover:underline"
+                prefetch={false} className="hover:text-foreground hover:underline"
               >
                 {t.artistName}
               </Link>
@@ -132,7 +132,7 @@ function ChartsAlbumCard({ item }: { item: AppleChartItem }) {
       {/* Cover + rank in one container so the Play fab can sit on top
           of the cover Link without nesting anchors. */}
       <div className="group relative overflow-hidden rounded-md">
-        <Link href={albumHref} className="block">
+        <Link href={albumHref} prefetch={false} className="block">
           {cover}
         </Link>
         <span
@@ -147,14 +147,14 @@ function ChartsAlbumCard({ item }: { item: AppleChartItem }) {
         />
       </div>
       <p className="mt-2 truncate text-sm font-medium">
-        <Link href={albumHref} className="hover:underline">
+        <Link href={albumHref} prefetch={false} className="hover:underline">
           {item.name}
         </Link>
       </p>
       <p className="text-muted-foreground truncate text-xs">
         <Link
           href={artistHref({ name: item.artistName })}
-          className="hover:text-foreground hover:underline"
+          prefetch={false} className="hover:text-foreground hover:underline"
         >
           {item.artistName}
         </Link>

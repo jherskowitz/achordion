@@ -55,7 +55,7 @@ export function Discography({ buckets }: { buckets: DiscographyBucket[] }) {
                   <div className="group relative overflow-hidden rounded-md">
                     <Link
                       href={`/release-group/${rg.id}`}
-                      className="block"
+                      prefetch={false} className="block"
                     >
                       <CoverArt
                         src={caaReleaseGroupUrl(rg.id, 250)}
@@ -76,7 +76,7 @@ export function Discography({ buckets }: { buckets: DiscographyBucket[] }) {
                   <p className="mt-2 truncate text-sm font-medium">
                     <Link
                       href={`/release-group/${rg.id}`}
-                      className="hover:underline"
+                      prefetch={false} className="hover:underline"
                     >
                       {rg.title}
                     </Link>

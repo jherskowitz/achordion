@@ -61,7 +61,7 @@ export function TopAlbumsGrid({ albums }: { albums: AlbumEntry[] }) {
                 sibling <a> inside the relative container so we don't
                 nest anchors. */}
             <div className="group relative overflow-hidden rounded-md">
-              <Link href={albumHref} className="block">
+              <Link href={albumHref} prefetch={false} className="block">
                 <CoverArt
                   src={coverFor(rg)}
                   alt={rg.release_group_name}
@@ -89,13 +89,14 @@ export function TopAlbumsGrid({ albums }: { albums: AlbumEntry[] }) {
               />
             </div>
             <p className="mt-2 truncate text-sm font-medium">
-              <Link href={albumHref} className="hover:underline">
+              <Link href={albumHref} prefetch={false} className="hover:underline">
                 {rg.release_group_name}
               </Link>
             </p>
             <p className="text-muted-foreground truncate text-xs">
               <Link
                 href={aHref}
+                prefetch={false}
                 className="hover:text-foreground hover:underline"
               >
                 {rg.artist_name}
