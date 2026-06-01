@@ -8,7 +8,6 @@ import {
   partitionArtistRelations,
   type RecordingRelease,
 } from "@/lib/clients/musicbrainz";
-import { getRecordingPopularity } from "@/lib/clients/listenbrainz";
 import { caaReleaseUrl } from "@/lib/clients/coverart";
 import { mergeTagsAndGenres } from "@/lib/merge-tags-genres";
 import { parachordPlayAlbum, parachordPlayTrack } from "@/lib/parachord";
@@ -24,10 +23,7 @@ import {
 } from "@/components/achordion/external-links";
 import { StreamingLinksRow } from "@/components/achordion/streaming-links-row";
 import { PageHeader } from "@/components/achordion/page-header";
-import {
-  EntityHeaderStats,
-  EntityHeaderStatsSkeleton,
-} from "@/components/achordion/entity-header-stats";
+import { EntityHeaderListenerStats } from "@/components/achordion/entity-listener-stats";
 import { PageShell } from "@/components/achordion/page-shell";
 import { EmbedShareButton } from "@/components/achordion/embed-share-button";
 import { TagChips } from "@/components/achordion/tag-chips";
@@ -72,14 +68,10 @@ async function RecordingBody({ mbid }: { mbid: string }) {
     (r) => r["release-group"]?.id !== heroReleaseGroup?.id,
   );
   const length = formatLength(recording.length);
-  // Stream the LB calls — recording popularity (header stats block)
-  // and the hero album's listeners (sidebar Top Listeners). LB has
-  // no per-recording top-listeners endpoint, so the hero album's
-  // listeners is the closest proxy. Don't await here — hand the
-  // promises to Suspense'd children so the header + breadcrumb +
-  // "Also appears on" grid can paint immediately on getRecording's
-  // return.
-  const popularityPromise = getRecordingPopularity(mbid).catch(() => null);
+  // The header listens/listeners counts load post-hydration via
+  // <EntityHeaderListenerStats> hitting `/api/recording/[mbid]/listeners`
+  // — keeping the LB popularity call off this CDN-cached page's render
+  // path so it can't wedge the page on its skeleton.
   const cover = heroRelease ? caaReleaseUrl(heroRelease.id, 500) : null;
   const { urls } = partitionArtistRelations({
     relations: recording.relations,
@@ -257,9 +249,9 @@ async function RecordingBody({ mbid }: { mbid: string }) {
           </div>
         }
         actions={
-          <Suspense fallback={<EntityHeaderStatsSkeleton />}>
-            <RecordingHeaderStats promise={popularityPromise} />
-          </Suspense>
+          <EntityHeaderListenerStats
+            endpoint={`/api/recording/${mbid}/listeners`}
+          />
         }
       />
 
@@ -349,24 +341,6 @@ async function RecordingBody({ mbid }: { mbid: string }) {
           track counts. Top Listeners stays on the album page where
           the data is honest. */}
     </>
-  );
-}
-
-/** Streams the recording's listens / listeners into the shared
- *  EntityHeaderStats block — same visual treatment as the album
- *  header. */
-async function RecordingHeaderStats({
-  promise,
-}: {
-  promise: Promise<{ totalListenCount: number; totalUserCount: number } | null>;
-}) {
-  const popularity = await promise;
-  if (!popularity) return null;
-  return (
-    <EntityHeaderStats
-      totalListens={popularity.totalListenCount}
-      totalListeners={popularity.totalUserCount}
-    />
   );
 }
 

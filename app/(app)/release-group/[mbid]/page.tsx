@@ -19,9 +19,9 @@ import { CoverArt } from "@/components/achordion/cover-art";
 import { PlayOnHoverFab } from "@/components/achordion/play-on-hover-fab";
 import { TrackList } from "@/components/achordion/track-list";
 import {
-  AlbumHeaderStats,
-  AlbumTopListeners,
-} from "@/components/achordion/album-listener-stats";
+  EntityHeaderListenerStats,
+  EntityTopListeners,
+} from "@/components/achordion/entity-listener-stats";
 import {
   ExternalLinks,
   categoriseLinks,
@@ -78,8 +78,8 @@ async function AlbumBody({ mbid }: { mbid: string }) {
   const canonical = pickCanonicalRelease(rg);
 
   // Listener stats (header counts + Top Listeners) are NOT fetched
-  // here — they load post-hydration via <AlbumHeaderStats> /
-  // <AlbumTopListeners> hitting `/api/release-group/[mbid]/listeners`.
+  // here — they load post-hydration via <EntityHeaderListenerStats> /
+  // <EntityTopListeners> hitting `/api/release-group/[mbid]/listeners`.
   // Keeping the (sometimes-slow / hanging) LB stats call off the
   // render path is what stops a stalled LB request from wedging this
   // CDN-cached page on its skeleton. `release` (an MB call) is still
@@ -289,7 +289,11 @@ async function AlbumBody({ mbid }: { mbid: string }) {
             />
           </div>
         }
-        actions={<AlbumHeaderStats mbid={mbid} />}
+        actions={
+          <EntityHeaderListenerStats
+            endpoint={`/api/release-group/${mbid}/listeners`}
+          />
+        }
       />
 
       <div className="-mt-2 flex flex-wrap gap-1.5 pb-4">
@@ -320,7 +324,9 @@ async function AlbumBody({ mbid }: { mbid: string }) {
         </div>
 
         <aside className="space-y-8">
-          <AlbumTopListeners mbid={mbid} />
+          <EntityTopListeners
+            endpoint={`/api/release-group/${mbid}/listeners`}
+          />
           {otherUrls.length > 0 && (
             <div>
               {/* h2 (sidebar): sibling of the main column's "Tracks"

@@ -8,19 +8,17 @@ import {
   type ArtistDetail,
 } from "@/lib/clients/musicbrainz";
 import {
-  getArtistListeners,
   getLbRadio,
   getSimilarArtists,
   getTopRecordingsForArtist,
-  type ArtistListeners,
 } from "@/lib/clients/listenbrainz";
 import { findBioSource, getBiography } from "@/lib/clients/wikipedia";
 import { PageShell } from "@/components/achordion/page-shell";
 import { PageHeader } from "@/components/achordion/page-header";
 import {
-  EntityHeaderStats,
-  EntityHeaderStatsSkeleton,
-} from "@/components/achordion/entity-header-stats";
+  EntityHeaderListenerStats,
+  EntityTopListeners,
+} from "@/components/achordion/entity-listener-stats";
 import { track } from "@vercel/analytics/server";
 import {
   ArtistAvatar,
@@ -101,13 +99,6 @@ async function ArtistBody({
   } catch {
     notFound();
   }
-
-  // Listener counts are best-effort and live behind a separate
-  // ListenBrainz call. Don't block the header render on it — pass
-  // the unawaited promise to a child Suspense boundary so the artist
-  // name + avatar paints as soon as `getArtist` returns; the
-  // numbers and the sidebar's top-listeners list fill in later.
-  const listenersPromise = getArtistListeners(mbid).catch(() => null);
 
   const { urls } = partitionArtistRelations(artist);
   const bioSource = findBioSource(urls);
@@ -215,9 +206,9 @@ async function ArtistBody({
         // we don't have an /artists directory page to crumb back to.
         // The "Artist" eyebrow already labels what kind of page this is.
         actions={
-          <Suspense fallback={<EntityHeaderStatsSkeleton />}>
-            <ListenerStats promise={listenersPromise} />
-          </Suspense>
+          <EntityHeaderListenerStats
+            endpoint={`/api/artist/${mbid}/listeners`}
+          />
         }
         afterTitle={
           /* Always render the streaming row so the "+ Add sources"
@@ -318,71 +309,22 @@ async function ArtistBody({
         {/* Sidebar — DOM-last so it's at the bottom on mobile.
             On lg, col-start-2 row-start-1 puts it back in the
             right column of the hero row. */}
-        <div className="lg:col-start-2 lg:row-start-1">
-          <Suspense
-            fallback={
-              <ArtistInfoSidebar
-                artist={artist}
-                linksOverride={otherWithCredits}
-                // No topListeners during the initial paint — the section
-                // gets hidden, fills in below when listeners resolves.
-              />
-            }
-          >
-            <SidebarWithListeners
-              artist={artist}
-              other={otherWithCredits}
-              promise={listenersPromise}
-            />
-          </Suspense>
+        <div className="lg:col-start-2 lg:row-start-1 space-y-8">
+          <ArtistInfoSidebar
+            artist={artist}
+            linksOverride={otherWithCredits}
+          />
+          {/* Top Listeners load post-hydration via the cacheable
+              `/api/artist/[mbid]/listeners` endpoint, so the
+              (hang-prone) getArtistListeners call stays off this
+              CDN-cached page's render path. */}
+          <EntityTopListeners endpoint={`/api/artist/${mbid}/listeners`} />
         </div>
       </div>
     </>
   );
 }
 
-/** Streams the artist's listens / listeners into the shared
- *  EntityHeaderStats block. Decoupled so the artist name + avatar
- *  can paint the moment `getArtist` resolves; the numbers fill in
- *  once the LB stats call returns. */
-async function ListenerStats({
-  promise,
-}: {
-  promise: Promise<ArtistListeners | null>;
-}) {
-  const listeners = await promise;
-  return (
-    <EntityHeaderStats
-      totalListens={listeners?.total_listen_count}
-      totalListeners={listeners?.total_user_count}
-    />
-  );
-}
-
-
-/** Awaits `listenersPromise` and renders the full sidebar including
- *  the top-listeners list. The Suspense fallback at the call site
- *  renders `<ArtistInfoSidebar>` with everything except the listeners
- *  list, so all the artist-info facts (life-span, members, links)
- *  paint immediately — only the top-listeners section streams in. */
-async function SidebarWithListeners({
-  artist,
-  other,
-  promise,
-}: {
-  artist: ArtistDetail;
-  other: ArtistExternalLink[];
-  promise: Promise<ArtistListeners | null>;
-}) {
-  const listeners = await promise;
-  return (
-    <ArtistInfoSidebar
-      artist={artist}
-      linksOverride={other}
-      topListeners={listeners?.listeners}
-    />
-  );
-}
 
 async function LbRadioBlock({
   mbid,

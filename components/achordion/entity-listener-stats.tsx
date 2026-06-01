@@ -11,56 +11,57 @@ import { UserAvatar } from "./user-avatar";
 import { LiveOnAirIndicator } from "./live-on-air-indicator";
 
 /**
- * Client island for a release-group's listener stats (header counts +
- * sidebar Top Listeners).
+ * Generalized client island for an entity's listener stats (header
+ * listens/listeners counts + sidebar Top Listeners), shared by the
+ * release-group, artist, and recording pages.
  *
- * Why a client island: the LB stats call behind these
- * (`getReleaseGroupListeners`) can be slow or hang, and the
- * `/release-group/[mbid]` page is CDN-cached — so when this rendered
- * server-side, a hung LB call wedged the whole page render (stuck
- * skeleton). Fetching post-hydration from the cacheable
- * `/api/release-group/[mbid]/listeners` endpoint keeps LB off the
- * render path: the page paints immediately and the stats fill in (or
- * quietly don't) without ever blocking it.
+ * Why a client island: the LB stats calls behind these
+ * (getReleaseGroupListeners / getArtistListeners / getRecordingPopularity)
+ * can be slow or hang, and the host pages are CDN-cached — so when this
+ * rendered server-side, a hung LB call wedged the whole page render
+ * (stuck skeleton; 30s+ partial render). Fetching post-hydration from a
+ * cacheable per-entity endpoint keeps LB off the render path: the page
+ * paints immediately and the stats fill in (or quietly don't) on their
+ * own.
  *
- * The per-row "on air" indicator uses the *client* `LiveOnAirIndicator`
- * (polls `/api/user/{u}/playing-now`) rather than the async-server
- * `OnAirIndicator`, since an async server component can't render inside
- * a client island.
+ * Each host page passes its own `endpoint` (e.g.
+ * `/api/artist/{mbid}/listeners`); the endpoints all return the same
+ * normalized {@link ListenersPayload}. `endpoint` doubles as the React
+ * Query key, so a page's header + top-listeners mounts resolve from a
+ * single fetch.
  *
- * `AlbumHeaderStats` and `AlbumTopListeners` share one React Query key
- * so both mount points resolve from a single fetch.
+ * Per-row "on air" uses the *client* `LiveOnAirIndicator` (polls
+ * `/api/user/{u}/playing-now`) since the async-server `OnAirIndicator`
+ * can't render inside a client island.
  */
 
 interface ListenersPayload {
   totalListens: number | null;
   totalListeners: number | null;
   listeners: Array<{ user_name: string; listen_count: number }>;
+  /** lower-cased LB username -> Bluesky avatar URL. */
   bskyAvatars: Record<string, string>;
 }
 
-function useListenerStats(mbid: string) {
+function useListenerStats(endpoint: string) {
   return useQuery<ListenersPayload>({
-    queryKey: ["release-group-listeners", mbid],
+    queryKey: ["entity-listeners", endpoint],
     queryFn: async () => {
-      const r = await fetch(
-        `/api/release-group/${encodeURIComponent(mbid)}/listeners`,
-        { credentials: "same-origin" },
-      );
+      const r = await fetch(endpoint, { credentials: "same-origin" });
       if (!r.ok) throw new Error(`listeners ${r.status}`);
       return r.json();
     },
-    // Listener stats shift slowly + the endpoint is edge-cached; once
-    // loaded, treat as good for the session.
+    // Listener stats shift slowly + the endpoints are edge-cached;
+    // once loaded, treat as good for the session.
     staleTime: Number.POSITIVE_INFINITY,
     refetchOnWindowFocus: false,
   });
 }
 
 /** Header listens/listeners counts. Skeleton while loading; renders
- *  nothing if the album has no stats. */
-export function AlbumHeaderStats({ mbid }: { mbid: string }) {
-  const { data, isLoading, error } = useListenerStats(mbid);
+ *  nothing if the entity has no stats. */
+export function EntityHeaderListenerStats({ endpoint }: { endpoint: string }) {
+  const { data, isLoading, error } = useListenerStats(endpoint);
   if (isLoading) return <EntityHeaderStatsSkeleton />;
   if (error || !data) return null;
   return (
@@ -72,10 +73,10 @@ export function AlbumHeaderStats({ mbid }: { mbid: string }) {
 }
 
 /** Sidebar Top Listeners. Renders nothing while loading or when the
- *  album has no listener data (keeps the sidebar from teasing an empty
- *  section). Mirrors the "stack" layout of `TopListenersList`. */
-export function AlbumTopListeners({ mbid }: { mbid: string }) {
-  const { data } = useListenerStats(mbid);
+ *  entity has no listener data. Mirrors the "stack" layout of
+ *  `TopListenersList`. */
+export function EntityTopListeners({ endpoint }: { endpoint: string }) {
+  const { data } = useListenerStats(endpoint);
   const avatars = useMemo(
     () => new Map(Object.entries(data?.bskyAvatars ?? {})),
     [data?.bskyAvatars],
@@ -125,8 +126,6 @@ export function AlbumTopListeners({ mbid }: { mbid: string }) {
                   />
                 </div>
               </Link>
-              {/* Client on-air (polls playing-now) — aligned under the
-                  avatar like the server list did. */}
               <LiveOnAirIndicator
                 username={l.user_name}
                 initialListen={null}
