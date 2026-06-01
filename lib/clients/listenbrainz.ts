@@ -7,6 +7,18 @@ const LB_LABS_BASE = "https://labs.api.listenbrainz.org";
 const USER_AGENT =
   "Achordion/0.1 (+https://github.com/jherskowitz/achordion)";
 
+// Hard ceiling on a single LB HTTP round-trip. LB usually answers in
+// <2s but can leave a connection open indefinitely on some endpoints
+// (observed: a release-group listener-stats request that never
+// returned, which wedged the /release-group render's Suspense
+// boundary and hung the whole page stream — curl saw a 30s+ partial
+// response; the browser sat on its skeleton). Without an abort, a hung
+// LB call blocks the React stream forever. AbortSignal.timeout turns
+// the hang into a thrown error the callers' `.catch` already handles,
+// so the affected section degrades to empty instead of hanging the
+// page. Mirrors mbFetch's MB_FETCH_TIMEOUT_MS.
+const LB_FETCH_TIMEOUT_MS = 10000;
+
 export class ListenBrainzError extends Error {
   // Next.js preserves `digest` across the server→client error boundary
   // even in production (where the message is sanitized), so we tag
@@ -66,16 +78,33 @@ async function lbFetch<T>(
     Accept: "application/json",
   };
   if (opts.token) headers.Authorization = `Token ${opts.token}`;
-  const res = await fetch(url, {
-    headers,
-    cache: noStore ? "no-store" : undefined,
-    next: noStore
-      ? undefined
-      : {
-          revalidate: opts.revalidate ?? 60,
-          tags: opts.tags,
-        },
-  });
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      headers,
+      signal: AbortSignal.timeout(LB_FETCH_TIMEOUT_MS),
+      cache: noStore ? "no-store" : undefined,
+      next: noStore
+        ? undefined
+        : {
+            revalidate: opts.revalidate ?? 60,
+            tags: opts.tags,
+          },
+    });
+  } catch (e) {
+    // AbortSignal.timeout fires a TimeoutError DOMException; network
+    // failures throw TypeError. Normalize both into a ListenBrainzError
+    // so a hung/failed LB call surfaces as a thrown error the caller's
+    // `.catch` handles — never an indefinitely pending fetch that
+    // wedges the React stream.
+    const aborted = e instanceof DOMException && e.name === "TimeoutError";
+    throw new ListenBrainzError(
+      aborted ? 504 : 503,
+      aborted
+        ? `LB timeout after ${LB_FETCH_TIMEOUT_MS}ms: ${path}`
+        : `LB fetch failed: ${e instanceof Error ? e.message : String(e)}`,
+    );
+  }
 
   if (!res.ok) {
     const body = await res.text().catch(() => "");
