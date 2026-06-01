@@ -10,24 +10,18 @@ import {
   type ReleaseDetail,
 } from "@/lib/clients/musicbrainz";
 import { parachordPlayAlbum, type ParachordTrack } from "@/lib/parachord";
-import {
-  getReleaseGroupListeners,
-  getTopRecordingsForArtist,
-  type ReleaseGroupListeners,
-} from "@/lib/clients/listenbrainz";
+import { getTopRecordingsForArtist } from "@/lib/clients/listenbrainz";
 import { caaReleaseGroupUrl } from "@/lib/clients/coverart";
 import { mergeTagsAndGenres } from "@/lib/merge-tags-genres";
 import { PageHeader } from "@/components/achordion/page-header";
-import {
-  EntityHeaderStats,
-  EntityHeaderStatsSkeleton,
-} from "@/components/achordion/entity-header-stats";
 import { PageShell } from "@/components/achordion/page-shell";
 import { CoverArt } from "@/components/achordion/cover-art";
 import { PlayOnHoverFab } from "@/components/achordion/play-on-hover-fab";
 import { TrackList } from "@/components/achordion/track-list";
-import { TopListenersList } from "@/components/achordion/top-listeners-list";
-import { resolveBskyAvatarsForUsers } from "@/lib/bsky-display";
+import {
+  AlbumHeaderStats,
+  AlbumTopListeners,
+} from "@/components/achordion/album-listener-stats";
 import {
   ExternalLinks,
   categoriseLinks,
@@ -83,13 +77,14 @@ async function AlbumBody({ mbid }: { mbid: string }) {
   const credit = formatArtistCredit(rg["artist-credit"]);
   const canonical = pickCanonicalRelease(rg);
 
-  // Stream the LB listener stats — the album header paints with rg
-  // data immediately; the listens / listeners number block fills in
-  // via Suspense once LB returns. Same posture for the sidebar's
-  // Top Listeners list. `release` (an MB call) is still awaited
-  // synchronously since the streaming-services row in the header AND
-  // the tracklist both need it.
-  const listenersPromise = getReleaseGroupListeners(mbid).catch(() => null);
+  // Listener stats (header counts + Top Listeners) are NOT fetched
+  // here — they load post-hydration via <AlbumHeaderStats> /
+  // <AlbumTopListeners> hitting `/api/release-group/[mbid]/listeners`.
+  // Keeping the (sometimes-slow / hanging) LB stats call off the
+  // render path is what stops a stalled LB request from wedging this
+  // CDN-cached page on its skeleton. `release` (an MB call) is still
+  // awaited synchronously — the streaming-services row AND the
+  // tracklist both need it.
   const release = canonical
     ? await getRelease(canonical.id).catch(() => null)
     : null;
@@ -294,11 +289,7 @@ async function AlbumBody({ mbid }: { mbid: string }) {
             />
           </div>
         }
-        actions={
-          <Suspense fallback={<EntityHeaderStatsSkeleton />}>
-            <HeaderStats promise={listenersPromise} />
-          </Suspense>
-        }
+        actions={<AlbumHeaderStats mbid={mbid} />}
       />
 
       <div className="-mt-2 flex flex-wrap gap-1.5 pb-4">
@@ -329,9 +320,7 @@ async function AlbumBody({ mbid }: { mbid: string }) {
         </div>
 
         <aside className="space-y-8">
-          <Suspense fallback={null}>
-            <TopListenersStream promise={listenersPromise} />
-          </Suspense>
+          <AlbumTopListeners mbid={mbid} />
           {otherUrls.length > 0 && (
             <div>
               {/* h2 (sidebar): sibling of the main column's "Tracks"
@@ -345,66 +334,6 @@ async function AlbumBody({ mbid }: { mbid: string }) {
         </aside>
       </div>
     </>
-  );
-}
-
-/** Streams the album's listens / listeners into the shared
- *  EntityHeaderStats block — same visual treatment as the
- *  recording header. */
-async function HeaderStats({
-  promise,
-}: {
-  promise: Promise<ReleaseGroupListeners | null>;
-}) {
-  const listeners = await promise;
-  return (
-    <EntityHeaderStats
-      totalListens={listeners?.total_listen_count}
-      totalListeners={listeners?.total_user_count}
-    />
-  );
-}
-
-/** Streams the sidebar's Top Listeners list. Renders nothing when the
- *  album has no listener stats (LB endpoint 204/404'd). */
-async function TopListenersStream({
-  promise,
-}: {
-  promise: Promise<ReleaseGroupListeners | null>;
-}) {
-  const listeners = await promise;
-  if (!listeners?.listeners || listeners.listeners.length === 0) return null;
-  // Upgrade DiceBear default avatars to each listener's linked
-  // Bluesky avatar when available.
-  //
-  // ⚠️ We pass `null` for the viewer rather than calling `auth()`
-  // here — see AGENTS.md § "Auth-gated content on edge-cached
-  // routes". The album route lives behind PUBLIC_ENTITY_CACHE
-  // (1h s-maxage on the Vercel edge); any `auth()` / cookies()
-  // call in the render path marks the route dynamic and
-  // bypasses that edge cache, costing every visitor the full
-  // origin round-trip. The bsky-link flag is currently
-  // default-on for everyone, so the flag check inside
-  // resolveBskyAvatarsForUsers passes with a null viewer. If we
-  // ever go back to allowlist mode for bsky-link, this surface
-  // should move to a client-island fetch (same pattern as
-  // <AlbumReviewsClient>) rather than re-introducing the
-  // auth() call here.
-  const bskyAvatars = await resolveBskyAvatarsForUsers(
-    null,
-    listeners.listeners.map((l) => l.user_name),
-  );
-  return (
-    <div>
-      {/* h2 (sidebar): sibling of the main column's "Tracks" h2. */}
-      <h2 className="mb-3 text-xs tracking-wide uppercase text-muted-foreground">
-        Top listeners
-      </h2>
-      <TopListenersList
-        listeners={listeners.listeners}
-        bskyAvatars={bskyAvatars}
-      />
-    </div>
   );
 }
 
