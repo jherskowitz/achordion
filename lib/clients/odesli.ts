@@ -66,6 +66,20 @@ export async function getOdesliLinks(
   });
   try {
     const res = await fetch(`${ODESLI_BASE}?${params}`, {
+      // Hard timeout. Odesli is a free third-party service that
+      // periodically goes slow / stops responding. Without an abort
+      // the `await` hangs indefinitely — and because callers use
+      // `getOdesliLinks(...).catch(() => null)`, the catch only rescues
+      // a *rejection*, never a hang. A hung Odesli call therefore
+      // wedged `resolveTrackLinks`, which is awaited inside the
+      // `<PinnedExternalLinks>` / recording-page async server
+      // components, leaving their Suspense boundaries stuck on the
+      // favicon skeleton forever (observed: pinned-track + recording
+      // favicon rows never resolving). AbortSignal.timeout turns the
+      // hang into a throw the catch already handles → the resolver
+      // degrades to MB-only links and the row resolves. Mirrors the
+      // fetch timeouts on the MB and LB clients.
+      signal: AbortSignal.timeout(6000),
       next: { revalidate: 86400, tags: ["odesli"] },
       headers: { Accept: "application/json" },
     });
