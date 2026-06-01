@@ -59,6 +59,17 @@ export function CoverArt({
       : { width: size, height: size };
 
   const [errored, setErrored] = useState(false);
+  // Cover Art Archive 302-redirects to individual archive.org storage
+  // nodes that are individually flaky — one request 200s, a re-request
+  // can 404/500. Without a retry, a single transient node failure
+  // permanently shows the Disc3 placeholder (and, since the cover now
+  // renders in both the page skeleton and the resolved header, that
+  // showed up as art "loading then 404ing" on the skeleton→header
+  // swap). Retry once with a cache-busted URL before giving up: the
+  // fresh request re-resolves the CAA redirect, usually to a healthy
+  // node. Bounded at one retry so a real outage can't storm archive.org.
+  const [retry, setRetry] = useState(0);
+  const MAX_COVER_RETRIES = 1;
   // Track the image's load state so we can fade it in once the bytes
   // arrive. Without this the placeholder → real-image swap is a hard
   // pixel snap; with it, the image fades in smoothly over 300ms and
@@ -75,7 +86,10 @@ export function CoverArt({
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setErrored(false);
     setLoaded(false);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setRetry(0);
   }, [src]);
+
 
   if (!src || errored) {
     return (
@@ -88,15 +102,27 @@ export function CoverArt({
     );
   }
 
+  // On retry, cache-bust so the browser re-issues the request (and CAA
+  // re-resolves its redirect to a fresh node) rather than serving the
+  // failed response. The `key` on <Image> forces a remount per attempt.
+  const effectiveSrc =
+    retry > 0 ? `${src}${src.includes("?") ? "&" : "?"}cb=${retry}` : src;
+
   return (
     <Image
-      src={src}
+      key={effectiveSrc}
+      src={effectiveSrc}
       alt={alt}
       width={size}
       height={size}
       unoptimized
       onLoad={() => setLoaded(true)}
-      onError={() => setErrored(true)}
+      onError={() => {
+        // Retry once (cache-busted) on a transient CAA/archive.org
+        // failure before falling back to the placeholder.
+        if (retry < MAX_COVER_RETRIES) setRetry((r) => r + 1);
+        else setErrored(true);
+      }}
       className={cn(
         "bg-muted shrink-0 object-cover transition-opacity duration-300 ease-out",
         loaded ? "opacity-100" : "opacity-0",
