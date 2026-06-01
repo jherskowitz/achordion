@@ -40,17 +40,16 @@ interface PageParams {
   params: Promise<{ mbid: string }>;
 }
 
-async function fetchListenCounts(
+/** Pure mapper: per-track listen counts from the artist's top
+ *  recordings, keyed to the release's track recording-MBIDs. The
+ *  artist-recordings fetch is started in `AlbumBody` (concurrently
+ *  with `getRelease`) and the result passed in here. Listen counts are
+ *  an enrichment — an empty `recordings` (LB hiccup) just yields an
+ *  empty map, never an error. */
+function buildListenCountMap(
   release: ReleaseDetail,
-  artistId: string | null,
-): Promise<Map<string, number>> {
-  if (!artistId) return new Map();
-  // Listen counts are an enrichment, never load-bearing — degrade
-  // to empty on any LB hiccup (429, transient 5xx) rather than
-  // taking the whole album page down with a generic error.
-  const recordings = await getTopRecordingsForArtist(artistId).catch(
-    () => [] as Awaited<ReturnType<typeof getTopRecordingsForArtist>>,
-  );
+  recordings: Awaited<ReturnType<typeof getTopRecordingsForArtist>>,
+): Map<string, number> {
   const trackIds = new Set<string>();
   for (const m of release.media ?? []) {
     for (const t of m.tracks ?? []) {
@@ -77,45 +76,34 @@ async function AlbumBody({ mbid }: { mbid: string }) {
   const credit = formatArtistCredit(rg["artist-credit"]);
   const canonical = pickCanonicalRelease(rg);
 
-  // Listener stats (header counts + Top Listeners) are NOT fetched
-  // here — they load post-hydration via <EntityHeaderListenerStats> /
-  // <EntityTopListeners> hitting `/api/release-group/[mbid]/listeners`.
-  // Keeping the (sometimes-slow / hanging) LB stats call off the
-  // render path is what stops a stalled LB request from wedging this
-  // CDN-cached page on its skeleton. `release` (an MB call) is still
-  // awaited synchronously — the streaming-services row AND the
-  // tracklist both need it.
-  const release = canonical
-    ? await getRelease(canonical.id).catch(() => null)
-    : null;
+  // FIRST-PAINT SPLIT. The header below needs only `rg` (cover, title,
+  // artist, type/year, tags), so we render it the moment
+  // getReleaseGroup resolves and DON'T block it on the release fetch.
+  // `getRelease` (tracklist + release-level links) and the artist's top
+  // recordings (per-track listen counts) are kicked off here as
+  // unawaited promises and consumed by Suspense'd children, so they
+  // stream in without gating first paint. On a cold (cache-miss) album
+  // this turns ~3 serialized 1-req/sec MB calls before any paint into
+  // one. Both promises depend only on `rg`, so they run concurrently.
+  const releasePromise = canonical
+    ? getRelease(canonical.id).catch(() => null)
+    : Promise.resolve(null);
+  type Recordings = Awaited<ReturnType<typeof getTopRecordingsForArtist>>;
+  const recordingsPromise: Promise<Recordings> = credit.primaryArtistId
+    ? getTopRecordingsForArtist(credit.primaryArtistId).catch(
+        () => [] as Recordings,
+      )
+    : Promise.resolve([] as Recordings);
 
-  // Merge url-rels from both the release group AND the canonical
-  // release. MB editors often attach Spotify / Apple Music to a
-  // specific release (edition) rather than the abstract release group,
-  // so the rg-level rels alone routinely come up empty even for albums
-  // that are widely streaming. `partitionArtistRelations` accepts
-  // anything with a `relations?` field, so we can call it on either.
-  const rgUrls = partitionArtistRelations(rg).urls;
-  const releaseUrls = release
-    ? partitionArtistRelations({ relations: release.relations }).urls
-    : [];
-  // Dedupe by URL — release-group and release editions sometimes
-  // duplicate the same Spotify / Apple link.
-  const urls = Array.from(
-    new Map([...rgUrls, ...releaseUrls].map((l) => [l.url, l])).values(),
-  );
-  // Streaming services render as a favicon row above the tracklist;
-  // everything else (Wikipedia, Discogs, lyrics, etc.) stays in the
-  // sidebar's "Other Links" so we don't show Spotify/Apple twice.
-  const { streaming: streamingUrls, other: otherUrlsFromMb } =
-    categoriseLinks(urls);
-  // Pre-render the MB streaming url-rels (rg-level + release-level
-  // merged) as clickable favicons on first paint, so a friend who
-  // lands here from a Parachord-shared link can play immediately
-  // even on a cold MBID. The <StreamingLinksRow> client island
-  // upgrades this set with the full Odesli-enriched / cache-resolved
-  // list once it mounts.
-  const initialStreamingItems = streamingUrls
+  // Header streaming favicons seed from the release-group's OWN MB
+  // url-rels only — release-level rels stream in with the tracklist,
+  // and the <StreamingLinksRow> client island enriches via Odesli /
+  // cache after mount regardless, so first paint isn't gated on
+  // getRelease.
+  const rgStreaming = categoriseLinks(
+    partitionArtistRelations(rg).urls,
+  ).streaming;
+  const initialStreamingItems = rgStreaming
     .map((link) => {
       const normalised = normalizeStreamingUrl(link.url);
       if (!normalised) return null;
@@ -128,48 +116,7 @@ async function AlbumBody({ mbid }: { mbid: string }) {
       return { url: normalised, label: tooltipLabel(link), host };
     })
     .filter((x): x is { url: string; label: string; host: string } => x !== null);
-  const albumOdesliSeed = streamingUrls[0]?.url ?? null;
-  // Always link back to MusicBrainz so users who care about a specific
-  // release / format / catalog number can drill in there. Append rather
-  // than prepend so MB sits below editorially-added rels (Wikipedia
-  // etc.) — those have richer info; MB is the dependable last stop.
-  // Dedupe in case a future MB editor adds the entity's own URL as a
-  // rel (rare but cheap to guard).
-  const mbReleaseGroupUrl = `https://musicbrainz.org/release-group/${mbid}`;
-  const otherUrls = otherUrlsFromMb.some((l) => l.url === mbReleaseGroupUrl)
-    ? otherUrlsFromMb
-    : [
-        ...otherUrlsFromMb,
-        { type: "musicbrainz entry", url: mbReleaseGroupUrl },
-      ];
-
-  const listenCounts = release
-    ? await fetchListenCounts(release, credit.primaryArtistId).catch(
-        () => new Map<string, number>(),
-      )
-    : new Map<string, number>();
-
-  // Reviews are gated by per-user feature flags. We mount the
-  // <AlbumReviews> client island unconditionally — it bypasses the
-  // page-level edge cache by fetching `/api/release-group/[mbid]/reviews`
-  // post-hydration, where the auth + flag checks happen. Doing the
-  // flag check here would break the CDN cache split since the page
-  // would render different HTML for allowlisted vs anonymous viewers.
-  const parachordTracks: ParachordTrack[] | undefined = release
-    ? release.media
-        ?.flatMap((m) => m.tracks ?? [])
-        .map((t): ParachordTrack => {
-          const trackArtist =
-            formatArtistCredit(t["artist-credit"]).name || credit.name;
-          const lengthMs = t.length ?? t.recording?.length;
-          return {
-            title: t.title,
-            artist: trackArtist,
-            album: rg.title,
-            ...(lengthMs ? { duration: Math.round(lengthMs / 1000) } : {}),
-          };
-        })
-    : undefined;
+  const albumOdesliSeed = rgStreaming[0]?.url ?? null;
 
   // Artist › Album breadcrumb. Primary credited artist only, so guest
   // features in the byline don't pollute the trail.
@@ -211,16 +158,10 @@ async function AlbumBody({ mbid }: { mbid: string }) {
               className="aspect-square w-full transition-opacity group-hover:opacity-90"
               rounded="md"
             />
+            {/* Play by release-group MBID — no track list needed, so
+                the fab works on first paint before getRelease. */}
             <PlayOnHoverFab
-              href={parachordPlayAlbum({
-                ...(rg.id
-                  ? { mbid: rg.id }
-                  : {
-                      artist: credit.name,
-                      title: rg.title,
-                      tracks: parachordTracks,
-                    }),
-              })}
+              href={parachordPlayAlbum({ mbid: rg.id })}
               label={`Play "${rg.title}" by ${credit.name} in Parachord`}
             />
           </div>
@@ -269,12 +210,15 @@ async function AlbumBody({ mbid }: { mbid: string }) {
         }
         afterTitle={
           <div className="flex flex-wrap items-center gap-2">
-            <TrackListActionsMenu
-              title={`${rg.title} — ${credit.name}`}
-              creator={credit.name}
-              tracks={parachordTracks ?? []}
-              triggerLabel={`${rg.title} actions`}
-            />
+            {/* Actions menu needs the full track list (release fetch),
+                so it streams in rather than blocking the header. */}
+            <Suspense fallback={null}>
+              <AlbumActionsMenu
+                promise={releasePromise}
+                albumTitle={rg.title}
+                creditName={credit.name}
+              />
+            </Suspense>
             <StreamingLinksRow
               entity="release-group"
               mbid={rg.id}
@@ -306,14 +250,12 @@ async function AlbumBody({ mbid }: { mbid: string }) {
             <h2 className="mb-4 text-sm font-semibold tracking-wide uppercase">
               Tracks
             </h2>
-            {release ? (
-              <TrackList release={release} listenCounts={listenCounts} />
-            ) : (
-              <EmptyState
-                title="No track listing"
-                description="MusicBrainz doesn't have a release on file we can show tracks from."
+            <Suspense fallback={<TracksSkeleton />}>
+              <AlbumTracks
+                releasePromise={releasePromise}
+                recordingsPromise={recordingsPromise}
               />
-            )}
+            </Suspense>
           </section>
 
           {/* Per-user reviews block. Renders nothing for viewers
@@ -327,19 +269,137 @@ async function AlbumBody({ mbid }: { mbid: string }) {
           <EntityTopListeners
             endpoint={`/api/release-group/${mbid}/listeners`}
           />
-          {otherUrls.length > 0 && (
-            <div>
-              {/* h2 (sidebar): sibling of the main column's "Tracks"
-                  h2, not nested under it. (#10) */}
-              <h2 className="mb-3 text-xs tracking-wide uppercase text-muted-foreground">
-                Other Links
-              </h2>
-              <ExternalLinks links={otherUrls} />
-            </div>
-          )}
+          {/* Other Links merges rg-level + release-level url-rels, so
+              it streams in with the release fetch rather than blocking
+              the sidebar. */}
+          <Suspense fallback={null}>
+            <AlbumOtherLinks promise={releasePromise} rg={rg} mbid={mbid} />
+          </Suspense>
         </aside>
       </div>
     </>
+  );
+}
+
+/** Streams the Parachord actions menu into the header once the release
+ *  (and thus the full track list) resolves. */
+async function AlbumActionsMenu({
+  promise,
+  albumTitle,
+  creditName,
+}: {
+  promise: Promise<ReleaseDetail | null>;
+  albumTitle: string;
+  creditName: string;
+}) {
+  const release = await promise;
+  const tracks: ParachordTrack[] = release
+    ? (release.media ?? [])
+        .flatMap((m) => m.tracks ?? [])
+        .map((t): ParachordTrack => {
+          const trackArtist =
+            formatArtistCredit(t["artist-credit"]).name || creditName;
+          const lengthMs = t.length ?? t.recording?.length;
+          return {
+            title: t.title,
+            artist: trackArtist,
+            album: albumTitle,
+            ...(lengthMs ? { duration: Math.round(lengthMs / 1000) } : {}),
+          };
+        })
+    : [];
+  return (
+    <TrackListActionsMenu
+      title={`${albumTitle} — ${creditName}`}
+      creator={creditName}
+      tracks={tracks}
+      triggerLabel={`${albumTitle} actions`}
+    />
+  );
+}
+
+/** Streams the track list. Awaits the release + the artist's top
+ *  recordings concurrently (both kicked off in AlbumBody), then maps
+ *  per-track listen counts. */
+async function AlbumTracks({
+  releasePromise,
+  recordingsPromise,
+}: {
+  releasePromise: Promise<ReleaseDetail | null>;
+  recordingsPromise: Promise<Awaited<ReturnType<typeof getTopRecordingsForArtist>>>;
+}) {
+  const [release, recordings] = await Promise.all([
+    releasePromise,
+    recordingsPromise,
+  ]);
+  if (!release) {
+    return (
+      <EmptyState
+        title="No track listing"
+        description="MusicBrainz doesn't have a release on file we can show tracks from."
+      />
+    );
+  }
+  return (
+    <TrackList
+      release={release}
+      listenCounts={buildListenCountMap(release, recordings)}
+    />
+  );
+}
+
+/** Streams the sidebar's "Other Links" — merges the release-group's
+ *  url-rels with the canonical release's (MB editors attach links to
+ *  either), plus the MB entry link. */
+async function AlbumOtherLinks({
+  promise,
+  rg,
+  mbid,
+}: {
+  promise: Promise<ReleaseDetail | null>;
+  rg: Awaited<ReturnType<typeof getReleaseGroup>>;
+  mbid: string;
+}) {
+  const release = await promise;
+  const rgUrls = partitionArtistRelations(rg).urls;
+  const releaseUrls = release
+    ? partitionArtistRelations({ relations: release.relations }).urls
+    : [];
+  const urls = Array.from(
+    new Map([...rgUrls, ...releaseUrls].map((l) => [l.url, l])).values(),
+  );
+  const { other: otherUrlsFromMb } = categoriseLinks(urls);
+  const mbReleaseGroupUrl = `https://musicbrainz.org/release-group/${mbid}`;
+  const otherUrls = otherUrlsFromMb.some((l) => l.url === mbReleaseGroupUrl)
+    ? otherUrlsFromMb
+    : [
+        ...otherUrlsFromMb,
+        { type: "musicbrainz entry", url: mbReleaseGroupUrl },
+      ];
+  if (otherUrls.length === 0) return null;
+  return (
+    <div>
+      {/* h2 (sidebar): sibling of the main column's "Tracks" h2. */}
+      <h2 className="mb-3 text-xs tracking-wide uppercase text-muted-foreground">
+        Other Links
+      </h2>
+      <ExternalLinks links={otherUrls} />
+    </div>
+  );
+}
+
+/** Tracklist skeleton for the streamed <AlbumTracks> boundary. */
+function TracksSkeleton() {
+  return (
+    <div className="border-border/60 divide-border/60 divide-y rounded-xl border px-4">
+      {Array.from({ length: 8 }).map((_, i) => (
+        <div key={i} className="flex items-center gap-3 py-3">
+          <Skeleton className="size-4" />
+          <Skeleton className="h-4 flex-1" />
+          <Skeleton className="h-3 w-12" />
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -376,7 +436,7 @@ export default async function ReleaseGroupPage({ params }: PageParams) {
   const { mbid } = await params;
   return (
     <PageShell>
-      <Suspense fallback={<AlbumPageSkeleton />}>
+      <Suspense fallback={<AlbumPageSkeleton mbid={mbid} />}>
         <AlbumBody mbid={mbid} />
       </Suspense>
     </PageShell>
@@ -387,13 +447,23 @@ export default async function ReleaseGroupPage({ params }: PageParams) {
  *  Mirrors the real layout — cover + title block, two-column body
  *  with tracklist on the left and sidebar on the right — so the
  *  user sees the page shape immediately rather than a blank canvas
- *  when MB is rate-limited. */
-function AlbumPageSkeleton() {
+ *  when MB is rate-limited.
+ *
+ *  The cover art renders for real even here: `caaReleaseGroupUrl` is
+ *  derived straight from the mbid (no fetch), so the artwork is
+ *  visible on the very first frame — before getReleaseGroup returns. */
+function AlbumPageSkeleton({ mbid }: { mbid: string }) {
   return (
     <div className="space-y-10 pt-8">
       {/* Header: cover + breadcrumb / title / artist / stats */}
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-[200px_minmax(0,1fr)] sm:gap-8">
-        <Skeleton className="aspect-square w-full max-w-[280px] rounded-md sm:max-w-none" />
+        <CoverArt
+          src={caaReleaseGroupUrl(mbid, 500)}
+          alt=""
+          size={500}
+          className="aspect-square w-full max-w-[280px] rounded-md sm:max-w-none"
+          rounded="md"
+        />
         <div className="space-y-3">
           <Skeleton className="h-3 w-32" />
           <Skeleton className="h-10 w-80 max-w-full" />
