@@ -72,8 +72,15 @@ export function PlaylistCard({
   const showCreator =
     creator &&
     creator.toLowerCase() !== (hideCreatorIfMatches ?? "").toLowerCase();
+  // Show the playlist's CREATED date (stable), not last_modified_at.
+  // last_modified gets bumped whenever a client syncs/edits the
+  // playlist — and a Parachord sync touching the whole library at once
+  // made every card read "today", which users understandably read as
+  // "my creation dates all changed." The created date is stable and
+  // matches what the playlist detail page shows. Fall back to
+  // last_modified only when `date` is somehow absent.
   const dateStr =
-    formatDate(ext?.last_modified_at) ?? formatDate(p.date) ?? null;
+    formatDate(p.date) ?? formatDate(ext?.last_modified_at) ?? null;
   const showMosaic = tracks !== undefined;
   // The mosaic expects `LbRadioTrack[] | undefined`; the "loading"
   // sentinel maps to `undefined` (skeleton state) at that boundary.
