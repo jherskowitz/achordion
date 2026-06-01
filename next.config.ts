@@ -174,7 +174,21 @@ const STATIC_ASSET_CACHE = {
  */
 const PUBLIC_ENTITY_CACHE = {
   key: "CDN-Cache-Control",
-  value: "public, s-maxage=3600, stale-while-revalidate=86400",
+  // s-maxage=6h: entity metadata (album/artist/recording titles,
+  // credits, tracklists) changes on the order of days, so re-rendering
+  // — and re-hitting the 1-req/sec MB API — hourly was wasted work.
+  // 6h fresh + 24h stale-while-revalidate means the edge serves an
+  // instant cached page to ~6h of visitors per entity and refreshes in
+  // the background, cutting both origin renders and MB call volume ~6×.
+  // Per-user / fast-moving data already lives in client islands
+  // (listener stats, reviews) or live API routes, so it isn't affected
+  // by the longer page TTL. The one thing baked into the cached HTML
+  // that can lag is the tag-chip set (a tag vote shows on the shared
+  // page up to 6h later) — acceptable; votes still write live via the
+  // API and the voter's own client updates optimistically. Charts +
+  // static pages share this and tolerate 6h fine (charts rotate daily;
+  // swr keeps them warm).
+  value: "public, s-maxage=21600, stale-while-revalidate=86400",
 };
 
 const nextConfig: NextConfig = {
