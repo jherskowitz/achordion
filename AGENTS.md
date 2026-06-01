@@ -496,7 +496,7 @@ When you widen a scope at MB, MB doesn't migrate the existing grant — it creat
 
 ## Auth-gated content on edge-cached routes (client-island pattern)
 
-Public entity routes (`/release-group/:mbid`, `/artist/:mbid`, `/recording/:mbid`, `/charts/*`, `/about`, `/faq`, etc.) carry a shared `CDN-Cache-Control: public, s-maxage=3600, stale-while-revalidate=86400` header (see `PUBLIC_ENTITY_CACHE` in `next.config.ts`). The Vercel edge serves a single SSR'd response to every visitor for an hour, refreshing in the background — the entire reason these pages feel instant.
+Public entity routes (`/release-group/:mbid`, `/artist/:mbid`, `/recording/:mbid`, `/charts/*`, `/about`, `/faq`, etc.) carry a shared `CDN-Cache-Control: public, s-maxage=21600, stale-while-revalidate=86400` header (see `PUBLIC_ENTITY_CACHE` in `next.config.ts`). The Vercel edge serves a single SSR'd response to every visitor for 6h, refreshing in the background — the entire reason these pages feel instant, and what keeps the rate-limited MB calls behind them rare. (Raised 1h → 6h since entity metadata changes on the order of days; per-user/fast-moving data lives in client islands, so the longer TTL doesn't stale it.)
 
 That cache is **shared across all visitors**, so any server-rendered output that depends on the session cookie or a per-user flag would either (a) leak personalized content to anonymous viewers (if your render hit the cache as a logged-in allowlisted user) or (b) hide that content from real users (if the first render was anonymous). Both modes are bugs.
 
@@ -567,6 +567,26 @@ The `href` rendered for Apple Music / iTunes / Spotify URLs is run through `norm
 Favicon hosts are normalised through `faviconUrl(host)` / `faviconHost(host)` in `lib/favicon.ts` — currently rewrites `<artist>.bandcamp.com` to `bandcamp.com` so artist subdomains always show the canonical Bandcamp orange-dot favicon instead of whatever (or nothing) each artist has configured. Add new rewrite rules to `FAVICON_HOST_REWRITES` if other tenant-subdomain services join the row.
 
 `<IconTooltip>` shows the friendly site name (X for twitter.com / x.com, MusicBrainz for musicbrainz.org, etc.).
+
+---
+
+## Render resilience: fetch timeouts, fail-open deps, first paint
+
+Hard-won from a run of "page stuck on its skeleton" / intermittent-503 incidents. These recur — internalize them.
+
+**1. Every outbound `fetch` MUST have a timeout — use `fetchWithTimeout` (`lib/fetch-timeout.ts`).** A bare `await fetch()` with no timeout can hang forever when the upstream is slow. In a server-component render path (directly or inside a Suspense boundary) that hang wedges the *whole* render — the page sits on its skeleton, and on CDN-cached routes the origin render never completes. **`try/catch` does NOT save you: a hang is never a rejection**, so `.catch(() => fallback)` only rescues real errors. This bit three times in one session — MusicBrainz, ListenBrainz, Odesli — each as a stuck skeleton / "Connection closed" until the client got a timeout. Every client routes through `fetchWithTimeout` (8s default) except `mbFetch` (8s inline) and Odesli (6s inline), which keep service-specific timeouts. New external client → `fetchWithTimeout`, never a raw `fetch`.
+
+**2. Per-request external deps MUST fail open.** Middleware runs `checkRateLimit` (Upstash) on every non-prefetch page request. An unguarded Upstash call that throws crashes the middleware → Vercel 503 → mid-stream that surfaces to the client as "Connection closed" → stuck skeleton. `checkRateLimit` and the track-links cache reads now catch-and-allow on Upstash error. Any new per-request Upstash/Redis read: catch, return the permissive default. A limiter or cache going down must never take the app down with it.
+
+**3. MB/LB throttle is 1 req/sec PER INSTANCE — no cross-instance coordination.** N warm Vercel instances can collectively blow past the upstream limit → 429. `mbFetch` honors `Retry-After` and retries once before surfacing the rate-limit page. Practical consequence: entity pages that fan out many MB calls serialize through this queue, so **sequential awaits before first paint are expensive** (≈≥1s each). Hence #4.
+
+**4. Don't block first paint on slow/serialized data — split Suspense, stream the rest.** Reference: `app/(app)/release-group/[mbid]/page.tsx`. `AlbumBody` awaits ONLY `getReleaseGroup`, renders the header, and hands `getRelease` + the artist-recordings fetch to Suspense'd children as **unawaited promises** (so they run concurrently and stream in). Cover art renders even in the skeleton — `caaReleaseGroupUrl(mbid)` is derived from the mbid (no fetch). Viewer-agnostic slow/hang-prone data (listener stats, reviews) lives in **lazy client islands** backed by **CDN-cacheable** API routes (`/api/<entity>/[mbid]/listeners`, `.../reviews`; generalized island `components/achordion/entity-listener-stats.tsx`), keeping the rate-limited LB/MB calls off the cached render path entirely. This is also the auth-gated-content pattern (see "Auth-gated content on edge-cached routes").
+
+**5. `prefetch={false}` on dense entity-link grids.** Next prefetches every visible `<Link>` on viewport entry. A dense page (explore/charts: nav + footer + sidebar + 12 cards + per-row entity links) fired ~150 RSC requests in one wave, tripping Vercel request-shedding (503s) — and a shed 503 on the link you clicked makes the soft navigation silently no-op (looks like "clicking does nothing"). All dense grids (`fresh-releases-grid`, `explore-track-list`, `recommended-artists-list`, `charts-list`, `lb-charts-list`, `college-charts-list`, `top-tracks/artists/listeners-list`, `discography`, `critical-darling-card`, `top-albums-grid`, `user-card`) set `prefetch={false}` on their `<Link>`s. Never prefetch high-cardinality grid links. Play controls (`PlayOnHoverFab`, `PlayOverNumberCell`) are `<a>`/buttons and never take `prefetch`.
+
+**6. `<CoverArt>` rides out transient Cover Art Archive failures.** CAA 302-redirects to individually-flaky archive.org storage nodes; `<CoverArt>` retries once (cache-busted, re-resolving the redirect to a fresh node) before the Disc3 placeholder. Don't simplify that away.
+
+**7. Playlist cards show the CREATED date, not `last_modified_at`.** A client sync that edits playlists in place bumps `last_modified_at`; showing that on the card made a library-wide sync look like every playlist's creation date reset. `playlist-card.tsx` prefers `p.date` (created, stable), matching the detail page.
 
 ---
 
@@ -1006,6 +1026,10 @@ Use case: Parachord's share sheet renders a "Copy embed code" pill alongside its
 9. **Don't add `<OdesliLinks>` to new code.** It bypasses the track-links cache and the ISRC alias path. Use `<StreamingLinksRow>` (client island) or `resolveTrackLinks()` (server-side) instead.
 10. **Don't render `relativeTime(...)` directly inline.** Use `<RelativeTime value={...} />` so the SSR/CSR clock-drift mismatch gets `suppressHydrationWarning` automatically. Mixed-text parents can take `suppressHydrationWarning` directly if there are multiple relative-time children.
 11. **Don't render listens / listeners stats inline.** Use `<EntityHeaderStats totalListens totalListeners />` from `components/achordion/entity-header-stats.tsx` — three pages used to define duplicate copies of the block.
+12. **Don't `await fetch()` a third party without a timeout.** Use `fetchWithTimeout` (`lib/fetch-timeout.ts`) / `mbFetch`. A hang in a render path wedges the page and `.catch()` won't save you — see "Render resilience" above.
+13. **Don't let a per-request Upstash/Redis read throw uncaught** (especially in middleware). Catch and return the permissive default — fail open.
+14. **Don't prefetch high-cardinality grid links.** Dense entity-link grids set `prefetch={false}`; an un-throttled prefetch wave trips Vercel request-shedding (503s) and silently breaks navigation.
+15. **Don't add a sequential `await` of slow/serialized data ahead of an entity page's first paint.** Await only the minimal blocking fetch, stream the rest via Suspense + unawaited promises (release-group page is the reference).
 
 ---
 
