@@ -95,6 +95,22 @@ export async function checkRateLimit(
           : pageLimiter;
   if (!limiter) return { ok: true };
   const ip = getClientIp(request);
-  const result = await limiter.limit(ip);
-  return { ok: result.success };
+  // FAIL OPEN. `limiter.limit()` is a network call to Upstash; it
+  // throws on any Upstash error (quota/command-limit exceeded, rate
+  // limit, timeout, transient network blip). This runs in per-request
+  // middleware with no caller-side catch, so an unhandled throw here
+  // crashes the middleware invocation and Vercel returns a 503 for the
+  // request — turning an Upstash hiccup into a site-wide outage
+  // (a 503 mid-stream surfaces to the RSC client as "Connection
+  // closed" → the error boundary / a stuck skeleton). A rate limiter
+  // going down must never take the app with it: on error, let the
+  // request through. Worst case a crawler slips a few extra requests
+  // during an Upstash blip — far cheaper than 503ing real users.
+  try {
+    const result = await limiter.limit(ip);
+    return { ok: result.success };
+  } catch (err) {
+    console.error("[rate-limit] limiter error — failing open:", err);
+    return { ok: true };
+  }
 }

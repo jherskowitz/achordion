@@ -131,9 +131,18 @@ export async function middleware(request: NextRequest) {
     request.headers.get("rsc") === "1" ||
     request.headers.get("purpose") === "prefetch";
   if (!isPrefetch) {
-    const rl = await checkRateLimit("page", request);
-    if (!rl.ok) {
-      return rateLimitedResponse();
+    // Defense-in-depth: never let the rate-limit path throw out of
+    // middleware. An uncaught throw here crashes the middleware
+    // invocation and Vercel serves a 503 for the page — a far worse
+    // outcome than skipping the limit. `checkRateLimit` already fails
+    // open internally; this catch is the belt to that suspenders.
+    try {
+      const rl = await checkRateLimit("page", request);
+      if (!rl.ok) {
+        return rateLimitedResponse();
+      }
+    } catch (err) {
+      console.error("[middleware] rate-limit check failed — allowing:", err);
     }
   }
 
