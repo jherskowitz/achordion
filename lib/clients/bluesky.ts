@@ -1,3 +1,4 @@
+import { fetchWithTimeout } from "@/lib/fetch-timeout";
 import { z } from "zod";
 
 /**
@@ -90,7 +91,7 @@ export function normalizeHandle(input: string): string {
  */
 export async function resolveHandle(handle: string): Promise<string> {
   const url = `${PUBLIC_APPVIEW}/com.atproto.identity.resolveHandle?handle=${encodeURIComponent(handle)}`;
-  const res = await fetch(url, {
+  const res = await fetchWithTimeout(url, {
     headers: { accept: "application/json" },
     // Short cache — a handle's DID is stable but we don't want to
     // pin a stale mapping across days.
@@ -129,7 +130,7 @@ function ensureBskyBlobFormat(url: string): string {
 export async function getProfile(actor: string): Promise<BskyProfile | null> {
   const url = `${PUBLIC_APPVIEW}/app.bsky.actor.getProfile?actor=${encodeURIComponent(actor)}`;
   try {
-    const res = await fetch(url, {
+    const res = await fetchWithTimeout(url, {
       headers: { accept: "application/json" },
       // 5-minute revalidate — display name / avatar / bio change
       // rarely enough that a bit of staleness on profile pages is
@@ -175,7 +176,7 @@ export async function getFollows(
     const url = `${PUBLIC_APPVIEW}/app.bsky.graph.getFollows?${params}`;
     let json: unknown;
     try {
-      const res = await fetch(url, {
+      const res = await fetchWithTimeout(url, {
         headers: { accept: "application/json" },
         // Per-page cache for 10 min — follow graph changes slowly
         // enough that this trades acceptable staleness for far

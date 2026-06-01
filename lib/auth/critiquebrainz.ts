@@ -1,4 +1,5 @@
 import "server-only";
+import { fetchWithTimeout } from "@/lib/fetch-timeout";
 
 import { z } from "zod";
 
@@ -74,7 +75,7 @@ export async function exchangeCode(opts: {
     client_secret: opts.clientSecret,
     redirect_uri: opts.redirectUri,
   });
-  const res = await fetch(CB_OAUTH_TOKEN, {
+  const res = await fetchWithTimeout(CB_OAUTH_TOKEN, {
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",

@@ -1,4 +1,5 @@
 import "server-only";
+import { fetchWithTimeout } from "@/lib/fetch-timeout";
 
 import { z } from "zod";
 import type { ArtistExternalLink } from "./musicbrainz";
@@ -67,7 +68,7 @@ async function fetchWikipediaSummary(
   )}`;
 
   try {
-    const res = await fetch(apiUrl, {
+    const res = await fetchWithTimeout(apiUrl, {
       headers: { "User-Agent": USER_AGENT, Accept: "application/json" },
       next: {
         revalidate: 60 * 60 * 24 * 7,
@@ -112,7 +113,7 @@ async function resolveWikidataToWikipedia(
   const sites = WIKI_LANG_PREFERENCE.join("|");
   const apiUrl = `https://www.wikidata.org/w/api.php?action=wbgetentities&ids=${qid}&props=sitelinks%2Furls&sitefilter=${sites}&format=json&origin=*`;
   try {
-    const res = await fetch(apiUrl, {
+    const res = await fetchWithTimeout(apiUrl, {
       headers: { "User-Agent": USER_AGENT, Accept: "application/json" },
       next: {
         revalidate: 60 * 60 * 24 * 30,
@@ -469,7 +470,7 @@ export async function getCriticalReception(
   let sectionIndex: string | null = null;
   let resolvedTitle = title;
   try {
-    const res = await fetch(sectionsUrl, {
+    const res = await fetchWithTimeout(sectionsUrl, {
       headers: { "User-Agent": USER_AGENT, Accept: "application/json" },
       next: {
         revalidate: 60 * 60 * 24 * 7,
@@ -495,7 +496,7 @@ export async function getCriticalReception(
     `&prop=text&format=json&origin=*`;
 
   try {
-    const res = await fetch(sectionUrl, {
+    const res = await fetchWithTimeout(sectionUrl, {
       headers: { "User-Agent": USER_AGENT, Accept: "application/json" },
       next: {
         revalidate: 60 * 60 * 24 * 7,

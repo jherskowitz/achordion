@@ -1,4 +1,5 @@
 import "server-only";
+import { fetchWithTimeout } from "@/lib/fetch-timeout";
 
 import { stripHtml } from "@/lib/strip-html";
 
@@ -108,7 +109,7 @@ export async function getSpinbinPlaylist(
   url: string,
 ): Promise<SpinbinPlaylist | null> {
   try {
-    const res = await fetch(url, {
+    const res = await fetchWithTimeout(url, {
       headers: {
         "User-Agent": USER_AGENT,
         Accept: "application/xspf+xml, application/xml, text/xml",

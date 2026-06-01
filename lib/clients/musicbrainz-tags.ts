@@ -1,4 +1,5 @@
 import "server-only";
+import { fetchWithTimeout } from "@/lib/fetch-timeout";
 
 /**
  * MusicBrainz user-tag voting client.
@@ -96,7 +97,7 @@ export async function submitTagVote(opts: {
     `</metadata>`;
 
   const url = `${MB_BASE}/tag?client=${encodeURIComponent(MB_CLIENT_ID)}`;
-  const res = await fetch(url, {
+  const res = await fetchWithTimeout(url, {
     method: "POST",
     headers: {
       "User-Agent": USER_AGENT,

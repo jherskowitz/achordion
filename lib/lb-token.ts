@@ -1,4 +1,5 @@
 import "server-only";
+import { fetchWithTimeout } from "@/lib/fetch-timeout";
 
 import { cookies } from "next/headers";
 import {
@@ -105,7 +106,7 @@ export async function validateLbToken(
 ): Promise<{ valid: true; userName: string } | { valid: false; reason: string }> {
   if (!token.trim()) return { valid: false, reason: "Token is empty." };
   try {
-    const res = await fetch("https://api.listenbrainz.org/1/validate-token", {
+    const res = await fetchWithTimeout("https://api.listenbrainz.org/1/validate-token", {
       headers: {
         Authorization: `Token ${token.trim()}`,
         "User-Agent": "Achordion/0.1 (jherskow@gmail.com)",

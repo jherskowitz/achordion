@@ -1,4 +1,5 @@
 import "server-only";
+import { fetchWithTimeout } from "@/lib/fetch-timeout";
 
 const SONGS_BASE = "https://rss.marketingtools.apple.com/api/v2";
 const ALBUMS_BASE = "https://rss.applemarketingtools.com/api/v2";
@@ -68,7 +69,7 @@ function parseResults(
 
 async function fetchFeed(url: string): Promise<unknown | null> {
   try {
-    const res = await fetch(url, {
+    const res = await fetchWithTimeout(url, {
       headers: {
         "User-Agent": USER_AGENT,
         Accept: "application/json",

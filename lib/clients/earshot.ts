@@ -1,3 +1,4 @@
+import { fetchWithTimeout } from "@/lib/fetch-timeout";
 /**
  * !earshot weekly Top 50 client.
  *
@@ -82,7 +83,7 @@ function clean(html: string): string {
  */
 export async function getEarshotTop50(): Promise<EarshotChart | null> {
   try {
-    const res = await fetch(EARSHOT_TOP50_URL, {
+    const res = await fetchWithTimeout(EARSHOT_TOP50_URL, {
       headers: { "User-Agent": UA },
       next: { revalidate: 60 * 60 * 24, tags: ["earshot-top50"] },
     });
@@ -175,7 +176,7 @@ export function parseTop50(html: string): EarshotChartItem[] {
 async function resolveCoverUrl(findImageId: string): Promise<string | null> {
   const url = `${EARSHOT_IMAGE_LOOKUP_BASE}?${EARSHOT_IMAGE_PARAM}=${encodeURIComponent(findImageId)}`;
   try {
-    const res = await fetch(url, {
+    const res = await fetchWithTimeout(url, {
       headers: { "User-Agent": UA },
       // Each disc ID is its own cache key; cover URLs basically
       // never change so 7d revalidate is fine. Tag separately so a

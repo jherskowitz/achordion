@@ -1,4 +1,5 @@
 import "server-only";
+import { fetchWithTimeout } from "@/lib/fetch-timeout";
 
 /**
  * MusicBrainz OAuth refresh-token helper.
@@ -60,7 +61,7 @@ export async function maybeRefreshMbToken(
     return { ok: false, reason: "no_refresh_token" };
   }
   try {
-    const res = await fetch(MB_TOKEN_ENDPOINT, {
+    const res = await fetchWithTimeout(MB_TOKEN_ENDPOINT, {
       method: "POST",
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",

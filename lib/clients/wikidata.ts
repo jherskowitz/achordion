@@ -1,4 +1,5 @@
 import "server-only";
+import { fetchWithTimeout } from "@/lib/fetch-timeout";
 
 const USER_AGENT =
   "Achordion/0.1 (+https://github.com/jherskowitz/achordion)";
@@ -43,7 +44,7 @@ export async function getWikidataP18Filename(
   qid: string,
 ): Promise<string | null> {
   try {
-    const res = await fetch(
+    const res = await fetchWithTimeout(
       `https://www.wikidata.org/wiki/Special:EntityData/${qid}.json`,
       {
         headers: {
@@ -125,7 +126,7 @@ export async function getWikidataEnWikipediaUrl(
   const qid = extractWikidataQid(wikidataUrl);
   if (!qid) return null;
   try {
-    const res = await fetch(
+    const res = await fetchWithTimeout(
       `https://www.wikidata.org/wiki/Special:EntityData/${qid}.json`,
       {
         headers: {

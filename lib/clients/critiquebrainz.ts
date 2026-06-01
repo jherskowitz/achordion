@@ -1,4 +1,5 @@
 import "server-only";
+import { fetchWithTimeout } from "@/lib/fetch-timeout";
 
 import { z } from "zod";
 
@@ -35,7 +36,7 @@ export async function getCbUserIdByMbUsername(
 ): Promise<string | null> {
   if (!mbUsername) return null;
   try {
-    const res = await fetch(
+    const res = await fetchWithTimeout(
       `${CB_BASE}/user/${encodeURIComponent(mbUsername)}`,
       {
         headers: { "User-Agent": USER_AGENT, Accept: "application/json" },
@@ -114,7 +115,7 @@ export async function getCbReviewsByUserId(
 ): Promise<CritiqueBrainzAuthoredReview[]> {
   if (!userId) return [];
   try {
-    const res = await fetch(
+    const res = await fetchWithTimeout(
       `${CB_BASE}/review/?user_id=${encodeURIComponent(userId)}&limit=${limit}`,
       {
         headers: { "User-Agent": USER_AGENT, Accept: "application/json" },
@@ -224,7 +225,7 @@ export async function getReleaseGroupReviews(
     `&sort=popularity` +
     `&limit=${limit}`;
   try {
-    const res = await fetch(url, {
+    const res = await fetchWithTimeout(url, {
       headers: { "User-Agent": USER_AGENT, Accept: "application/json" },
       next: {
         revalidate: 60 * 60 * 24,
@@ -295,7 +296,7 @@ export async function submitReleaseGroupReview(opts: {
 
   let res: Response;
   try {
-    res = await fetch(`${CB_BASE}/review/`, {
+    res = await fetchWithTimeout(`${CB_BASE}/review/`, {
       method: "POST",
       headers: {
         "User-Agent": USER_AGENT,

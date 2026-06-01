@@ -1,4 +1,5 @@
 import "server-only";
+import { fetchWithTimeout } from "@/lib/fetch-timeout";
 
 import { z } from "zod";
 
@@ -75,7 +76,7 @@ export async function getArtistImageFromFanart(
     // 6 hours puts the worst-case "approved but not yet visible" gap
     // at half a workday. Cache-tag-based revalidation could cut that
     // further if we ever want a manual refresh path.
-    const res = await fetch(url, {
+    const res = await fetchWithTimeout(url, {
       headers: { Accept: "application/json" },
       next: {
         revalidate: 60 * 60 * 6,

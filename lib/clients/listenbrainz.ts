@@ -1,4 +1,5 @@
 import "server-only";
+import { fetchWithTimeout } from "@/lib/fetch-timeout";
 
 import { z } from "zod";
 
@@ -80,7 +81,7 @@ async function lbFetch<T>(
   if (opts.token) headers.Authorization = `Token ${opts.token}`;
   let res: Response;
   try {
-    res = await fetch(url, {
+    res = await fetchWithTimeout(url, {
       headers,
       signal: AbortSignal.timeout(LB_FETCH_TIMEOUT_MS),
       cache: noStore ? "no-store" : undefined,
@@ -953,7 +954,7 @@ export async function getRecordingMetadata(
         // the plus survives.
         const mbids = encodeURIComponent(chunk.join(","));
         const url = `${LB_BASE}/metadata/recording/?recording_mbids=${mbids}&inc=artist+release`;
-        const res = await fetch(url, {
+        const res = await fetchWithTimeout(url, {
           headers: {
             "User-Agent": USER_AGENT,
             Accept: "application/json",
@@ -1107,7 +1108,7 @@ async function lbFollowMutation(
   target: string,
   token: string,
 ): Promise<FollowResult> {
-  const res = await fetch(
+  const res = await fetchWithTimeout(
     `${LB_BASE}/user/${encodeURIComponent(target)}/${path}`,
     {
       method: "POST",
@@ -1496,7 +1497,7 @@ async function fetchPopularityBatch(
         : "artist_mbids";
   const idKey = `${kind === "release-group" ? "release_group" : kind}_mbid`;
   try {
-    const res = await fetch(`${LB_BASE}/popularity/${kind}`, {
+    const res = await fetchWithTimeout(`${LB_BASE}/popularity/${kind}`, {
       method: "POST",
       headers: {
         "User-Agent": USER_AGENT,
@@ -1545,7 +1546,7 @@ export async function getRecordingPopularity(
 ): Promise<RecordingPopularity | null> {
   try {
     const url = `${LB_BASE}/popularity/recording`;
-    const res = await fetch(url, {
+    const res = await fetchWithTimeout(url, {
       method: "POST",
       headers: {
         "User-Agent": USER_AGENT,
@@ -1834,7 +1835,7 @@ export async function tryGetLbRadio(
   const normalised = normaliseRadioPrompt(prompt);
   const params = new URLSearchParams({ prompt: normalised, mode });
   try {
-    const res = await fetch(`${LB_BASE}/explore/lb-radio?${params}`, {
+    const res = await fetchWithTimeout(`${LB_BASE}/explore/lb-radio?${params}`, {
       headers: {
         Authorization: `Token ${token}`,
         "User-Agent": USER_AGENT,
@@ -1994,7 +1995,7 @@ export async function editPlaylist(
       "https://musicbrainz.org/doc/jspf#playlist": ext,
     };
   }
-  const res = await fetch(
+  const res = await fetchWithTimeout(
     `${LB_BASE}/playlist/edit/${encodeURIComponent(mbid)}`,
     {
       method: "POST",
@@ -2042,7 +2043,7 @@ export async function deletePlaylist(
   mbid: string,
   token: string,
 ): Promise<{ ok: boolean; status: number; message?: string }> {
-  const res = await fetch(
+  const res = await fetchWithTimeout(
     `${LB_BASE}/playlist/${encodeURIComponent(mbid)}/delete`,
     {
       method: "POST",
@@ -2086,7 +2087,7 @@ export async function getSimilarArtists(
   limit = 12,
 ): Promise<SimilarArtist[]> {
   try {
-    const res = await fetch(`${LB_LABS_BASE}/similar-artists/json`, {
+    const res = await fetchWithTimeout(`${LB_LABS_BASE}/similar-artists/json`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -2563,7 +2564,7 @@ export async function getUserFeed(
   if (opts.minTs) params.set("min_ts", String(opts.minTs));
   if (opts.maxTs) params.set("max_ts", String(opts.maxTs));
   try {
-    const res = await fetch(
+    const res = await fetchWithTimeout(
       `${LB_BASE}/user/${encodeURIComponent(userName)}/feed/events?${params}`,
       {
         headers: {
@@ -2592,7 +2593,7 @@ export async function getUserFeed(
  * (typically server actions) should catch and surface the message.
  */
 async function lbPost(path: string, token: string, body: unknown): Promise<void> {
-  const res = await fetch(`${LB_BASE}${path}`, {
+  const res = await fetchWithTimeout(`${LB_BASE}${path}`, {
     method: "POST",
     headers: {
       Authorization: `Token ${token}`,
@@ -2792,7 +2793,7 @@ export async function createPlaylistOnLb(
       },
     ];
   }
-  const res = await fetch(`${LB_BASE}/playlist/create`, {
+  const res = await fetchWithTimeout(`${LB_BASE}/playlist/create`, {
     method: "POST",
     headers: {
       Authorization: `Token ${token}`,

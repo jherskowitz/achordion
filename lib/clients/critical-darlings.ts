@@ -1,4 +1,5 @@
 import "server-only";
+import { fetchWithTimeout } from "@/lib/fetch-timeout";
 
 /**
  * Critical Darlings — top-rated albums from leading music publications.
@@ -134,7 +135,7 @@ function parseRss(xml: string): CriticsPickAlbum[] {
  */
 export async function getCriticalDarlings(): Promise<CriticsPickAlbum[]> {
   try {
-    const res = await fetch(RSS_URL, {
+    const res = await fetchWithTimeout(RSS_URL, {
       headers: {
         "User-Agent": "Achordion/0.1 (jherskow@gmail.com)",
         Accept: "application/rss+xml, application/xml, text/xml",

@@ -26,6 +26,7 @@
  * before we get blocked.
  */
 
+import { fetchWithTimeout } from "@/lib/fetch-timeout";
 import type { EarshotChartItem } from "./earshot";
 
 const NACC_URL = "https://naccchart.com/charts/";
@@ -58,7 +59,7 @@ function clean(html: string): string {
 /** Pull the public top 30 of the NACC 200 plus the week-ending date. */
 export async function getNaccTop30(): Promise<NaccTopChart | null> {
   try {
-    const res = await fetch(NACC_URL, {
+    const res = await fetchWithTimeout(NACC_URL, {
       headers: { "User-Agent": UA },
       next: { revalidate: 60 * 60 * 24, tags: ["nacc-top30"] },
     });
