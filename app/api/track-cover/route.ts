@@ -1,6 +1,6 @@
 import {
-  searchRecordings,
   searchReleaseGroups,
+  withLookupDeadline,
 } from "@/lib/clients/musicbrainz";
 import { caaReleaseGroupUrl } from "@/lib/clients/coverart";
 import { checkRateLimit } from "@/lib/rate-limit";
@@ -64,48 +64,43 @@ export async function GET(request: Request) {
   // across "the" / "national" and pulls in irrelevant groups.
   const quoted = (s: string) => `"${s.replace(/"/g, '\\"')}"`;
 
+  const nullResponse = () =>
+    Response.json({ url: null, mbid: null }, { headers: CACHE_HEADERS });
+
+  // No album → no way to resolve a cover. (A recording search can't
+  // help: MB's recording-search response doesn't carry release-group
+  // info in the schema we parse, so that path always returned null —
+  // it was a pure wasted MB call that only added load to the shared
+  // 1-req/sec queue. Dropped.)
+  if (!album) return nullResponse();
+
   try {
-    if (album) {
-      const q = `release:${quoted(album)} AND artist:${quoted(artist)}`;
-      const results = await searchReleaseGroups(q, 4);
-      const top = results.find((r) => r["primary-type"] === "Album") ?? results[0];
-      if (top?.id) {
-        // Surface the resolved release-group MBID alongside the URL.
-        // Callers (chart cards) use it to swap their `href` from a
-        // /release-group/lookup fallback to a direct
-        // /release-group/<mbid> link once the cover resolves.
-        return Response.json(
-          { url: caaReleaseGroupUrl(top.id, 250), mbid: top.id },
-          { headers: CACHE_HEADERS },
-        );
-      }
-    }
-    // Fall through to recording-search when no album OR rg search
-    // came up dry. Note MB's recording search doesn't include release
-    // metadata in the response shape we parse, so this branch is
-    // almost always going to land on `null`. Kept for the "no album
-    // info" case so we tried.
-    const rec = await searchRecordings(
-      `recording:${quoted(title)} AND artist:${quoted(artist)}`,
-      3,
+    // Bound the whole MB resolution on a wall clock. /api/track-cover
+    // is fired in bursts (a radio-rewind tracklist requests a cover per
+    // row), and every call serializes through the per-instance
+    // 1-req/sec MB queue — so under load a request can sit in the queue
+    // for tens of seconds and blow past Vercel's function limit, which
+    // surfaced as a 5xx spike (the inner try/catch can't catch a
+    // function timeout). withLookupDeadline makes the function return a
+    // graceful 200 null within ~7s instead; the cover just falls back
+    // to its placeholder. A cover is cosmetic — never worth a 504.
+    const resolved = await withLookupDeadline(
+      (async (): Promise<{ url: string; mbid: string } | null> => {
+        const q = `release:${quoted(album)} AND artist:${quoted(artist)}`;
+        const results = await searchReleaseGroups(q, 4);
+        const top =
+          results.find((r) => r["primary-type"] === "Album") ?? results[0];
+        // Surface the resolved release-group MBID alongside the URL so
+        // callers (chart cards) can swap their href from a
+        // /release-group/lookup fallback to a direct /release-group/<mbid>.
+        return top?.id ? { url: caaReleaseGroupUrl(top.id, 250), mbid: top.id } : null;
+      })(),
     );
-    if (rec.length > 0) {
-      // Recording search response doesn't include release info via
-      // our schema; would need a follow-up getRecording per hit.
-      // Skip rather than blow the rate limit on a low-success path.
-      return Response.json(
-        { url: null, mbid: null },
-        { headers: CACHE_HEADERS },
-      );
-    }
-    return Response.json(
-      { url: null, mbid: null },
-      { headers: CACHE_HEADERS },
-    );
+    return resolved
+      ? Response.json(resolved, { headers: CACHE_HEADERS })
+      : nullResponse();
   } catch {
-    return Response.json(
-      { url: null, mbid: null },
-      { headers: CACHE_HEADERS },
-    );
+    // MB error OR deadline exceeded → graceful null, fast.
+    return nullResponse();
   }
 }
