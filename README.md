@@ -57,6 +57,22 @@ External data sources:
 - **Wikidata + Wikimedia Commons** — artist photos (P18 → Special:FilePath)
 - **Apple Music RSS / Wikipedia / spinbin / Critical Darlings RSS** — chart and editorial feeds
 
+### ListenBrainz API surface
+
+Every LB endpoint Achordion calls (all via `lib/clients/listenbrainz.ts`; base `https://api.listenbrainz.org/1`, Labs base `https://labs.api.listenbrainz.org`). Token-authed `POST`s and private reads use your `LISTENBRAINZ_TOKEN`; everything else is public and edge-cacheable.
+
+- **Listens** — `GET /user/{name}/listens`, `GET /user/{name}/playing-now`, `POST /delete-listen`
+- **Feed** — `GET /user/{name}/feed/events`
+- **Stats** — `GET /stats/user/{name}/{artists,recordings,release-groups,listening-activity,daily-activity,year-in-music/{year}}`; `GET /stats/sitewide/{artists,recordings,release-groups}`; `GET /stats/{artist,release-group}/{mbid}/listeners`
+- **Popularity** — `POST /popularity/{recording,release-group,artist}`; `GET /popularity/top-{recordings,release-groups}-for-artist/{mbid}`
+- **Feedback (loves)** — `GET /feedback/user/{name}/get-feedback`, `POST /feedback/recording-feedback`
+- **Playlists** — `GET /user/{name}/playlists`, `/user/{name}/playlists/createdfor`, `GET /playlist/{mbid}`; `POST /playlist/create`, `/playlist/edit/{mbid}`, `/playlist/{mbid}/delete`, `/playlist/{mbid}/item/add`
+- **Social** — `GET /user/{name}/{followers,following,similar-users}`; `POST /user/{name}/{follow,unfollow}`, `/user/{name}/timeline-event/create/thanks`
+- **Explore / recommendations / radio** — `GET /cf/recommendation/user/{name}/recording`, `/explore/fresh-releases`, `/user/{name}/fresh_releases`, `/explore/lb-radio`
+- **Metadata** — `POST /metadata/recording`
+- **Auth** — `GET /validate-token`
+- **Labs** — `GET /similar-artists/json`
+
 ## Getting started
 
 ```bash
