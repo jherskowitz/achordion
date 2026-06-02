@@ -4,6 +4,8 @@ import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import { Disc3 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useInViewOnce } from "@/lib/use-in-view";
+import { limitCoverFetch } from "@/lib/cover-fetch-limiter";
 
 /**
  * Full-bleed album cover tile that lazily resolves an `(artist,
@@ -50,6 +52,11 @@ export function LazyAlbumCover({
    *  the effect's deps would otherwise spam the network. */
   onResolved?: (data: { url: string | null; mbid: string | null }) => void;
 }) {
+  // Only resolve the cover once the tile is on/near screen — a long
+  // chart grid mounts dozens of these, and firing them all on mount
+  // bursts MB's 1-req/sec queue. The placeholder (rendered until `src`)
+  // carries the observer ref.
+  const { ref, inView } = useInViewOnce<HTMLDivElement>();
   const [src, setSrc] = useState<string | null>(initialSrc ?? null);
   const [errored, setErrored] = useState(false);
   // Fade-in once the image's bytes land. See `<CoverArt>` for the
@@ -82,6 +89,11 @@ export function LazyAlbumCover({
     // their MBID.
     const callback = onResolvedRef.current;
     if (initialSrc && !callback) return;
+    // Gate the from-scratch cover lookup (no initialSrc) on visibility —
+    // that's the burst source. initialSrc+callback rows already show a
+    // cover and only fetch for the MBID; let those proceed (still
+    // capped by the limiter) since their placeholder ref never mounts.
+    if (!initialSrc && !inView) return;
 
     let cancelled = false;
     // /api/track-cover takes title + optional album; for album-only
@@ -92,10 +104,14 @@ export function LazyAlbumCover({
       title: album,
       album,
     });
-    fetch(`/api/track-cover?${params}`)
-      .then((r) =>
+    // Route through the page-wide limiter so a scroll-through can't
+    // open dozens of cover requests at once.
+    limitCoverFetch(() => {
+      if (cancelled) return Promise.resolve({ url: null, mbid: null });
+      return fetch(`/api/track-cover?${params}`).then((r) =>
         r.ok ? r.json() : { url: null, mbid: null },
-      )
+      );
+    })
       .then((data: { url: string | null; mbid: string | null }) => {
         if (cancelled) return;
         // Don't overwrite a known-good initialSrc — Earshot's
@@ -111,11 +127,12 @@ export function LazyAlbumCover({
     return () => {
       cancelled = true;
     };
-  }, [artist, album, initialSrc]);
+  }, [artist, album, initialSrc, inView]);
 
   if (!src || errored) {
     return (
       <div
+        ref={ref}
         className={cn(
           "bg-muted text-muted-foreground/40 flex aspect-square w-full items-center justify-center transition-opacity group-hover:opacity-90",
           className,

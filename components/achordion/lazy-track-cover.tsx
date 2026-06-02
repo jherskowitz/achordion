@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { CoverArt } from "./cover-art";
+import { useInViewOnce } from "@/lib/use-in-view";
+import { limitCoverFetch } from "@/lib/cover-fetch-limiter";
 
 /**
  * Cover-art tile that lazily resolves an artist/title/album triple
@@ -45,6 +47,10 @@ export function LazyTrackCover({
    *  `<LazyAlbumCover>` — see that file for details. */
   onResolved?: (data: { url: string | null; mbid: string | null }) => void;
 }) {
+  // Resolve the cover only once the tile is on/near screen — a 50-row
+  // rewind tracklist firing all lookups on mount bursts MB's 1-req/sec
+  // queue. The wrapper div below carries the observer ref.
+  const { ref, inView } = useInViewOnce<HTMLDivElement>();
   const [src, setSrc] = useState<string | null>(initialSrc ?? null);
   // Mirror the latest callback into a ref so the effect below doesn't
   // need it as a dep. The lint rule is conservative about ref writes
@@ -60,12 +66,22 @@ export function LazyTrackCover({
     // that ship a cover (spinbin) would never learn the MBID.
     const callback = onResolvedRef.current;
     if (initialSrc && !callback) return;
+    // Gate the from-scratch lookup (no initialSrc) on visibility — the
+    // burst source. initialSrc+callback rows already show a cover and
+    // only fetch for the MBID; let those proceed (still limiter-capped).
+    if (!initialSrc && !inView) return;
 
     let cancelled = false;
     const params = new URLSearchParams({ artist, title });
     if (album) params.set("album", album);
-    fetch(`/api/track-cover?${params}`)
-      .then((r) => (r.ok ? r.json() : { url: null, mbid: null }))
+    // Route through the page-wide limiter so a fast scroll can't open
+    // dozens of cover requests at once.
+    limitCoverFetch(() => {
+      if (cancelled) return Promise.resolve({ url: null, mbid: null });
+      return fetch(`/api/track-cover?${params}`).then((r) =>
+        r.ok ? r.json() : { url: null, mbid: null },
+      );
+    })
       .then((data: { url: string | null; mbid: string | null }) => {
         if (cancelled) return;
         if (data.url && !initialSrc) setSrc(data.url);
@@ -77,7 +93,14 @@ export function LazyTrackCover({
     return () => {
       cancelled = true;
     };
-  }, [artist, title, album, initialSrc]);
+  }, [artist, title, album, initialSrc, inView]);
 
-  return <CoverArt src={src} alt={alt} size={size} />;
+  // Wrapper carries the IntersectionObserver ref (CoverArt doesn't
+  // forward one); `contents`-free shrink-0 div is layout-neutral inside
+  // the flex rows these covers live in.
+  return (
+    <div ref={ref} className="shrink-0">
+      <CoverArt src={src} alt={alt} size={size} />
+    </div>
+  );
 }
