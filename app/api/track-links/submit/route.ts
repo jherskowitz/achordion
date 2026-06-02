@@ -7,6 +7,10 @@ import {
   type CachedLink,
   type LinkEntity,
 } from "@/lib/track-links-store";
+import {
+  PARACHORD_CLIENT_HEADER,
+  normalizeParachordClient,
+} from "@/lib/parachord-client";
 
 /**
  * Parachord-only endpoint for submitting MBID → external-links
@@ -154,6 +158,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     );
   }
 
+  // Contributing platform, for telemetry only (analytics / abuse triage
+  // / rollout monitoring). Client-controlled, so normalized against a
+  // fixed allowlist and NEVER used for authz — auth is the bearer token
+  // above. Additive: absent header → "unknown", behavior unchanged.
+  const client = normalizeParachordClient(
+    request.headers.get(PARACHORD_CLIENT_HEADER),
+  );
+
   let body: unknown;
   try {
     body = await request.json();
@@ -238,6 +250,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     isrcs.length > 0 ? { isrcs } : undefined,
   );
 
+  // Attribute the accepted contribution by platform. Structured log so
+  // it's filterable in the runtime logs for rollout/abuse monitoring.
+  console.log(
+    `[track-links-submit] client=${client} entity=${entity} mbid=${mbid} accepted=${normalised.length}`,
+  );
+
   // Bust the edge cache for the entity's user-facing pages so the
   // freshly-submitted links appear without waiting out the 1h
   // s-maxage. `revalidatePath` is best-effort — failures here just
@@ -263,6 +281,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       // release-group MBID so they can update their own cache
       // mapping if useful.
       stored_as: { entity, mbid },
+      // Echo the normalized contributing platform back so the caller
+      // can confirm we read its X-Parachord-Client header.
+      client,
     },
     { headers: NO_STORE },
   );

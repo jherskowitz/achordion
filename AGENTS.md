@@ -809,6 +809,7 @@ Reference payload shapes: `createPlaylistOnLb` and `editPlaylist` in [`lib/clien
 Parachord can push confirmed-on-playback MBID → external-streaming-URL matches into Achordion's persistent links cache. Each submitted link is stored with `source: "parachord"`, which outranks the Odesli + MB lookups Achordion does itself — so the next user who clicks the favicon row sees the playback-verified URL, not Odesli's best-effort match. Works for both **recordings** (per-track URLs) and **release-groups** (per-album URLs).
 
 - **Auth:** bearer token. Achordion reads `PARACHORD_TRACK_LINKS_TOKEN` from its env; Parachord side configures the matching value and presents `Authorization: Bearer <token>` on every request.
+- **Client attribution (telemetry):** send `X-Parachord-Client: desktop | android | ios` to attribute the contribution by platform. The server normalizes it against that allowlist (`lib/parachord-client.ts`) — anything else (or absent) is recorded as `unknown` — logs it (`[track-links-submit] client=…`), and echoes it back as `client` in the response. It's **telemetry only** (client-controlled → never used for authz); omitting it is fine and changes nothing.
 - **Endpoint:** `POST https://achordion.xyz/api/track-links/submit` (or `localhost:3000/api/track-links/submit` for dev).
 - **Body:**
   ```json
