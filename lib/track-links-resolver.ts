@@ -11,6 +11,7 @@ import {
   canonicalHost,
   getCachedTrackLinks,
   getCachedTrackLinksByIsrcs,
+  getCachedTrackLinksByName,
   setCachedTrackLinks,
   type CachedLink,
   type LinkEntity,
@@ -183,6 +184,38 @@ export async function resolveTrackLinks(
       });
       return sortByPlatformPriority(
         aliasHit.map(({ url, label, host }) => ({ url, label, host })),
+      );
+    }
+  }
+
+  // 2.6. Name alias fallback (recording entities only). Last resort
+  // before paying for Odesli: when the same song is modeled as two
+  // recording MBIDs and NEITHER carries an ISRC (so 2.5 can't fire),
+  // bridge on exact (artist, title). The alias key includes the
+  // artist (covers never match) and the exact title (live/demo/remix
+  // variants carry MB's parenthetical ETI, so they key differently
+  // and never inherit the studio recording's links). Back-fill the
+  // per-MBID cache on a hit so the next lookup is a direct hit.
+  if (
+    entity === "recording" &&
+    mbid &&
+    mbNames.artistName &&
+    mbNames.trackName
+  ) {
+    const nameHit = await getCachedTrackLinksByName(
+      mbNames.artistName,
+      mbNames.trackName,
+    );
+    if (nameHit && nameHit.length > 0) {
+      void setCachedTrackLinks(
+        mbid,
+        nameHit,
+        mbNames,
+        "recording",
+        isrcs.length > 0 ? { isrcs } : undefined,
+      );
+      return sortByPlatformPriority(
+        nameHit.map(({ url, label, host }) => ({ url, label, host })),
       );
     }
   }

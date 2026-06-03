@@ -3,6 +3,7 @@ import "server-only";
 import { Redis } from "@upstash/redis";
 import { revalidateTag, unstable_cache } from "next/cache";
 import { canonicalHost } from "@/lib/host";
+import { nameAliasKey } from "@/lib/track-links-key";
 
 // Re-export so existing call sites that import canonicalHost from
 // here keep working.
@@ -225,6 +226,47 @@ export async function getCachedTrackLinksByIsrcs(
 }
 
 /**
+ * Look up cached external links by exact (artist, title) name.
+ *
+ * Last-resort bridge for the "same song, two recording MBIDs" case
+ * when neither side carries an ISRC in MusicBrainz (so the ISRC alias
+ * can't fire). MB commonly models a song as a single recording AND an
+ * album-track recording; streaming links land on one, a listen/pin
+ * resolves to the other. ISRC is the correct bridge when present;
+ * this name alias covers the gap when it isn't.
+ *
+ * Safety: the key includes the **artist** (so a cover by a different
+ * artist never matches — unlike a composition/Work bridge) and an
+ * **exact** title (so MusicBrainz's parenthetical ETI — "(live)",
+ * "(demo)", "(… remix)" — produces a different key and never
+ * cross-contaminates the studio recording's links). See
+ * `lib/track-links-key.ts` for the normalization rationale.
+ *
+ * Returns null on miss / empty / Upstash-not-configured. Caller
+ * back-fills the per-MBID key after a hit so the next lookup is a
+ * direct hit.
+ */
+export async function getCachedTrackLinksByName(
+  artistName: string | undefined | null,
+  trackName: string | undefined | null,
+): Promise<CachedLink[] | null> {
+  if (!redis) return null;
+  if (!artistName || !trackName) return null;
+  const k = nameAliasKey(artistName, trackName);
+  if (!k) return null;
+  try {
+    const raw = await redis.get<CachedEntry | string | null>(k);
+    if (!raw) return null;
+    const entry =
+      typeof raw === "string" ? (JSON.parse(raw) as CachedEntry) : raw;
+    if (!Array.isArray(entry.links) || entry.links.length === 0) return null;
+    return entry.links;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Merge new links into the cache for an entity. Existing entries
  * with the same host are replaced ONLY when the incoming source has
  * equal or higher priority. Result is written back as a fresh
@@ -303,6 +345,24 @@ export async function setCachedTrackLinks(
         if (!isrc) continue;
         try {
           await redis.set(isrcKey(isrc), serialised, { ex: TTL_SECONDS });
+        } catch {
+          // Best-effort — primary key already wrote successfully.
+        }
+      }
+    }
+
+    // Name alias (recording-only) — the last-resort bridge for the
+    // "same song, different recording MBID, no shared ISRC" case.
+    // Keyed off the merged entry's own names (so a write that didn't
+    // pass names still aliases when a prior write captured them).
+    // Same JSON duplication as ISRC aliases. The key includes the
+    // artist + exact title, so covers and live/demo variants never
+    // collide — see `getCachedTrackLinksByName`.
+    if (entity === "recording" && entry.artist_name && entry.track_name) {
+      const nameKeyAlias = nameAliasKey(entry.artist_name, entry.track_name);
+      if (nameKeyAlias) {
+        try {
+          await redis.set(nameKeyAlias, serialised, { ex: TTL_SECONDS });
         } catch {
           // Best-effort — primary key already wrote successfully.
         }
