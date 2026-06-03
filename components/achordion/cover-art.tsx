@@ -108,28 +108,48 @@ export function CoverArt({
   const effectiveSrc =
     retry > 0 ? `${src}${src.includes("?") ? "&" : "?"}cb=${retry}` : src;
 
+  // Layer the placeholder BEHIND the image. While the image's bytes are
+  // still loading it sits at `opacity-0`, so the Disc3 placeholder shows
+  // through underneath — we never flash a blank `bg-muted` box between
+  // "placeholder" and "cover". Once `onLoad` fires, the image fades to
+  // `opacity-100`, covering the placeholder. (Previously the image
+  // *replaced* the placeholder the instant `src` was set, so a long
+  // image load showed a blank box: placeholder → blank → cover.)
   return (
-    <Image
-      key={effectiveSrc}
-      src={effectiveSrc}
-      alt={alt}
-      width={size}
-      height={size}
-      unoptimized
-      onLoad={() => setLoaded(true)}
-      onError={() => {
-        // Retry once (cache-busted) on a transient CAA/archive.org
-        // failure before falling back to the placeholder.
-        if (retry < MAX_COVER_RETRIES) setRetry((r) => r + 1);
-        else setErrored(true);
-      }}
+    <div
       className={cn(
-        "bg-muted shrink-0 object-cover transition-opacity duration-300 ease-out",
-        loaded ? "opacity-100" : "opacity-0",
+        "bg-muted relative shrink-0 overflow-hidden",
         radius,
         className,
       )}
       style={sizeStyle}
-    />
+      aria-label={alt}
+      role="img"
+    >
+      {!loaded && (
+        <span className="text-muted-foreground/60 absolute inset-0 flex items-center justify-center">
+          <Disc3 className="size-1/2" />
+        </span>
+      )}
+      <Image
+        key={effectiveSrc}
+        src={effectiveSrc}
+        alt={alt}
+        width={size}
+        height={size}
+        unoptimized
+        onLoad={() => setLoaded(true)}
+        onError={() => {
+          // Retry once (cache-busted) on a transient CAA/archive.org
+          // failure before falling back to the placeholder.
+          if (retry < MAX_COVER_RETRIES) setRetry((r) => r + 1);
+          else setErrored(true);
+        }}
+        className={cn(
+          "absolute inset-0 h-full w-full object-cover transition-opacity duration-300 ease-out",
+          loaded ? "opacity-100" : "opacity-0",
+        )}
+      />
+    </div>
   );
 }

@@ -129,37 +129,39 @@ export function LazyAlbumCover({
     };
   }, [artist, album, initialSrc, inView]);
 
-  if (!src || errored) {
-    return (
-      <div
-        ref={ref}
-        className={cn(
-          "bg-muted text-muted-foreground/40 flex aspect-square w-full items-center justify-center transition-opacity group-hover:opacity-90",
-          className,
-        )}
-      >
-        <Disc3 className="size-1/3" aria-hidden />
-      </div>
-    );
-  }
+  // One layered tile for every state: the Disc3 placeholder sits behind
+  // the image and stays visible until the image's bytes load, so the
+  // resolve never flashes a blank box (placeholder → cover, never
+  // placeholder → blank → cover). The container always carries the
+  // in-view observer ref. `group-hover:opacity-90` dims the whole tile.
   return (
-    <Image
-      src={src}
-      alt={alt}
-      width={500}
-      height={500}
-      onLoad={() => setLoaded(true)}
-      onError={() => setErrored(true)}
+    <div
+      ref={ref}
       className={cn(
-        // `transition-opacity` covers both the load fade-in (controlled
-        // by the `loaded` state) and the existing `group-hover` dim.
-        // 300ms ease-out feels faster than the default 150ms but still
-        // soft enough not to read as a jump.
-        "aspect-square w-full object-cover transition-opacity duration-300 ease-out group-hover:opacity-90",
-        loaded ? "opacity-100" : "opacity-0",
+        "bg-muted text-muted-foreground/40 relative aspect-square w-full overflow-hidden transition-opacity group-hover:opacity-90",
         className,
       )}
-      unoptimized
-    />
+    >
+      {(!src || errored || !loaded) && (
+        <span className="absolute inset-0 flex items-center justify-center">
+          <Disc3 className="size-1/3" aria-hidden />
+        </span>
+      )}
+      {src && !errored && (
+        <Image
+          src={src}
+          alt={alt}
+          width={500}
+          height={500}
+          onLoad={() => setLoaded(true)}
+          onError={() => setErrored(true)}
+          className={cn(
+            "absolute inset-0 h-full w-full object-cover transition-opacity duration-300 ease-out",
+            loaded ? "opacity-100" : "opacity-0",
+          )}
+          unoptimized
+        />
+      )}
+    </div>
   );
 }
