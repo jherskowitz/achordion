@@ -131,7 +131,13 @@ const ListenSchema = z.object({
         artist_mbids: z.array(z.string()).optional(),
         duration_ms: z.number().optional(),
         spotify_id: z.string().optional(),
+        // Streamed-from source, enriched by Parachord ≥ v0.9.4.
+        // `origin_url` is the URL actually played; `music_service` is
+        // its canonical host (e.g. "spotify.com"); `music_service_name`
+        // is the human label (e.g. "Spotify"). See `deriveListenSource`.
         origin_url: z.string().optional(),
+        music_service: z.string().optional(),
+        music_service_name: z.string().optional(),
       })
       .partial()
       .passthrough()
