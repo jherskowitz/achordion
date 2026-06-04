@@ -4,7 +4,6 @@ import { caaUrlFromListen } from "@/lib/clients/coverart";
 import type { Listen } from "@/lib/clients/listenbrainz";
 import { deriveListenSource } from "@/lib/listen-source";
 import { parachordPlayTrack } from "@/lib/parachord";
-import { faviconUrl } from "@/lib/favicon";
 import { InlineTrackLinks } from "./inline-track-links";
 import { PlayOverCover } from "./parachord-button";
 import {
@@ -43,11 +42,11 @@ export function ScrobbleRow({
   // artist + title pair and let it resolve at click time.
   const releaseGroupMbid = meta.additional_info?.release_group_mbid;
   const cover = caaUrlFromListen(meta, 250);
-  // The source Parachord (≥ v0.9.4) actually streamed from. Drives a
-  // direct "Listen on {service}" link and seeds the link resolver via
-  // Odesli so the track expands to other services even when MB has no
-  // url-rel. Absent (null) for older clients / localfiles plays — the
-  // row then renders exactly as before.
+  // The source Parachord (≥ v0.9.4) actually streamed from. Used to
+  // seed the link flyout's resolver via Odesli so the track expands to
+  // other services even when MB has no url-rel. Absent (null) for older
+  // clients / localfiles plays — the flyout then falls back to the
+  // recording-MBID resolution path as before.
   const source = deriveListenSource(meta.additional_info);
 
   return (
@@ -98,33 +97,12 @@ export function ScrobbleRow({
           )}
         </p>
       </div>
-      {/* Direct "Listen on {service}" link to the source Parachord
-          actually streamed from — instant, no resolve. Only shown when
-          the scrobble carries source enrichment (Parachord ≥ v0.9.4). */}
-      {source && (
-        <a
-          href={source.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label={`Listen on ${source.serviceName}`}
-          title={`Listen on ${source.serviceName}`}
-          className="border-border/60 text-muted-foreground hover:text-foreground inline-flex size-6 shrink-0 items-center justify-center rounded-full border transition-colors pointer-coarse:size-9"
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={faviconUrl(source.serviceHost)}
-            alt=""
-            width={16}
-            height={16}
-            loading="lazy"
-            className="size-3.5 opacity-90"
-          />
-        </a>
-      )}
-      {/* Lazy streaming-link expansion sits as the first column
-          after the track info, matching the album tracklist layout.
-          Seeded with the played source URL so it expands to other
-          services via Odesli even when MB has no streaming url-rel. */}
+      {/* Lazy streaming-link expansion (the flyout) holds ALL the
+          track's links in one place. Seeded with the source URL
+          Parachord actually streamed from, so the played service — and
+          everything Odesli expands it into — shows up here even when MB
+          has no streaming url-rel. No separate per-service link on the
+          row: keep them together in the flyout. */}
       <InlineTrackLinks recordingMbid={recordingMbid} seedUrl={source?.url} />
       {showRelative && (
         <RelativeTime
