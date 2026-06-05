@@ -7,6 +7,7 @@ import {
   getReleaseGroup,
   partitionArtistRelations,
   pickCanonicalRelease,
+  withLookupDeadline,
   type ReleaseDetail,
 } from "@/lib/clients/musicbrainz";
 import { parachordPlayAlbum, type ParachordTrack } from "@/lib/parachord";
@@ -85,14 +86,19 @@ async function AlbumBody({ mbid }: { mbid: string }) {
   // stream in without gating first paint. On a cold (cache-miss) album
   // this turns ~3 serialized 1-req/sec MB calls before any paint into
   // one. Both promises depend only on `rg`, so they run concurrently.
+  // Deadline-bound both streamed promises: `.catch` only saves us from
+  // an *error*, not a *hang* — a stuck MB/LB call (no error, no resolve)
+  // would keep the Suspense child, and the whole function, alive to
+  // maxDuration (a billed timeout). The deadline throws into the catch
+  // so each degrades fast (empty tracklist / no listen counts).
   const releasePromise = canonical
-    ? getRelease(canonical.id).catch(() => null)
+    ? withLookupDeadline(getRelease(canonical.id)).catch(() => null)
     : Promise.resolve(null);
   type Recordings = Awaited<ReturnType<typeof getTopRecordingsForArtist>>;
   const recordingsPromise: Promise<Recordings> = credit.primaryArtistId
-    ? getTopRecordingsForArtist(credit.primaryArtistId).catch(
-        () => [] as Recordings,
-      )
+    ? withLookupDeadline(
+        getTopRecordingsForArtist(credit.primaryArtistId),
+      ).catch(() => [] as Recordings)
     : Promise.resolve([] as Recordings);
 
   // Header streaming favicons seed from the release-group's OWN MB
