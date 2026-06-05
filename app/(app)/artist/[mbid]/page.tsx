@@ -102,8 +102,12 @@ async function ArtistBody({
 }) {
   let artist;
   try {
-    artist = await getArtist(mbid);
-  } catch {
+    artist = await withLookupDeadline(getArtist(mbid));
+  } catch (e) {
+    // Deadline (MB-queue saturation) → fast uncached 500 via the error
+    // boundary (refreshable) rather than hanging to maxDuration or
+    // caching a transient 404; real miss → 404.
+    if (e instanceof Error && /exceeded/.test(e.message)) throw e;
     notFound();
   }
 

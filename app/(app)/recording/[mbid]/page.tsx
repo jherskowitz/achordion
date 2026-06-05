@@ -6,6 +6,7 @@ import {
   formatArtistCredit,
   getRecording,
   partitionArtistRelations,
+  withLookupDeadline,
   type RecordingRelease,
 } from "@/lib/clients/musicbrainz";
 import { caaReleaseUrl } from "@/lib/clients/coverart";
@@ -56,8 +57,15 @@ function pickHeroRelease(
 async function RecordingBody({ mbid }: { mbid: string }) {
   let recording;
   try {
-    recording = await getRecording(mbid);
-  } catch {
+    recording = await withLookupDeadline(getRecording(mbid));
+  } catch (e) {
+    // Distinguish a deadline (MB 1-req/sec queue saturated under load —
+    // overwhelmingly bot-crawled cold renders) from a real not-found.
+    // Deadline → re-throw to the (app) error boundary: a fast, UNCACHED
+    // 500 the user can refresh, instead of hanging to maxDuration (a
+    // billed timeout) or caching a transient 404. Caps every cold
+    // render at the deadline rather than the function limit.
+    if (e instanceof Error && /exceeded/.test(e.message)) throw e;
     notFound();
   }
 

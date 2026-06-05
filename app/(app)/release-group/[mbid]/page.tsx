@@ -69,8 +69,12 @@ function buildListenCountMap(
 async function AlbumBody({ mbid }: { mbid: string }) {
   let rg;
   try {
-    rg = await getReleaseGroup(mbid);
-  } catch {
+    rg = await withLookupDeadline(getReleaseGroup(mbid));
+  } catch (e) {
+    // Deadline (MB-queue saturation) → fast uncached 500 via the error
+    // boundary (refreshable) rather than hanging to maxDuration or
+    // caching a transient 404; real miss → 404.
+    if (e instanceof Error && /exceeded/.test(e.message)) throw e;
     notFound();
   }
 
