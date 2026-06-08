@@ -27,6 +27,26 @@ interface ChangelogEntry {
 
 const ENTRIES: ChangelogEntry[] = [
   {
+    date: "2026-06-05",
+    intro:
+      "A site-wide speed and reliability pass — pages paint sooner, stay fresh longer, and a slow or overloaded data source no longer takes a page down with an error.",
+    highlights: [
+      "Entity pages (artist / album / track / charts) now paint the header first and stream the rest of the page in behind it, and they stay edge-cached for 6 hours instead of 1 — so the next time you or anyone else opens a page, it loads basically instantly. Listener counts and other stats load off the main render path, so the page content shows up without waiting on them.",
+      "Cover art no longer flashes an empty frame while it loads — the placeholder now sits behind the image and the artwork fades in over it, and a transient hiccup fetching a cover retries once instead of leaving a blank tile.",
+      "Long lists of tracks only fetch the covers for the rows actually on screen (and cap how many load at once), so listen / loved / chart pages scroll smoothly instead of hammering the network the moment they open.",
+      "When MusicBrainz, ListenBrainz, or the streaming-link resolver is slow or rate-limiting us, pages now degrade gracefully instead of erroring — every outbound call has a timeout and a deadline, we honour “Retry-After” and back off, and a blip in our own rate limiter fails open rather than taking the whole site down. The net effect for you: far fewer of the occasional 500 / 503 / 504 pages that used to appear when an upstream service had a bad moment.",
+    ],
+  },
+  {
+    date: "2026-05-26",
+    intro:
+      "When the Parachord desktop app is running, Play opens it instantly — no browser round-trip.",
+    highlights: [
+      "On desktop, if the Parachord app is open and connected, every Play / Open in Parachord / Listen along link across Achordion now hands straight off to the running app the moment you click it — no new tab, no parachord.com round-trip, and the page you're on stays put. If the app isn't running, the same link falls back to the parachord.com page exactly as before.",
+      "Sharing is unaffected: copy-link, middle-click, and Cmd/Ctrl-click all still use the clean https://parachord.com/… URL, so what you hand to someone else is always the universally-openable form that works whether or not they have the app.",
+    ],
+  },
+  {
     date: "2026-05-21",
     intro:
       "Mobile Play buttons now Just Work — every Parachord hand-off uses Universal Links / App Links instead of the custom scheme, so installed users tap straight into the app and non-installed users land on a useful page instead of an OS error.",
