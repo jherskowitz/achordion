@@ -1,5 +1,9 @@
 import type { ReactNode } from "react";
-import { UserPageHeader } from "@/components/achordion/user-page-header";
+import { Suspense } from "react";
+import {
+  UserPageHeader,
+  UserPageHeaderSkeleton,
+} from "@/components/achordion/user-page-header";
 
 export default async function UserLayout({
   children,
@@ -11,7 +15,13 @@ export default async function UserLayout({
   const { name } = await params;
   return (
     <>
-      <UserPageHeader name={name} />
+      {/* Own Suspense boundary so the header's upstream calls (playing-
+          now / following / Bluesky) stream independently and never gate
+          the tab content below — which has its own per-section Suspense
+          and should paint without waiting on the header. */}
+      <Suspense fallback={<UserPageHeaderSkeleton />}>
+        <UserPageHeader name={name} />
+      </Suspense>
       {children}
     </>
   );

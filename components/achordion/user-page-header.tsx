@@ -2,7 +2,19 @@ import { Suspense } from "react";
 import { UserAvatar } from "./user-avatar";
 import { auth } from "@/auth";
 import { getFollowing, getPlayingNow } from "@/lib/clients/listenbrainz";
+import { withLookupDeadline } from "@/lib/clients/musicbrainz";
 import { getLbTokenForRequest } from "@/lib/lb-token";
+import { Skeleton } from "@/components/ui/skeleton";
+
+// The header shell blocks on three upstream calls (playing-now,
+// following, Bluesky profile). They're all non-critical enrichments
+// with safe fallbacks (client-polled on-air, default toggle, default
+// avatar), so bound each one well under the entity-page deadline: a
+// slow or hung ListenBrainz / Bluesky call degrades the header to
+// defaults fast instead of stalling it. Combined with the <Suspense>
+// the layout now wraps this in, a bad upstream moment can no longer
+// hold up the rest of the page.
+const HEADER_LOOKUP_DEADLINE_MS = 4000;
 import { getBskyDisplayProfile } from "@/lib/bsky-display";
 import { BlueskyStrip } from "./bluesky-strip";
 import { ListenerBioRow } from "./listener-bio-row";
@@ -39,7 +51,10 @@ export async function UserPageHeader({ name }: { name: string }) {
 
   // Fetch initial playing-now in parallel with the rest so the header
   // renders without a flash; LiveOnAirIndicator polls from there.
-  const initialPlayingPromise = getPlayingNow(name).catch(() => null);
+  const initialPlayingPromise = withLookupDeadline(
+    getPlayingNow(name),
+    HEADER_LOOKUP_DEADLINE_MS,
+  ).catch(() => null);
 
   let followInitial = false;
   let disabledReason: string | undefined;
@@ -50,7 +65,10 @@ export async function UserPageHeader({ name }: { name: string }) {
         "Add your ListenBrainz token in Settings to follow users.";
     }
     try {
-      const following = await getFollowing(viewer);
+      const following = await withLookupDeadline(
+        getFollowing(viewer),
+        HEADER_LOOKUP_DEADLINE_MS,
+      );
       followInitial = following.some(
         (u) => u.toLowerCase() === name.toLowerCase(),
       );
@@ -67,7 +85,10 @@ export async function UserPageHeader({ name }: { name: string }) {
   // Bluesky avatar in place of the DiceBear default. Falls back
   // silently when any precondition fails. The same fetch is reused
   // by <BlueskyStrip> below via unstable_cache.
-  const bskyDisplay = await getBskyDisplayProfile(name, viewer ?? null);
+  const bskyDisplay = await withLookupDeadline(
+    getBskyDisplayProfile(name, viewer ?? null),
+    HEADER_LOOKUP_DEADLINE_MS,
+  ).catch(() => null);
   const avatarOverride = bskyDisplay?.avatar ?? undefined;
 
   return (
@@ -179,6 +200,44 @@ export async function UserPageHeader({ name }: { name: string }) {
           )}
         </div>
         <SectionTabs tabs={userTabs(name)} />
+      </div>
+    </header>
+  );
+}
+
+/**
+ * Header placeholder shown by the layout's <Suspense> while
+ * UserPageHeader resolves. Mirrors the real header's shape (avatar +
+ * name block + chip row + fingerprint slot + tabs) so the page doesn't
+ * shift when the real header streams in, and — crucially — so the tab
+ * content below can render immediately instead of waiting on the
+ * header's upstream calls.
+ */
+export function UserPageHeaderSkeleton() {
+  return (
+    <header className="border-border/60 border-b" aria-hidden>
+      <div className="mx-auto max-w-7xl px-4 pt-10 pb-0 sm:px-6">
+        <div className="flex flex-col items-start gap-4 pb-6 sm:flex-row sm:items-start sm:gap-6">
+          <Skeleton className="size-16 shrink-0 rounded-full sm:mt-5 sm:size-20" />
+          <div className="min-w-0 flex-1 space-y-2">
+            <Skeleton className="h-3 w-28" />
+            <Skeleton className="h-9 w-64 max-w-full" />
+            <Skeleton className="h-4 w-44" />
+            <div className="flex flex-wrap gap-1.5 pt-1">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <Skeleton key={i} className="h-6 w-16 rounded-full" />
+              ))}
+            </div>
+          </div>
+          <div className="ml-auto hidden shrink-0 self-center sm:block">
+            <Skeleton className="size-32 rounded-full" />
+          </div>
+        </div>
+        <div className="flex gap-4 pb-3">
+          {Array.from({ length: 7 }).map((_, i) => (
+            <Skeleton key={i} className="h-4 w-16" />
+          ))}
+        </div>
       </div>
     </header>
   );
