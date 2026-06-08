@@ -24,9 +24,15 @@ export { canonicalHost };
  *   - "parachord" — actively-confirmed match Parachord pushed via
  *     /api/track-links/submit (most authoritative since Parachord
  *     played it to confirm).
+ *   - "parachord-scrobble" — the source URL a Parachord scrobble
+ *     reported it streamed from (`additional_info.origin_url`),
+ *     captured passively on resolve. Lowest priority: it's the exact
+ *     played link, but the recording MBID came from ListenBrainz's
+ *     mapper (which can pick the wrong sibling), so it only ever
+ *     fills a host no better source covered — never overrides.
  *
  * When merging entries with the same host, the higher-priority
- * source wins: parachord > odesli > mb.
+ * source wins: parachord > odesli > mb > parachord-scrobble.
  *
  * TTL: 90 days. After expiry the read returns null and the caller
  * re-resolves; the freshly-resolved entry overwrites with a new
@@ -38,7 +44,7 @@ export { canonicalHost };
  * pre-cache behavior.
  */
 
-export type LinkSource = "odesli" | "mb" | "parachord";
+export type LinkSource = "odesli" | "mb" | "parachord" | "parachord-scrobble";
 
 export interface CachedLink {
   url: string;
@@ -91,6 +97,9 @@ const SOURCE_PRIORITY: Record<LinkSource, number> = {
   parachord: 3,
   odesli: 2,
   mb: 1,
+  // Lowest: fills a host nothing else covered, never overrides a
+  // resolved (odesli/mb) or confirmed (parachord) link.
+  "parachord-scrobble": 0,
 };
 
 const redis = (() => {

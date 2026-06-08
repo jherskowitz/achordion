@@ -248,6 +248,21 @@ export async function resolveTrackLinks(
     seen.add(h);
   }
 
+  // 4.5. Played source (parachord-scrobble). When the caller passed a
+  // `seedUrl` — the origin_url Parachord reported it streamed from —
+  // keep that exact link if no better source already covers its host.
+  // This guarantees a track that was actually played retains at least
+  // its played-from link even when Odesli can't expand it (the residual
+  // gap after #1). Tagged `parachord-scrobble` below so the store ranks
+  // it lowest: fills gaps, never overrides odesli/mb/parachord.
+  if (seedUrl) {
+    const h = hostOf(seedUrl);
+    if (h && ![...seen].some((s) => h === s || h.includes(s))) {
+      items.push({ url: seedUrl, label: prettyLabel(h), host: h });
+      seen.add(h);
+    }
+  }
+
   // 5. Write-through. Tag each link with its origin so future
   // Parachord submissions can override on priority. Background-write
   // — let the response return immediately.
@@ -258,7 +273,13 @@ export async function resolveTrackLinks(
         Object.values(odesli.linksByPlatform).some(
           (l) => l?.url === item.url,
         );
-      return { ...item, source: fromOdesli ? "odesli" : "mb" };
+      if (fromOdesli) return { ...item, source: "odesli" as const };
+      // The played-source link we just appended (only present when it
+      // filled a host Odesli/MB didn't) → lowest-priority scrobble tag.
+      if (seedUrl && item.url === seedUrl) {
+        return { ...item, source: "parachord-scrobble" as const };
+      }
+      return { ...item, source: "mb" as const };
     });
     void setCachedTrackLinks(
       mbid,
