@@ -27,6 +27,16 @@ interface ChangelogEntry {
 
 const ENTRIES: ChangelogEntry[] = [
   {
+    date: "2026-06-08",
+    intro:
+      "Streaming links now show up for a lot more tracks — and the songs you play in Parachord link straight to wherever you streamed them.",
+    highlights: [
+      "The “where to listen” row (Spotify / Apple Music / Tidal / …) now appears on many more tracks. MusicBrainz often files the same song under two different IDs — a single and its album version — so links attached to one used to be invisible on the other. Achordion now bridges them by exact artist + title (and by shared recording ID when available), so links you'd previously miss just show up. Covers, remixes, and live versions are kept deliberately separate, so you never get sent to the wrong one.",
+      "When you play something in Parachord (desktop or Android), the listen now remembers the exact source you streamed from. On your Listens, the link row jumps straight there — and fills in the other services even when our usual lookup comes up empty.",
+      "Album art now fades in smoothly from its placeholder instead of briefly flashing an empty grey box while it loads.",
+    ],
+  },
+  {
     date: "2026-06-05",
     intro:
       "A site-wide speed and reliability pass — pages paint sooner, stay fresh longer, and a slow or overloaded data source no longer takes a page down with an error.",
