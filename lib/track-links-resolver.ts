@@ -98,10 +98,26 @@ export async function resolveTrackLinks(
   const { mbid, seedUrl, prefetched } = opts;
   const entity: LinkEntity = opts.entity ?? "recording";
 
-  // 1. Cache hit short-circuits every external call.
+  // 1. Cache hit short-circuits every external call. One exception: an
+  // enriched scrobble may pass a `seedUrl` for a service the cached set
+  // doesn't list yet (the listener played it somewhere new). Merge that
+  // single new host in (fill-only `parachord-scrobble`) so a track's
+  // coverage grows over time. Fire-and-forget, and only when the host is
+  // genuinely new, so cached tracks normally stay a pure read.
   if (mbid) {
     const cached = await getCachedTrackLinks(mbid, entity);
     if (cached && cached.length > 0) {
+      const seedLink = newSeedLink(cached, seedUrl);
+      if (seedLink) {
+        void setCachedTrackLinks(mbid, [seedLink], undefined, entity);
+        return sortByPlatformPriority(
+          [...cached, seedLink].map(({ url, label, host }) => ({
+            url,
+            label,
+            host,
+          })),
+        );
+      }
       return sortByPlatformPriority(
         cached.map(({ url, label, host }) => ({ url, label, host })),
       );
@@ -317,6 +333,31 @@ function sortByPlatformPriority(items: ResolvedLink[]): ResolvedLink[] {
       a.idx !== b.idx ? a.idx - b.idx : a.original - b.original,
     )
     .map(({ item }) => item);
+}
+
+/**
+ * If `seedUrl` (an enriched scrobble's played source) names a streaming
+ * host the cached set doesn't already have, return it as a fill-only
+ * `parachord-scrobble` link to merge in; otherwise null. Lets a track
+ * accumulate services as it gets played from new sources, without ever
+ * overriding an existing (higher-priority) link for a host we already
+ * have.
+ */
+function newSeedLink(
+  cached: CachedLink[],
+  seedUrl: string | null | undefined,
+): CachedLink | null {
+  if (!seedUrl) return null;
+  const host = hostOf(seedUrl);
+  if (!host) return null;
+  const have = new Set(cached.map((l) => canonicalHost(l.host)));
+  if (have.has(canonicalHost(host))) return null;
+  return {
+    url: seedUrl,
+    label: prettyLabel(host),
+    host,
+    source: "parachord-scrobble",
+  };
 }
 
 function hostOf(url: string): string | null {
