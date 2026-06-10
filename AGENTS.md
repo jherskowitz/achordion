@@ -592,23 +592,32 @@ Hard-won from a run of "page stuck on its skeleton" / intermittent-503 incidents
 
 ## Track-links cache (Redis) + resolver
 
-Persistent MBID → external-streaming-URL store backed by Upstash Redis. Lives in **`lib/track-links-store.ts`** (raw cache CRUD) + **`lib/track-links-resolver.ts`** (the read-through pipeline). Read by every favicon row on the site and populated by Parachord submissions plus Achordion's own Odesli / MB lookups. Disclosed publicly in the About page section "The recording-to-streaming-link gap (and why we're filling it)" — the long-term goal is an open, community-curated mapping fed by Parachord playback, not a private cache.
+Persistent MBID → external-streaming-URL store backed by Upstash Redis. Lives in **`lib/track-links-store.ts`** (raw cache CRUD) + **`lib/track-links-resolver.ts`** (the read-through pipeline). Read by every favicon row on the site and populated by Parachord submissions, Achordion's own Odesli / MB lookups, and the source URLs Parachord scrobbles passively report (`origin_url`). Disclosed publicly in the About page section "The recording-to-streaming-link gap (and why we're filling it)" — the long-term goal is an open, community-curated mapping fed by Parachord playback, not a private cache.
 
 ### Resolver pipeline
 
 `resolveTrackLinks({ mbid, entity, seedUrl?, prefetched? })` runs steps in order, returning the first non-empty result:
 
-1. **Direct cache hit** — `getCachedTrackLinks(mbid, entity)`. Recording uses key `track-links:<mbid>`; release-group uses `track-links:release-group:<mbid>`.
+1. **Direct cache hit** — `getCachedTrackLinks(mbid, entity)`. Recording uses key `track-links:<mbid>`; release-group uses `track-links:release-group:<mbid>`. On a hit, if a `seedUrl` (a scrobble's `origin_url`) names a streaming host the cached set doesn't have yet, that one link is merged in fire-and-forget (fill-only `parachord-scrobble`) so a track accumulates services as it gets played from new sources — otherwise the hit is a pure read.
 2. **MB fetch** — for cache miss, fetches the recording / release-group from MB to extract url-rels + ISRCs (recording only). Skipped when caller passes `prefetched` (entity pages already have the recording loaded).
 3. **ISRC alias fallback** (recording only) — `getCachedTrackLinksByIsrcs(isrcs)`. Same audio is often modeled as two distinct recording MBIDs (single + album-track variants); ISRC is the canonical "same audio" identifier MB exposes. On hit, back-fills the per-MBID cache.
-4. **Odesli + MB merge** — calls `getOdesliLinks(seedUrl ?? mbStreamingUrls[0])` and merges with any MB url-rels. Skipped when seed is unavailable.
-5. **Write-through** — writes the resolved set under MBID + each ISRC alias key (90-day TTL). Always pass through `setCachedTrackLinks` even on partial resolves so the next ISRC-equivalent lookup hits.
+4. **Name alias fallback** (recording only) — `getCachedTrackLinksByName(artist, title)`. Last-resort bridge for the "same song, two MBIDs, no shared ISRC" case. Keyed on exact normalized `(artist, title)`: includes the artist (covers by other artists never match) and the exact title (MB's parenthetical ETI keeps live / demo / remix variants on separate keys). On hit, back-fills the per-MBID cache.
+5. **Odesli + MB merge** — calls `getOdesliLinks(seedUrl ?? mbStreamingUrls[0])` and merges with any MB url-rels. Skipped when seed is unavailable.
+6. **Played-source capture** — if a `seedUrl` was passed (a scrobble's `origin_url`) and its host wasn't already covered by Odesli/MB, the played URL is kept as a fill-only `parachord-scrobble` link, so a track that was actually played retains at least its played-from link even when Odesli can't expand it.
+7. **Write-through** — writes the resolved set under MBID + each ISRC alias key + the `(artist, title)` name-alias key (90-day TTL), tagging each link by source. Always pass through `setCachedTrackLinks` even on partial resolves so the next ISRC- or name-equivalent lookup hits.
 
 Output is sorted by `sortByPlatformPriority` against the same `STREAMING_HOST_PRIORITY` table the renderer uses.
 
 ### Source priority
 
-Each cached link is tagged with its origin: `parachord` > `odesli` > `mb`. `mergeLinks` in the store resolves host conflicts by priority — a Parachord-confirmed Spotify URL overrides an Odesli-resolved one, which overrides an MB url-rel. **Parachord's tier exists because those URLs are implicit-human-curated** (a real listener picked the MBID, picked a service, pressed play, and audio came out — see About page framing).
+Each cached link is tagged with its origin: `parachord` > `odesli` > `mb` > `parachord-scrobble`. `mergeLinks` in the store resolves host conflicts by priority, ties going to the incoming link — a Parachord-confirmed Spotify URL overrides an Odesli-resolved one, which overrides an MB url-rel.
+
+**`parachord` vs `parachord-scrobble`** (both come from Parachord, very different trust):
+
+- **`parachord`** (highest) — an explicit, above-confidence-threshold submission to `/api/track-links/submit`. Parachord played the track, confirmed the match, and *pushed* the links. Most authoritative; can override Odesli/MB.
+- **`parachord-scrobble`** (lowest) — the `origin_url` a scrobble passively reported it streamed from, captured by the resolver on the read side. The URL is real, but its recording MBID came from ListenBrainz's mapper (which can pick the wrong sibling recording), so it ranks lowest and is **fill-only**: it only ever populates a host no better source covered, and never overrides a resolved or confirmed link. It exists to catch plays *below* Parachord's submit threshold, which still scrobble their source.
+
+**Parachord's top tier exists because those URLs are implicit-human-curated** (a real listener picked the MBID, picked a service, pressed play, and audio came out — see About page framing).
 
 ### Where the cache is read
 
