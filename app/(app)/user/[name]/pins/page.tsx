@@ -5,6 +5,7 @@ import { indexPinMentionsFromList } from "@/lib/index-pin-mentions";
 import { PinnedTrackCard } from "@/components/achordion/pinned-track-card";
 import { PageShell } from "@/components/achordion/page-shell";
 import { EmptyState } from "@/components/achordion/empty-state";
+import { friendlyListenBrainzError } from "@/lib/upstream-error";
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface PageParams {
@@ -30,7 +31,7 @@ async function PinsHistory({
     return (
       <EmptyState
         title="Couldn't load pins"
-        description={err instanceof Error ? err.message : ""}
+        description={friendlyListenBrainzError(err)}
       />
     );
   }

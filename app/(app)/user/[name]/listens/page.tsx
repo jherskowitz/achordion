@@ -7,6 +7,7 @@ import { PageShell } from "@/components/achordion/page-shell";
 import { EmptyState } from "@/components/achordion/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { listensToParachordTracks } from "@/lib/parachord-listens";
+import { friendlyListenBrainzError } from "@/lib/upstream-error";
 
 interface PageParams {
   params: Promise<{ name: string }>;
@@ -31,7 +32,7 @@ async function ListensSection({
       ...(before ? { maxTs: before } : {}),
     });
   } catch (err) {
-    errorMessage = err instanceof Error ? err.message : "Try again in a moment.";
+    errorMessage = friendlyListenBrainzError(err);
   }
   if (!listens) {
     return (

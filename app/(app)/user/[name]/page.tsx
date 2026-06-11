@@ -19,6 +19,7 @@ import {
   WeeklyStatsSidebarSkeleton,
 } from "@/components/achordion/weekly-stats-sidebar";
 import { getUserActivityFeed } from "@/lib/user-activity-feed";
+import { friendlyListenBrainzError } from "@/lib/upstream-error";
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface PageParams {
@@ -99,7 +100,7 @@ async function RecentListensSection({ name }: { name: string }) {
   try {
     listens = await getRecentListens(name, { count: 10 });
   } catch (err) {
-    errorMessage = err instanceof Error ? err.message : errorMessage;
+    errorMessage = friendlyListenBrainzError(err);
   }
   if (!listens) {
     return (

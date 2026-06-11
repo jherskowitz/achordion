@@ -9,6 +9,7 @@ import { PageShell } from "@/components/achordion/page-shell";
 import { FreshReleasesGrid } from "@/components/achordion/fresh-releases-grid";
 import { FilterPills } from "@/components/achordion/filter-pills";
 import { Skeleton } from "@/components/ui/skeleton";
+import { friendlyListenBrainzError } from "@/lib/upstream-error";
 
 interface PageProps {
   searchParams: Promise<{
@@ -90,8 +91,7 @@ async function ReleasesSection({
   } catch (err) {
     return (
       <p className="text-muted-foreground text-sm">
-        Couldn&apos;t load releases:{" "}
-        {err instanceof Error ? err.message : "unknown error"}
+        {friendlyListenBrainzError(err)}
       </p>
     );
   }

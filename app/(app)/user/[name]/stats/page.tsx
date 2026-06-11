@@ -10,6 +10,7 @@ import {
 } from "@/lib/clients/listenbrainz";
 import { PageShell } from "@/components/achordion/page-shell";
 import { EmptyState } from "@/components/achordion/empty-state";
+import { friendlyListenBrainzError } from "@/lib/upstream-error";
 import { StatRangePicker } from "@/components/achordion/stat-range-picker";
 import { TopArtistsList } from "@/components/achordion/top-artists-list";
 import { TopAlbumsGrid } from "@/components/achordion/top-albums-grid";
@@ -51,7 +52,7 @@ async function ArtistsSection({
   try {
     artists = await getUserTopArtists(name, range, 25);
   } catch (err) {
-    errorMessage = err instanceof Error ? err.message : "";
+    errorMessage = friendlyListenBrainzError(err);
   }
   if (!artists) {
     return (
@@ -76,7 +77,7 @@ async function AlbumsSection({
   try {
     albums = await getUserTopReleaseGroups(name, range, 24);
   } catch (err) {
-    errorMessage = err instanceof Error ? err.message : "";
+    errorMessage = friendlyListenBrainzError(err);
   }
   if (!albums) {
     return (
@@ -101,7 +102,7 @@ async function TracksSection({
   try {
     tracks = await getUserTopRecordings(name, range, 25);
   } catch (err) {
-    errorMessage = err instanceof Error ? err.message : "";
+    errorMessage = friendlyListenBrainzError(err);
   }
   if (!tracks) {
     return (

@@ -15,6 +15,7 @@ import type {
 } from "@/lib/clients/listenbrainz";
 import { PlaylistCard } from "@/components/achordion/playlist-card";
 import { EmptyState } from "@/components/achordion/empty-state";
+import { friendlyListenBrainzError } from "@/lib/upstream-error";
 import { cn } from "@/lib/utils";
 
 // Inline copy of `playlistMbidFromIdentifier` from the LB client.
@@ -352,7 +353,7 @@ export function PlaylistsBrowser({
       // created mid-pagination). Trust the latest response.
       setTotal(data.total);
     } catch (err) {
-      setLoadError(err instanceof Error ? err.message : "Couldn't load more.");
+      setLoadError(friendlyListenBrainzError(err));
     } finally {
       setLoading(false);
     }
