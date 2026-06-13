@@ -1246,6 +1246,40 @@ export async function getUserDistinctArtistCount(
   }
 }
 
+const ListenCountSchema = z.object({
+  payload: z.object({
+    count: z.number(),
+  }),
+});
+
+/**
+ * Live lifetime listen count — LB's real-time counter, the exact
+ * number the ListenBrainz website shows on a profile. Unlike the
+ * `/stats/user/*` endpoints (which LB batch-recomputes on a schedule
+ * and therefore trail real time by the rollup delay), this ticks up
+ * the moment a scrobble lands. Used by the total-plays milestone so
+ * the chip matches the website instead of lagging it.
+ *
+ * Not under `/stats`, so it needs no `range`. Short revalidate since
+ * it's live data; returns null on outage so callers can fall back to
+ * the slower bucket sum.
+ */
+export async function getUserListenCount(
+  name: string,
+): Promise<number | null> {
+  try {
+    const result = await lbFetch(
+      `/user/${encodeURIComponent(name)}/listen-count`,
+      ListenCountSchema,
+      { revalidate: 60 * 5, tags: [cacheTagsLB.userStats(name)] },
+    );
+    return result.payload.count;
+  } catch (err) {
+    if (err instanceof ListenBrainzError && err.status === 204) return 0;
+    return null;
+  }
+}
+
 const StatTopReleaseGroupsSchema = z.object({
   payload: z.object({
     release_groups: z.array(

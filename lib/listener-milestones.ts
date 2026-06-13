@@ -4,6 +4,7 @@ import { unstable_cache } from "next/cache";
 import {
   getListeningActivity,
   getUserDistinctArtistCount,
+  getUserListenCount,
 } from "@/lib/clients/listenbrainz";
 
 /**
@@ -43,28 +44,36 @@ interface RawData {
 }
 
 async function fetchData(name: string): Promise<RawData> {
-  const [activityAllTime, activityMonth, distinctArtists] = await Promise.all([
-    getListeningActivity(name, "all_time").catch(
-      () => [] as Awaited<ReturnType<typeof getListeningActivity>>,
-    ),
-    getListeningActivity(name, "month").catch(
-      () => [] as Awaited<ReturnType<typeof getListeningActivity>>,
-    ),
-    // LB exposes the exact lifetime distinct-artist count as
-    // `total_artist_count` on the top-artists payload. Use the
-    // count=1 variant so we don't pull 500 artist rows just to
-    // count them. Returns null on outage / older LB; we treat
-    // null as "unknown" and skip the chip.
-    getUserDistinctArtistCount(name, "all_time"),
-  ]);
+  const [activityAllTime, activityMonth, distinctArtists, liveListenCount] =
+    await Promise.all([
+      getListeningActivity(name, "all_time").catch(
+        () => [] as Awaited<ReturnType<typeof getListeningActivity>>,
+      ),
+      getListeningActivity(name, "month").catch(
+        () => [] as Awaited<ReturnType<typeof getListeningActivity>>,
+      ),
+      // LB exposes the exact lifetime distinct-artist count as
+      // `total_artist_count` on the top-artists payload. Use the
+      // count=1 variant so we don't pull 500 artist rows just to
+      // count them. Returns null on outage / older LB; we treat
+      // null as "unknown" and skip the chip.
+      getUserDistinctArtistCount(name, "all_time"),
+      // Live lifetime count — the real-time figure the LB website
+      // shows. Null on outage; we fall back to the stats bucket sum.
+      getUserListenCount(name),
+    ]);
 
-  // Total plays = sum of all-time bucket listen_counts. LB's
+  // Total plays prefers LB's live listen-count endpoint so the chip
+  // matches the website. The /stats/* pipeline (the bucket sum below)
+  // is batch-recomputed on a schedule and trails real time, so it's
+  // only the fallback when the live endpoint is unavailable. LB's
   // listening-activity for `range=all_time` returns one bucket per
-  // year, so the sum is the lifetime total.
-  const totalPlays = activityAllTime.reduce(
+  // year, so summing them is the lifetime total.
+  const bucketSum = activityAllTime.reduce(
     (s, b) => s + (b.listen_count ?? 0),
     0,
   );
+  const totalPlays = liveListenCount ?? bucketSum;
 
   // First listen year = oldest bucket with listen_count > 0.
   // Buckets arrive ordered oldest → newest; walk forward to find
@@ -157,12 +166,11 @@ export async function getListenerMilestones(
   if (!name) return [];
   const cached = unstable_cache(
     async () => composeMilestones(await fetchData(name)),
-    // v3 — distinct-artists chip now reads LB's exact
-    // `total_artist_count` instead of the count=500 array length.
-    // Bumping the cache key evicts older entries that may still
-    // hold the v2 ">500 artists" floor label even for users who
-    // now have an exact count available.
-    ["listener-milestones-v3", name.toLowerCase()],
+    // v4 — total-plays chip now reads LB's live listen-count
+    // endpoint instead of summing the lagging /stats bucket sum,
+    // so the number matches the LB website. Bumping the key evicts
+    // v3 entries still holding the stale stats-derived total.
+    ["listener-milestones-v4", name.toLowerCase()],
     {
       revalidate: 86400,
       tags: [`listener-milestones:${name.toLowerCase()}`],
