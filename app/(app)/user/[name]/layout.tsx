@@ -4,6 +4,7 @@ import {
   UserPageHeader,
   UserPageHeaderSkeleton,
 } from "@/components/achordion/user-page-header";
+import { recordProfileView } from "@/lib/profile-views";
 
 export default async function UserLayout({
   children,
@@ -13,6 +14,9 @@ export default async function UserLayout({
   params: Promise<{ name: string }>;
 }) {
   const { name } = await params;
+  // Fire-and-forget profile-view tracking for the /admin/profiles list.
+  // Runs for every profile + sub-tab render; never awaited.
+  recordProfileView(name);
   return (
     <>
       {/* Own Suspense boundary so the header's upstream calls (playing-
