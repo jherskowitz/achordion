@@ -36,17 +36,23 @@ function parseFamiliarity(raw: string | undefined): number {
 async function loadFilteredTracks(username: string, familiarity: number) {
   const threshold = thresholdFromFamiliarity(familiarity);
   const [recordings, exclude] = await Promise.all([
-    getRecommendedRecordings(username, 200, "raw").catch(() => []),
+    // Fetch the full pool. LB returns the whole set (up to ~1000) in
+    // this single call regardless of `count`, and it's score-sorted
+    // with familiar tracks on top — so the discovery tracks the slider
+    // needs live deep in the list. count=200 starved the discovery end
+    // (~5 never-heard tracks); 1000 surfaces them all (~150) at no
+    // extra LB cost — still one request.
+    getRecommendedRecordings(username, 1000, "raw").catch(() => []),
     buildExcludedRecordingSet(username, threshold),
   ]);
   if (recordings.length === 0) {
     return { top: [], metadata: new Map(), parachordTracks: [] };
   }
-  const metadata = await getRecordingMetadata(
-    recordings.map((r) => r.recording_mbid),
-  );
-  // Hide anything LB knows the user has heard, at any non-zero
-  // slider value. See overview page for the full reasoning.
+  // Filter BEFORE resolving metadata. The rec pool is cheap (one LB
+  // call), but metadata is a per-track MusicBrainz lookup — so we only
+  // pay it for the <=50 tracks we actually show, never the whole pool.
+  // Hide anything LB knows the user has heard, at any non-zero slider
+  // value. See overview page for the full reasoning.
   const filtered = recordings.filter((r) => {
     if (familiarity === 0) return true;
     if (r.latest_listened_at !== null) return false;
@@ -54,6 +60,9 @@ async function loadFilteredTracks(username: string, familiarity: number) {
     return true;
   });
   const top = filtered.slice(0, 50);
+  const metadata = await getRecordingMetadata(
+    top.map((r) => r.recording_mbid),
+  );
   const parachordTracks: ParachordTrack[] = top
     .map((r) => {
       const m = metadata.get(r.recording_mbid);
