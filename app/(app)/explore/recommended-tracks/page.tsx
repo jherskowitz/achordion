@@ -5,8 +5,7 @@ import {
   getRecommendedRecordings,
   getRecordingMetadata,
 } from "@/lib/clients/listenbrainz";
-import { buildExcludedRecordingSet } from "@/lib/exclude-listened";
-import { thresholdFromFamiliarity } from "@/lib/familiarity";
+import { filterByRecency } from "@/lib/familiarity";
 import type { ParachordTrack } from "@/lib/parachord";
 import { ExploreTrackList } from "@/components/achordion/explore-track-list";
 import { FamiliaritySlider } from "@/components/achordion/familiarity-slider";
@@ -34,31 +33,25 @@ function parseFamiliarity(raw: string | undefined): number {
  *  Both call sites trigger the same LB fetches; Next's data cache
  *  dedupes them within a single render. */
 async function loadFilteredTracks(username: string, familiarity: number) {
-  const threshold = thresholdFromFamiliarity(familiarity);
-  const [recordings, exclude] = await Promise.all([
-    // Fetch the full pool. LB returns the whole set (up to ~1000) in
-    // this single call regardless of `count`, and it's score-sorted
-    // with familiar tracks on top — so the discovery tracks the slider
-    // needs live deep in the list. count=200 starved the discovery end
-    // (~5 never-heard tracks); 1000 surfaces them all (~150) at no
-    // extra LB cost — still one request.
-    getRecommendedRecordings(username, 1000, "raw").catch(() => []),
-    buildExcludedRecordingSet(username, threshold),
-  ]);
+  // Fetch the full pool. LB returns the whole set (up to ~1000) in this
+  // single call regardless of `count`, and it's score-sorted with
+  // familiar tracks on top — so the discovery tracks the slider needs
+  // live deep in the list. 1000 surfaces them all at no extra LB cost.
+  const recordings = await getRecommendedRecordings(
+    username,
+    1000,
+    "raw",
+  ).catch(() => []);
   if (recordings.length === 0) {
     return { top: [], metadata: new Map(), parachordTracks: [] };
   }
-  // Filter BEFORE resolving metadata. The rec pool is cheap (one LB
-  // call), but metadata is a per-track MusicBrainz lookup — so we only
-  // pay it for the <=50 tracks we actually show, never the whole pool.
-  // Hide anything LB knows the user has heard, at any non-zero slider
-  // value. See overview page for the full reasoning.
-  const filtered = recordings.filter((r) => {
-    if (familiarity === 0) return true;
-    if (r.latest_listened_at !== null) return false;
-    if (exclude.has(r.recording_mbid)) return false;
-    return true;
-  });
+  // Graduate by recency of listening (see lib/familiarity.ts): 0 keeps
+  // all, 100 keeps only never-heard, between hides the most-recently-
+  // heard share. Self-contained in the rec data — reliable where a
+  // recording-MBID play-count match isn't, and one fewer LB call.
+  // Filter BEFORE resolving metadata so the per-track MB lookup is only
+  // paid for the <=50 we actually show, never the whole pool.
+  const filtered = filterByRecency(recordings, familiarity);
   const top = filtered.slice(0, 50);
   const metadata = await getRecordingMetadata(
     top.map((r) => r.recording_mbid),
@@ -180,17 +173,11 @@ export default async function RecommendedTracksPage({
           param="familiarity"
           kind="track"
         />
-        <Suspense
-          key={`pa-${thresholdFromFamiliarity(familiarity) ?? "off"}`}
-          fallback={null}
-        >
+        <Suspense key={`pa-${familiarity}`} fallback={null}>
           <PlayAll username={username} familiarity={familiarity} />
         </Suspense>
       </div>
-      <Suspense
-        key={`${thresholdFromFamiliarity(familiarity) ?? "off"}`}
-        fallback={<Fallback />}
-      >
+      <Suspense key={`${familiarity}`} fallback={<Fallback />}>
         <Body username={username} familiarity={familiarity} />
       </Suspense>
     </PageShell>

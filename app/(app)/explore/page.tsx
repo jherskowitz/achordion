@@ -18,11 +18,8 @@ import { PlaylistCard } from "@/components/achordion/playlist-card";
 import { EmptyState } from "@/components/achordion/empty-state";
 import { ExploreTrackList } from "@/components/achordion/explore-track-list";
 import { FamiliaritySlider } from "@/components/achordion/familiarity-slider";
-import { thresholdFromFamiliarity } from "@/lib/familiarity";
-import {
-  buildExcludedArtistSet,
-  buildExcludedRecordingSet,
-} from "@/lib/exclude-listened";
+import { filterByRecency } from "@/lib/familiarity";
+import { buildExcludedArtistSet } from "@/lib/exclude-listened";
 import { FreshReleasesGrid } from "@/components/achordion/fresh-releases-grid";
 import { OpenInParachordButton } from "@/components/achordion/open-in-parachord-button";
 import { RecommendedArtistsList } from "@/components/achordion/recommended-artists-list";
@@ -242,7 +239,6 @@ async function WeeklyAlgoSection({
  * call is a free dedup, not a real round-trip.
  */
 async function loadRecommendedTracks(username: string, familiarity: number) {
-  const threshold = thresholdFromFamiliarity(familiarity);
   // Pull the full rec pool in one LB call. Like the dedicated
   // /explore/recommended-tracks page, the discovery tracks
   // (latest_listened_at === null) live deep in the score-sorted list
@@ -251,32 +247,22 @@ async function loadRecommendedTracks(username: string, familiarity: number) {
   // down to a single row. LB returns the whole set (~1000) regardless
   // of `count`, so 1000 surfaces them all at no extra LB cost.
   //
-  // Catch on every upstream so a 429 from MB / LB doesn't take the
-  // entire /explore page down with a generic 429 response. Empty
-  // metadata or an empty exclude set degrades the row gracefully —
-  // no recommendations, but the rest of the page still renders.
-  const [recordings, exclude] = await Promise.all([
-    getRecommendedRecordings(username, 1000, "raw").catch(() => []),
-    buildExcludedRecordingSet(username, threshold).catch(
-      () => new Set<string>(),
-    ),
-  ]);
+  // Catch so a 429 from LB doesn't take the entire /explore page down
+  // — an empty pool degrades the row gracefully.
+  const recordings = await getRecommendedRecordings(
+    username,
+    1000,
+    "raw",
+  ).catch(() => []);
   if (recordings.length === 0) {
     return { top: [], metadata: new Map(), parachordTracks: [] };
   }
-  // Filter BEFORE resolving metadata so the per-track metadata lookup
-  // is only paid for the handful we might show, never the whole pool.
-  // `latest_listened_at` is the reliable "I've heard this exact rec"
-  // signal — MBID-based filters miss cases where the rec and the
-  // user's listen history use different MBIDs for the same conceptual
-  // track. The listen-count `exclude` set is belt-and-braces for the
-  // graduated-strictness UX.
-  const filtered = recordings.filter((r) => {
-    if (familiarity === 0) return true;
-    if (r.latest_listened_at !== null) return false;
-    if (exclude.has(r.recording_mbid)) return false;
-    return true;
-  });
+  // Graduate by recency of listening (see lib/familiarity.ts): 0 keeps
+  // all, 100 keeps only never-heard, between hides the most-recently-
+  // heard share. Reliable where a recording-MBID play-count match
+  // isn't, and one fewer LB call. Filter BEFORE resolving metadata so
+  // the per-track lookup is only paid for the handful we might show.
+  const filtered = filterByRecency(recordings, familiarity);
   // Overscan past the visible 12 so the occasional rec whose LB
   // metadata lookup comes back empty (niche / freshly-uploaded MBID)
   // can be dropped without leaving a gap — while still resolving far
@@ -362,14 +348,13 @@ async function RecommendedArtistsSection({
   familiarity: number;
   layout?: "grid" | "stack";
 }) {
-  const threshold = thresholdFromFamiliarity(familiarity);
   // Fetch recommendations + build the exclude set in parallel. The
-  // exclude set is "every artist whose all-time listen_count exceeds
-  // the slider's threshold" — captures artists outside the top-100
-  // who the user nonetheless plays regularly.
+  // exclude set is the user's top `familiarity`% most-played artists
+  // (play-rank percentile), so the slider graduates evenly across its
+  // range instead of saturating for heavy listeners.
   const [recordings, exclude] = await Promise.all([
     getRecommendedRecordings(username, 100, "raw").catch(() => []),
-    buildExcludedArtistSet(username, threshold).catch(
+    buildExcludedArtistSet(username, familiarity).catch(
       () => new Set<string>(),
     ),
   ]);
@@ -512,7 +497,7 @@ export default async function ExploreOverviewPage({
                 kind="track"
               />
               <Suspense
-                key={`tracks-pa-${thresholdFromFamiliarity(tracksFamiliarity) ?? "off"}`}
+                key={`tracks-pa-${tracksFamiliarity}`}
                 fallback={null}
               >
                 <RecommendedTracksPlayAll
@@ -522,7 +507,7 @@ export default async function ExploreOverviewPage({
               </Suspense>
             </div>
             <Suspense
-              key={`tracks-${thresholdFromFamiliarity(tracksFamiliarity) ?? "off"}`}
+              key={`tracks-${tracksFamiliarity}`}
               fallback={<TrackListSkeleton rows={8} />}
             >
               <RecommendedTracksSection
@@ -551,7 +536,7 @@ export default async function ExploreOverviewPage({
               />
             </div>
             <Suspense
-              key={`artists-${thresholdFromFamiliarity(artistsFamiliarity) ?? "off"}`}
+              key={`artists-${artistsFamiliarity}`}
               fallback={<SidebarUserSkeleton rows={8} />}
             >
               <RecommendedArtistsSection

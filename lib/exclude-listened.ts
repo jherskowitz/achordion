@@ -1,53 +1,40 @@
-import {
-  getUserTopArtists,
-  getUserTopRecordings,
-} from "@/lib/clients/listenbrainz";
+import { getUserTopArtists } from "@/lib/clients/listenbrainz";
+import { clampFamiliarity } from "@/lib/familiarity";
 
 /**
- * Pull every artist with a non-trivial listen count from LB and
- * return the set of MBIDs whose listen_count exceeds the supplied
- * threshold. Used by Recommended Artists rails to filter out
- * artists the user already plays a lot. Threshold === null disables
- * exclusion (slider at 0).
+ * Build the set of artist MBIDs to hide from Recommended Artists for a
+ * given familiarity slider value, by play-RANK percentile.
  *
- * 1000 is LB's documented per-page max for /stats/user/.../artists.
- * Wide net so even the user's "rank 500" artist gets filtered out
- * if its listen count crosses the threshold — the previous
- * top-100-only approach missed those.
+ * `familiarity` 0 hides nothing (show everything, familiar included).
+ * 100 hides every artist the user has ever played (only never-heard
+ * recommendations remain). In between, hides the user's top
+ * `familiarity`% most-played artists.
+ *
+ * Why rank, not an absolute listen-count threshold: heavy listeners
+ * have almost all of their artists above any small count, so an
+ * absolute threshold saturates and the discovery half of the slider
+ * goes dead (every value from ~50→100 excludes the same set). A
+ * percentile of the user's OWN distribution keeps the full range live
+ * regardless of how much they listen.
+ *
+ * 1000 is LB's documented per-page max for /stats/user/.../artists —
+ * a wide enough net that even a deep-catalog artist is ranked.
  */
 export async function buildExcludedArtistSet(
   username: string,
-  threshold: number | null,
+  familiarity: number,
 ): Promise<Set<string>> {
-  if (threshold === null) return new Set();
+  const fam = clampFamiliarity(familiarity);
+  if (fam <= 0) return new Set();
   const top = await getUserTopArtists(username, "all_time", 1000).catch(
     () => [],
   );
-  const out = new Set<string>();
-  for (const a of top) {
-    if (!a.artist_mbid) continue;
-    if (a.listen_count > threshold) out.add(a.artist_mbid);
-  }
-  return out;
-}
-
-/**
- * Same shape, but for recordings. Used by Recommended Tracks rails
- * so the slider hides specific tracks the user has played a lot —
- * not just every track by an artist they like.
- */
-export async function buildExcludedRecordingSet(
-  username: string,
-  threshold: number | null,
-): Promise<Set<string>> {
-  if (threshold === null) return new Set();
-  const top = await getUserTopRecordings(username, "all_time", 1000).catch(
-    () => [],
-  );
-  const out = new Set<string>();
-  for (const r of top) {
-    if (!r.recording_mbid) continue;
-    if (r.listen_count > threshold) out.add(r.recording_mbid);
-  }
-  return out;
+  // Played artists, most-played first. (LB returns them ranked, but
+  // sort defensively so the percentile cut is exact.)
+  const played = top
+    .filter((a) => a.artist_mbid && a.listen_count > 0)
+    .sort((a, b) => b.listen_count - a.listen_count);
+  if (played.length === 0) return new Set();
+  const cut = Math.round((fam / 100) * played.length);
+  return new Set(played.slice(0, cut).map((a) => a.artist_mbid as string));
 }

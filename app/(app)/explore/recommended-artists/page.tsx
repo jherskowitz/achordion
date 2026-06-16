@@ -6,7 +6,6 @@ import {
   getRecordingMetadata,
 } from "@/lib/clients/listenbrainz";
 import { buildExcludedArtistSet } from "@/lib/exclude-listened";
-import { thresholdFromFamiliarity } from "@/lib/familiarity";
 import { FamiliaritySlider } from "@/components/achordion/familiarity-slider";
 import { PageShell } from "@/components/achordion/page-shell";
 import { RecommendedArtistsList } from "@/components/achordion/recommended-artists-list";
@@ -34,10 +33,9 @@ async function Body({
   username: string;
   familiarity: number;
 }) {
-  const threshold = thresholdFromFamiliarity(familiarity);
   const [recordings, exclude] = await Promise.all([
     getRecommendedRecordings(username, 200, "raw").catch(() => []),
-    buildExcludedArtistSet(username, threshold),
+    buildExcludedArtistSet(username, familiarity),
   ]);
   if (recordings.length === 0) {
     return (
@@ -107,13 +105,10 @@ export default async function RecommendedArtistsPage({
       <div className="mb-3">
         <FamiliaritySlider initial={familiarity} param="familiarity" />
       </div>
-      {/* Suspense keyed on the resolved threshold (not the raw slider
-          value) so within-bucket nudges don't trigger pointless
-          skeleton flashes. */}
-      <Suspense
-        key={`${thresholdFromFamiliarity(familiarity) ?? "off"}`}
-        fallback={<Fallback />}
-      >
+      {/* Keyed on the slider value: each step (0–100, step 10) now
+          produces a graduated, distinct result, so a remount per step
+          is exactly what we want. */}
+      <Suspense key={`${familiarity}`} fallback={<Fallback />}>
         <Body username={username} familiarity={familiarity} />
       </Suspense>
     </PageShell>
