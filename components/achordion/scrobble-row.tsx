@@ -67,6 +67,10 @@ export function ScrobbleRow({
               mbid: recordingMbid,
               artist: meta.artist_name,
               title: meta.track_name,
+              // When LB's mapper gave no recording_mbid but the scrobble
+              // carries an ISRC, link to the exact recording via the
+              // ISRC resolver instead of the artist/title fuzzy search.
+              isrc: meta.additional_info?.isrc,
             })}
             className="hover:underline"
           >

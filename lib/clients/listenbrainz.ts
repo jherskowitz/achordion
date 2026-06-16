@@ -131,6 +131,11 @@ const ListenSchema = z.object({
         artist_mbids: z.array(z.string()).optional(),
         duration_ms: z.number().optional(),
         spotify_id: z.string().optional(),
+        // Exact recording identifier, when the scrobbling client knows
+        // it (streaming services ship it for free). Lets the row link
+        // to the exact recording via the ISRC resolver when LB's mapper
+        // gave no recording_mbid — see `recordingHref({ isrc })`.
+        isrc: z.string().optional(),
         // Streamed-from source, enriched by Parachord ≥ v0.9.4.
         // `origin_url` is the URL actually played; `music_service` is
         // its canonical host (e.g. "spotify.com"); `music_service_name`

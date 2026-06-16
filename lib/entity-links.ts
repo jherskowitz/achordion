@@ -45,11 +45,19 @@ export function recordingHref(opts: {
   mbid?: string | null;
   artist: string;
   title: string;
+  /** Exact recording identifier. When present (and no MBID), links via
+   *  the ISRC resolver — an exact match — instead of the artist/title
+   *  fuzzy search. The artist/title still ride along as the resolver's
+   *  fallback for when the ISRC doesn't resolve. */
+  isrc?: string | null;
 }): string {
   if (opts.mbid) return `/recording/${opts.mbid}`;
   const params = new URLSearchParams({
     artist: opts.artist,
     title: opts.title,
   });
+  if (opts.isrc) {
+    return `/recording/by-isrc/${encodeURIComponent(opts.isrc)}?${params}`;
+  }
   return `/recording/lookup?${params}`;
 }

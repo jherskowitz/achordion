@@ -309,7 +309,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   // Attribute the accepted contribution by platform. Structured log so
   // it's filterable in the runtime logs for rollout/abuse monitoring.
   console.log(
-    `[track-links-submit] client=${client} entity=${entity} mbid=${mbid} accepted=${normalised.length} changed=${changed}`,
+    `[track-links-submit] client=${client} entity=${entity} mbid=${mbid}` +
+      ` isrc=${isrc ?? "-"}${!payloadMbid && isrc ? " (mbid resolved from isrc)" : ""}` +
+      ` accepted=${normalised.length} changed=${changed}`,
   );
 
   // Bust the edge cache for the entity's user-facing surfaces so the
