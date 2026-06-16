@@ -238,7 +238,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
   }
 
-  await setCachedTrackLinks(
+  const changed = await setCachedTrackLinks(
     mbid,
     normalised,
     {
@@ -253,23 +253,34 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   // Attribute the accepted contribution by platform. Structured log so
   // it's filterable in the runtime logs for rollout/abuse monitoring.
   console.log(
-    `[track-links-submit] client=${client} entity=${entity} mbid=${mbid} accepted=${normalised.length}`,
+    `[track-links-submit] client=${client} entity=${entity} mbid=${mbid} accepted=${normalised.length} changed=${changed}`,
   );
 
-  // Bust the edge cache for the entity's user-facing pages so the
-  // freshly-submitted links appear without waiting out the 1h
-  // s-maxage. `revalidatePath` is best-effort — failures here just
-  // mean users see the new links once the edge entry naturally
-  // refreshes (well within stale-while-revalidate).
-  try {
-    if (entity === "release-group") {
-      revalidatePath(`/release-group/${mbid}`);
-    } else {
-      revalidatePath(`/recording/${mbid}`);
-      revalidatePath(`/embed/track/${mbid}`);
+  // Bust the edge cache for the entity's user-facing surfaces so the
+  // freshly-submitted links appear without waiting out the s-maxage.
+  // Only when the write actually changed the stored set — a re-submit
+  // of links we already had is a no-op and shouldn't force a pointless
+  // edge regeneration. `revalidatePath` is best-effort.
+  if (changed) {
+    try {
+      if (entity === "release-group") {
+        revalidatePath(`/release-group/${mbid}`);
+      } else {
+        revalidatePath(`/recording/${mbid}`);
+        revalidatePath(`/embed/track/${mbid}`);
+      }
+      // The favicon rows on those pages are CLIENT islands that fetch
+      // `/api/track-links?mbid=…` — a separately edge-cached response
+      // (s-maxage). Revalidating only the pages leaves that API
+      // response stale for up to a day, so a freshly-submitted link a
+      // page doesn't server-render (e.g. SoundCloud, which MusicBrainz
+      // often lacks) sits in Redis but never reaches the client. Bust
+      // the API path too — the easy miss the AGENTS.md caching docs
+      // call out.
+      revalidatePath(`/api/track-links`);
+    } catch {
+      // ignore — write to Redis already succeeded.
     }
-  } catch {
-    // ignore — write to Redis already succeeded.
   }
 
   return NextResponse.json(
@@ -281,6 +292,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       // release-group MBID so they can update their own cache
       // mapping if useful.
       stored_as: { entity, mbid },
+      // Whether this submit actually changed the stored set. `false`
+      // means every link was already present at equal/higher priority
+      // (a no-op re-submit) — useful for Parachord to throttle repeat
+      // submissions of unchanged data.
+      changed,
       // Echo the normalized contributing platform back so the caller
       // can confirm we read its X-Parachord-Client header.
       client,

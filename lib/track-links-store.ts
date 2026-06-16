@@ -296,9 +296,9 @@ export async function setCachedTrackLinks(
   names?: TrackNames,
   entity: LinkEntity = "recording",
   aliases?: { isrcs?: string[] },
-): Promise<void> {
-  if (!redis) return;
-  if (!mbid) return;
+): Promise<boolean> {
+  if (!redis) return false;
+  if (!mbid) return false;
   try {
     // Read the prior entry (full blob, not just links) so we can
     // preserve any name fields the caller didn't supply this time.
@@ -318,6 +318,11 @@ export async function setCachedTrackLinks(
     }
     const existingLinks = Array.isArray(prior?.links) ? prior.links : [];
     const merged = mergeLinks(existingLinks, incoming);
+    // Did the user-visible link set actually change? Callers (e.g. the
+    // Parachord submit route) use this to skip an edge-cache bust when
+    // the write was a no-op — a re-submit of links we already had at
+    // equal/higher priority shouldn't force a pointless revalidation.
+    const changed = linksSignature(existingLinks) !== linksSignature(merged);
     const entry: CachedEntry = {
       mbid: mbid.toLowerCase(),
       links: merged,
@@ -377,10 +382,26 @@ export async function setCachedTrackLinks(
         }
       }
     }
+    return changed;
   } catch {
     // Best-effort — caller already has the resolved links, the
     // cache write is just optimisation.
+    return false;
   }
+}
+
+/**
+ * Order-independent signature of a link set's user-visible fields
+ * (canonical host + url + label). Two sets with the same signature
+ * render identically, so a write whose signature matches the prior
+ * entry is a no-op as far as any consumer is concerned. Used to tell
+ * callers whether a write actually changed anything.
+ */
+function linksSignature(links: CachedLink[]): string {
+  return links
+    .map((l) => `${canonicalHost(l.host)}|${l.url}|${l.label}`)
+    .sort()
+    .join("\n");
 }
 
 /**
