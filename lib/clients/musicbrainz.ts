@@ -554,6 +554,40 @@ export async function getRecording(mbid: string): Promise<RecordingDetail> {
   );
 }
 
+const IsrcLookupSchema = z.object({
+  recordings: z.array(z.object({ id: z.string() }).passthrough()).optional(),
+});
+
+/**
+ * Resolve an ISRC to a recording MBID via MusicBrainz's exact ISRC
+ * lookup (`/ws/2/isrc/{isrc}`) — a different endpoint from the
+ * artist/title recording *search*. An ISRC is an exact recording
+ * identifier, so the first result is a safe, deterministic pick with
+ * none of the wrong-variant risk a fuzzy search carries. (MB
+ * occasionally has the same ISRC on more than one recording from
+ * merges/re-releases; first-result is the pragmatic choice.)
+ *
+ * Returns null on miss / 404 / MB unreachable — callers should treat
+ * that as "couldn't resolve, retry later", never cache it as
+ * authoritative. Goes through `mbFetch` (rate limit + UA) under the
+ * shared lookup deadline, like every other MB call.
+ */
+export async function lookupRecordingMbidByIsrc(
+  isrc: string,
+): Promise<string | null> {
+  try {
+    const data = await withLookupDeadline(
+      mbFetch(`/isrc/${encodeURIComponent(isrc)}`, IsrcLookupSchema, {
+        tags: [`mb:isrc:${isrc.toUpperCase()}`],
+      }),
+      LOOKUP_DEADLINE_MS,
+    );
+    return data.recordings?.[0]?.id ?? null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Reduce a recording's `releases` array to one entry per
  * release-group, preferring the earliest official release inside each

@@ -824,6 +824,7 @@ Parachord can push confirmed-on-playback MBID → external-streaming-URL matches
   ```json
   {
     "mbid": "<entity-mbid>",
+    "isrc": "GBAYE0601498",
     "entity": "recording",
     "links": [
       { "url": "https://open.spotify.com/track/...", "label": "Spotify", "host": "spotify.com" },
@@ -834,6 +835,7 @@ Parachord can push confirmed-on-playback MBID → external-streaming-URL matches
     "albumName": "Album Name"
   }
   ```
+  - **One of `mbid` or `isrc` is required.** Supply `mbid` directly when you have it; supply `isrc` (12-char, `^[A-Z]{2}[A-Z0-9]{3}\d{7}$`, case-insensitive) when you don't. When `mbid` is absent, Achordion resolves the ISRC to a recording MBID server-side via MusicBrainz's exact `/ws/2/isrc/{isrc}` lookup (first result — ISRC is an exact recording identifier, so no fuzzy-search risk), then runs the normal recording-keyed flow. This lets ISRC-only clients contribute during LB MBID-mapper outages and for streaming-resolved tracks (Spotify `externalIds.isrc` / Apple Music `attributes.isrc` come for free, often before any MBID is known). An unresolvable ISRC (not in MB, or MB unreachable) returns **400** — Achordion never writes a placeholder, so the client should retry later. The resolved MBID comes back in `stored_as.mbid`. The submitted ISRC is always aliased onto the cache entry (`track-links:isrc:<isrc>`) even if MB's `recording.isrcs` hasn't caught up. `isrc` only makes sense with `entity: "recording"` (the default).
   - `entity` (optional, default `recording`):
     - `recording` (alias `track`) — per-track URLs (Spotify track links etc.). Cached under recording.
     - `release-group` (alias `album`) — per-album URLs. Cached under release-group.
@@ -841,7 +843,7 @@ Parachord can push confirmed-on-playback MBID → external-streaming-URL matches
 
     The two storage entity types (`recording` and `release-group`) use separate cache namespaces so MBIDs can't collide.
   - `label` and `host` are optional — Achordion derives `host` from the URL and capitalises the second-level domain when missing. `trackName` / `artistName` / `albumName` are also optional but encouraged: they make the stored cache entry self-describing (so admins can scan keys without an MB roundtrip to identify what each entry is) and unlock future search-by-name features over the cache.
-- **Response:** `200 { ok: true, accepted: <n>, stored_as: { entity, mbid } }` on success — `stored_as` echoes the storage key Achordion actually used (matters when `entity: "release"` was redirected to a release-group). `400` for malformed payload or an unresolvable release MBID; `401` when the bearer is missing or wrong; `503` when the env var isn't configured (Achordion's signal that submissions aren't accepted on this deploy).
+- **Response:** `200 { ok: true, accepted: <n>, stored_as: { entity, mbid } }` on success — `stored_as` echoes the storage key Achordion actually used (matters when `entity: "release"` was redirected to a release-group, or when an `isrc` was resolved to a recording MBID). `400` for malformed payload, neither `mbid` nor `isrc` supplied, a malformed ISRC, an unresolvable ISRC, or an unresolvable release MBID; `401` when the bearer is missing or wrong; `503` when the env var isn't configured (Achordion's signal that submissions aren't accepted on this deploy).
 - **TTL:** 90 days per MBID per entity. Re-submit periodically to keep the entry warm.
 - **ISRC alias coverage (recording entity only):** when Achordion writes a recording's links to the cache, it ALSO writes the same blob under each of the recording's ISRCs (`track-links:isrc:<isrc>`). On a cache miss for a recording MBID the resolver falls back to ISRC aliases — so a Parachord submission against the single's MBID also serves the album-track MBID for the same audio (and vice versa). Submit + resolver both fetch ISRCs from MB lazily; Parachord doesn't need to send them.
 - **Cache busting:** the submit endpoint calls `revalidatePath` for the entity's user-facing route (`/recording/<mbid>` + `/embed/track/<mbid>` for recordings, `/release-group/<mbid>` for release-groups) so the new links appear immediately without waiting out the page-level edge cache.

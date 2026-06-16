@@ -1,7 +1,11 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { getRecording, getRelease } from "@/lib/clients/musicbrainz";
+import {
+  getRecording,
+  getRelease,
+  lookupRecordingMbidByIsrc,
+} from "@/lib/clients/musicbrainz";
 import {
   setCachedTrackLinks,
   type CachedLink,
@@ -26,7 +30,10 @@ import {
  *
  * Body shape:
  *   {
- *     mbid: "<recording mbid>",
+ *     mbid: "<recording mbid>",   // or omit and pass `isrc` instead
+ *     isrc: "GBAYE0601498",       // alt key — resolved to a recording
+ *                                 //   MBID server-side when `mbid` is
+ *                                 //   absent (one of the two required)
  *     links: [
  *       { url: "https://open.spotify.com/track/...",
  *         label: "Spotify",
@@ -39,6 +46,14 @@ import {
  * from the URL and use a capitalised version of the second-level
  * domain as `label`. Lets Parachord submit minimum-viable payloads
  * without doing the platform-mapping themselves.
+ *
+ * `isrc` lets ISRC-only clients contribute when they have no recording
+ * MBID — common during LB MBID-mapper outages, and for tracks resolved
+ * straight from a streaming service (Spotify/Apple ship the ISRC for
+ * free). An ISRC is an exact recording identifier, so resolving it to
+ * an MBID via MusicBrainz is high-confidence (no fuzzy-search risk). A
+ * miss / MB-unreachable returns 400 so the client retries — we never
+ * write a placeholder.
  */
 
 export const dynamic = "force-dynamic";
@@ -47,46 +62,63 @@ const NO_STORE: Record<string, string> = {
   "Cache-Control": "private, no-store",
 };
 
-const SubmitSchema = z.object({
-  mbid: z.string().min(1).max(100),
-  // Which MB entity the MBID refers to. Defaults to recording for
-  // back-compat with the existing track-only submission shape.
-  //
-  // Accepted:
-  //   - `recording` (alias `track`) → cached under recording.
-  //   - `release-group` (alias `album`) → cached under release-group.
-  //   - `release` → resolved server-side to its parent
-  //     release-group, then cached under release-group. Lets
-  //     Parachord submit the specific edition it played without
-  //     having to look up the rg itself; the abstract album is the
-  //     right cache key since that's what the album page reads.
-  entity: z
-    .enum([
-      "recording",
-      "release-group",
-      "track",
-      "album",
-      "release",
-    ])
-    .optional(),
-  links: z
-    .array(
-      z.object({
-        url: z.string().url(),
-        label: z.string().max(80).optional(),
-        host: z.string().max(120).optional(),
-      }),
-    )
-    .min(1)
-    .max(50),
-  // Optional name metadata. Parachord knows the track + artist +
-  // album it just played; passing them along makes the cache entry
-  // self-describing and unlocks future "search the link cache by
-  // name" features. All optional — an MBID-only submit still works.
-  trackName: z.string().max(500).optional(),
-  artistName: z.string().max(500).optional(),
-  albumName: z.string().max(500).optional(),
-});
+// ISRC: 2-letter country + 3-char registrant + 7 digits (year + serial).
+const ISRC_RE = /^[A-Z]{2}[A-Z0-9]{3}\d{7}$/;
+
+const SubmitSchema = z
+  .object({
+    // Optional when an `isrc` is supplied — see the refine below. The
+    // handler resolves the recording MBID from the ISRC server-side
+    // for ISRC-only clients (LB mapper outages; streaming-resolved
+    // tracks that carry an ISRC but no MBID).
+    mbid: z.string().min(1).max(100).optional(),
+    // Exact recording identifier. Used to derive `mbid` when the
+    // client didn't supply one. Normalized to upper-case; rejected if
+    // malformed.
+    isrc: z
+      .string()
+      .transform((s) => s.trim().toUpperCase())
+      .refine((s) => ISRC_RE.test(s), "invalid ISRC")
+      .optional(),
+    // Which MB entity the MBID refers to. Defaults to recording for
+    // back-compat with the existing track-only submission shape.
+    //
+    // Accepted:
+    //   - `recording` (alias `track`) → cached under recording.
+    //   - `release-group` (alias `album`) → cached under release-group.
+    //   - `release` → resolved server-side to its parent
+    //     release-group, then cached under release-group. Lets
+    //     Parachord submit the specific edition it played without
+    //     having to look up the rg itself; the abstract album is the
+    //     right cache key since that's what the album page reads.
+    entity: z
+      .enum(["recording", "release-group", "track", "album", "release"])
+      .optional(),
+    links: z
+      .array(
+        z.object({
+          url: z.string().url(),
+          label: z.string().max(80).optional(),
+          host: z.string().max(120).optional(),
+        }),
+      )
+      .min(1)
+      .max(50),
+    // Optional name metadata. Parachord knows the track + artist +
+    // album it just played; passing them along makes the cache entry
+    // self-describing and unlocks future "search the link cache by
+    // name" features. All optional — an MBID-only submit still works.
+    trackName: z.string().max(500).optional(),
+    artistName: z.string().max(500).optional(),
+    albumName: z.string().max(500).optional(),
+  })
+  // Need a key to store against — an MBID directly, or an ISRC we can
+  // resolve into one. (ISRC only makes sense for recordings; an ISRC
+  // with entity=release-group will fail resolution downstream, which
+  // is the right outcome.)
+  .refine((d) => d.mbid || d.isrc, {
+    message: "one of `mbid` or `isrc` is required",
+  });
 
 /**
  * Coerce the raw `entity` field into a storage-side entity
@@ -184,8 +216,27 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     );
   }
 
-  const { mbid: rawMbid, links, trackName, artistName, albumName } =
+  const { mbid: payloadMbid, isrc, links, trackName, artistName, albumName } =
     parsed.data;
+
+  // Derive a recording MBID from the ISRC when the client didn't send
+  // one. Clients frequently have an ISRC and no MBID — LB's MBID mapper
+  // goes down (502 for 2+ days in June 2026), and streaming-resolved
+  // tracks carry an ISRC for free (Spotify externalIds, Apple Music
+  // attributes) before they ever know the MBID. ISRC is an exact
+  // recording identifier, so first-result is a high-confidence key.
+  const rawMbid =
+    payloadMbid ?? (isrc ? await lookupRecordingMbidByIsrc(isrc) : null);
+  if (!rawMbid) {
+    return NextResponse.json(
+      {
+        error: isrc
+          ? "could not resolve ISRC to a recording (not in MusicBrainz, or MusicBrainz unreachable — retry later)"
+          : "one of `mbid` or `isrc` is required",
+      },
+      { status: 400, headers: NO_STORE },
+    );
+  }
 
   // Resolve the storage key. Releases get redirected to their parent
   // release-group server-side so Parachord can submit whichever
@@ -236,6 +287,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     } catch {
       // continue without alias coverage
     }
+    // Make sure the ISRC the client submitted is aliased even if MB's
+    // recording.isrcs hasn't caught up to it yet (eventual consistency
+    // / freshly-added ISRC). We resolved the MBID from it, so it's the
+    // right audio.
+    if (isrc && !isrcs.includes(isrc)) isrcs.push(isrc);
   }
 
   const changed = await setCachedTrackLinks(
