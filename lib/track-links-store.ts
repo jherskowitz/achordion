@@ -77,6 +77,16 @@ interface CachedEntry {
   track_name?: string;
   artist_name?: string;
   album_name?: string;
+  /**
+   * Whether we've run a one-time Odesli enrichment pass over this
+   * entry. Entries born from a Parachord submit (or a partial MB
+   * resolve) only carry the services that source knew about; the
+   * resolver fires a single background Odesli lookup the first time it
+   * serves such an entry and flips this true so it never repeats. The
+   * goal (see About-page framing) is for our cache to become the
+   * union of every source's links, not just whoever wrote first.
+   */
+  odesli_enriched?: boolean;
 }
 
 /**
@@ -144,15 +154,24 @@ function cacheTag(mbid: string, entity: LinkEntity): string {
   return `track-links:${entity}:${mbid.toLowerCase()}`;
 }
 
+/** A cache entry's links plus the metadata the resolver needs to
+ *  decide whether to enrich. Kept narrow on purpose — callers that
+ *  only want links use `getCachedTrackLinks`. */
+export interface CachedTrackEntry {
+  links: CachedLink[];
+  /** Has the one-time Odesli enrichment pass already run? */
+  odesliEnriched: boolean;
+}
+
 /**
  * Raw Redis read — bypasses the Next-layer cache. Internal only;
- * the public `getCachedTrackLinks` wraps this in `unstable_cache`
+ * the public `getCachedTrackEntry` wraps this in `unstable_cache`
  * so hot reads within the TTL window don't re-hit Upstash.
  */
-async function readCachedTrackLinksFromRedis(
+async function readCachedEntryFromRedis(
   mbid: string,
   entity: LinkEntity,
-): Promise<CachedLink[] | null> {
+): Promise<CachedTrackEntry | null> {
   if (!redis) return null;
   if (!mbid) return null;
   try {
@@ -162,10 +181,39 @@ async function readCachedTrackLinksFromRedis(
     if (!raw) return null;
     const entry = typeof raw === "string" ? (JSON.parse(raw) as CachedEntry) : raw;
     if (!Array.isArray(entry.links)) return null;
-    return entry.links;
+    return { links: entry.links, odesliEnriched: entry.odesli_enriched === true };
   } catch {
     return null;
   }
+}
+
+/**
+ * Look up the full cached entry (links + enrichment flag) for an
+ * entity. Returns null on miss / expired / Upstash-not-configured.
+ *
+ * **Two-level caching:** the Redis read is wrapped in Next's
+ * `unstable_cache` (60s TTL, tagged per (entity, mbid) pair). Hot
+ * reads on the same node within the window avoid re-hitting Upstash
+ * entirely. Writes invalidate via `revalidateTag` in
+ * `setCachedTrackLinks`, so newly-submitted Parachord URLs surface
+ * immediately rather than waiting for the 60s TTL to lapse.
+ */
+export async function getCachedTrackEntry(
+  mbid: string,
+  entity: LinkEntity = "recording",
+): Promise<CachedTrackEntry | null> {
+  if (!mbid) return null;
+  // unstable_cache requires the closure to be stable across renders;
+  // we capture the entity + mbid in the cache key list so each
+  // (entity, mbid) pair gets its own cache slot. Key versioned `-e`
+  // because the cached value shape changed from `CachedLink[]` to
+  // `CachedTrackEntry` — a stale array-shaped entry would break reads.
+  const cached = unstable_cache(
+    () => readCachedEntryFromRedis(mbid, entity),
+    [`track-links-e`, entity, mbid.toLowerCase()],
+    { revalidate: 60, tags: [cacheTag(mbid, entity)] },
+  );
+  return cached();
 }
 
 /**
@@ -174,31 +222,15 @@ async function readCachedTrackLinksFromRedis(
  * as "go resolve and write back."
  *
  * `entity` defaults to `"recording"` for back-compat with existing
- * call sites; pass `"release-group"` for album-level lookups.
- *
- * **Two-level caching:** the Redis read is wrapped in Next's
- * `unstable_cache` (60s TTL, tagged per (entity, mbid) pair). Hot
- * reads on the same node within the window avoid re-hitting
- * Upstash entirely — significant when a popular recording renders
- * across multiple surfaces in quick succession. Writes invalidate
- * via `revalidateTag` in `setCachedTrackLinks`, so newly-submitted
- * Parachord URLs surface immediately rather than waiting for the
- * 60s TTL to lapse.
+ * call sites; pass `"release-group"` for album-level lookups. Thin
+ * wrapper over `getCachedTrackEntry` (shares the same cached read).
  */
 export async function getCachedTrackLinks(
   mbid: string,
   entity: LinkEntity = "recording",
 ): Promise<CachedLink[] | null> {
-  if (!mbid) return null;
-  // unstable_cache requires the closure to be stable across renders;
-  // we capture the entity + mbid in the cache key list so each
-  // (entity, mbid) pair gets its own cache slot.
-  const cached = unstable_cache(
-    () => readCachedTrackLinksFromRedis(mbid, entity),
-    [`track-links`, entity, mbid.toLowerCase()],
-    { revalidate: 60, tags: [cacheTag(mbid, entity)] },
-  );
-  return cached();
+  const entry = await getCachedTrackEntry(mbid, entity);
+  return entry ? entry.links : null;
 }
 
 /**
@@ -296,6 +328,7 @@ export async function setCachedTrackLinks(
   names?: TrackNames,
   entity: LinkEntity = "recording",
   aliases?: { isrcs?: string[] },
+  meta?: { odesliEnriched?: boolean },
 ): Promise<boolean> {
   if (!redis) return false;
   if (!mbid) return false;
@@ -335,6 +368,12 @@ export async function setCachedTrackLinks(
         : {}),
       ...(names?.albumName ?? prior?.album_name
         ? { album_name: names?.albumName ?? prior?.album_name }
+        : {}),
+      // Sticky once set: any write can flip it true, none flips it
+      // back. So a Parachord submit landing after enrichment keeps the
+      // entry marked enriched (it won't re-trigger an Odesli pass).
+      ...(meta?.odesliEnriched ?? prior?.odesli_enriched
+        ? { odesli_enriched: true }
         : {}),
     };
     const serialised = JSON.stringify(entry);

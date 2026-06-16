@@ -9,7 +9,7 @@ import {
 } from "@/lib/clients/musicbrainz";
 import {
   canonicalHost,
-  getCachedTrackLinks,
+  getCachedTrackEntry,
   getCachedTrackLinksByIsrcs,
   getCachedTrackLinksByName,
   setCachedTrackLinks,
@@ -17,6 +17,13 @@ import {
   type LinkEntity,
   type TrackNames,
 } from "@/lib/track-links-store";
+import { isFeatureEnabled } from "@/lib/flags";
+import { pickOdesliSeed } from "@/lib/odesli-seed";
+
+/** Kill-switch flag for the one-time Odesli enrichment pass. Global
+ *  default-only (no viewer at this edge-cached resolve path), so it's
+ *  flipped via `SET flag:track-links-enrichment:default on|off`. */
+const ENRICHMENT_FLAG = "track-links-enrichment";
 
 /**
  * Server-side resolver for a recording's external streaming links.
@@ -105,8 +112,19 @@ export async function resolveTrackLinks(
   // coverage grows over time. Fire-and-forget, and only when the host is
   // genuinely new, so cached tracks normally stay a pure read.
   if (mbid) {
-    const cached = await getCachedTrackLinks(mbid, entity);
-    if (cached && cached.length > 0) {
+    const entry = await getCachedTrackEntry(mbid, entity);
+    if (entry && entry.links.length > 0) {
+      const cached = entry.links;
+      // One-time Odesli enrichment: an entry born from a Parachord
+      // submit (or a partial MB resolve) only lists the services that
+      // source knew about. Fire a single background Odesli lookup to
+      // fold in the rest, so the cache becomes the union of every
+      // source — never overriding the higher-priority links it already
+      // has. Flag-gated kill-switch; fire-and-forget so the hit stays
+      // fast; marked done inside so it never repeats.
+      if (!entry.odesliEnriched) {
+        void maybeEnrichWithOdesli(mbid, entity, cached, seedUrl ?? null);
+      }
       const seedLink = newSeedLink(cached, seedUrl);
       if (seedLink) {
         void setCachedTrackLinks(mbid, [seedLink], undefined, entity);
@@ -306,10 +324,69 @@ export async function resolveTrackLinks(
       // when entity is "release-group". Pass even on miss-then-
       // resolve so future cross-MBID lookups via ISRC work.
       isrcs.length > 0 ? { isrcs } : undefined,
+      // We consulted Odesli on this miss (got a response, even if it
+      // had no links) → mark enriched so a later cache hit doesn't
+      // re-run the one-time enrichment pass. A failed/throttled Odesli
+      // call (null) leaves it unmarked so enrichment retries later.
+      { odesliEnriched: odesli != null },
     );
   }
 
   return sortByPlatformPriority(items);
+}
+
+/**
+ * One-time Odesli enrichment of an already-cached entry.
+ *
+ * Entries created by a Parachord submit (or a partial MB resolve)
+ * carry only the services that source knew about. This folds in
+ * Odesli's cross-service set so the cache trends toward the union of
+ * every source — the long-term goal of making our DB the primary
+ * link source. Merge priority means Odesli never overrides a
+ * Parachord-confirmed or MB link; it only fills hosts nothing better
+ * covered.
+ *
+ * Fire-and-forget from the cache-hit path. Guards:
+ *   - Kill-switch flag (global default-only — no viewer here).
+ *   - Marks the entry enriched on any Odesli *response* (even an empty
+ *     one) so it never repeats; a transient failure (null) stays
+ *     unmarked and retries on a later resolve.
+ *   - Bounded to once per track by the marker, and Odesli's own 24h
+ *     fetch cache + fail-fast-on-429 keep the cost contained.
+ */
+async function maybeEnrichWithOdesli(
+  mbid: string,
+  entity: LinkEntity,
+  cachedLinks: CachedLink[],
+  seedUrl: string | null,
+): Promise<void> {
+  try {
+    if (!(await isFeatureEnabled(ENRICHMENT_FLAG))) return;
+    const seed = pickOdesliSeed(cachedLinks, seedUrl);
+    if (!seed) return;
+    const odesli = await getOdesliLinks(seed).catch(() => null);
+    // null = error / rate-limit / timeout — leave unmarked, retry later.
+    if (!odesli) return;
+    const odesliLinks: CachedLink[] = [];
+    for (const p of PLATFORM_ORDER) {
+      const link = odesli.linksByPlatform[p.key];
+      if (link?.url) {
+        odesliLinks.push({
+          url: link.url,
+          label: p.label,
+          host: p.host,
+          source: "odesli",
+        });
+      }
+    }
+    // Write the Odesli links in (merged by priority) AND mark enriched.
+    // Empty odesliLinks still flips the marker so we don't re-run.
+    await setCachedTrackLinks(mbid, odesliLinks, undefined, entity, undefined, {
+      odesliEnriched: true,
+    });
+  } catch {
+    // Best-effort enrichment — never affects the served response.
+  }
 }
 
 /**

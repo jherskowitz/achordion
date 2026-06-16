@@ -177,6 +177,12 @@ export const KNOWN_FLAGS: ReadonlyArray<FlagDefinition> = [
       "CritiqueBrainz reviews + Wikipedia 'Critical reception' fallback on /release-group/<mbid>.",
   },
   {
+    id: "track-links-enrichment",
+    label: "Track-links Odesli enrichment",
+    description:
+      "One-time background Odesli lookup the first time a cached track/album entry is served, folding Odesli's cross-service links into our DB so it trends toward the union of every source (Parachord submits, MusicBrainz, scrobble origin_url, Odesli). Global kill-switch (default-only — runs on the viewer-less /api/track-links resolve path). Bounded to once per entry; never overrides higher-priority links.",
+  },
+  {
     id: "write_reviews",
     label: "Write reviews",
     description:
