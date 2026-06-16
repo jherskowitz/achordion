@@ -70,6 +70,15 @@ interface ResolveTrackLinksOpts {
    *  rel is used. */
   seedUrl?: string | null;
   /**
+   * Exact (artist, title) for the name-alias bridge. Lets a caller
+   * with no MBID — typically a scrobble ListenBrainz never mapped to a
+   * recording — still surface a track's stored links, including
+   * Parachord submissions that landed under a sibling MBID. Normalized
+   * the same way on read + write (see `lib/track-links-key.ts`).
+   */
+  artist?: string | null;
+  title?: string | null;
+  /**
    * Optional pre-fetched MB data. When the caller already loaded the
    * entity (e.g. the embed page's hero block, or a release-group
    * page that already has its url-rels), pass the streaming url-rels
@@ -264,10 +273,37 @@ export async function resolveTrackLinks(
   const items: ResolvedLink[] = [];
   const seen = new Set<string>();
 
+  // 4.0. Name-alias bridge. When the caller has an exact (artist,
+  // title) — typically a scrobble ListenBrainz never mapped to an MBID
+  // — pull the track's stored links by name and seed them FIRST, so a
+  // Parachord submission that landed under a sibling MBID wins host
+  // conflicts over Odesli's best-effort matches. Same exact-name key
+  // the write path populates (artist + ETI-preserving title), so
+  // covers / live / remix variants never cross-contaminate. Falls back
+  // to the MB-derived names when the caller didn't pass any.
+  const bridgeArtist = opts.artist ?? mbNames.artistName;
+  const bridgeTitle = opts.title ?? mbNames.trackName;
+  if (bridgeArtist && bridgeTitle) {
+    const nameLinks = await getCachedTrackLinksByName(
+      bridgeArtist,
+      bridgeTitle,
+    ).catch(() => null);
+    if (nameLinks) {
+      for (const l of nameLinks) {
+        const h = canonicalHost(l.host);
+        if (seen.has(h)) continue;
+        items.push({ url: l.url, label: l.label, host: l.host });
+        seen.add(h);
+      }
+    }
+  }
+
   if (odesli) {
     for (const p of PLATFORM_ORDER) {
       const link = odesli.linksByPlatform[p.key];
-      if (link?.url) {
+      // Skip a host the name-alias bridge already supplied — its link
+      // is higher-trust (often a Parachord submission) than Odesli's.
+      if (link?.url && !seen.has(p.host)) {
         items.push({ url: link.url, label: p.label, host: p.host });
         seen.add(p.host);
       }

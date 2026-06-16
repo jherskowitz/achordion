@@ -103,7 +103,12 @@ export function ScrobbleRow({
           everything Odesli expands it into — shows up here even when MB
           has no streaming url-rel. No separate per-service link on the
           row: keep them together in the flyout. */}
-      <InlineTrackLinks recordingMbid={recordingMbid} seedUrl={source?.url} />
+      <InlineTrackLinks
+        recordingMbid={recordingMbid}
+        seedUrl={source?.url}
+        artist={meta.artist_name}
+        title={meta.track_name}
+      />
       {showRelative && (
         <RelativeTime
           value={listen.listened_at}

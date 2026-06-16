@@ -32,9 +32,20 @@ import type { LinkEntity } from "@/lib/track-links-store";
  * round-tripping through fetch.
  */
 
+// Short fresh window, long stale-while-revalidate. A track's link set
+// GROWS over its first days of life — a Parachord submit, then an
+// Odesli merge, then an ISRC / name back-fill — and only a Parachord
+// submit busts this cache. A long s-maxage (was 24h) therefore pinned
+// already-fetched URLs (notably the per-scrobble `?seedUrl=…` variants
+// on Recently Played) to a stale subset for up to a day. A 5-minute
+// fresh window means growth surfaces quickly; the long SWR keeps the
+// row instant (serve stale, refresh in the background). The resolve is
+// a cheap cache-hit (one Upstash read), so the extra revalidations
+// cost little. Once a track's set is stable the data is immutable, so
+// the short window costs nothing there either.
 const CACHE_HEADERS: Record<string, string> = {
   "Cache-Control":
-    "public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800",
+    "public, max-age=300, s-maxage=300, stale-while-revalidate=86400",
 };
 
 const ENTITY_ALIASES: Record<string, LinkEntity> = {
@@ -50,7 +61,12 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const seedUrl = url.searchParams.get("seedUrl")?.trim() || null;
   const entityRaw = url.searchParams.get("entity")?.trim().toLowerCase() ?? "";
   const entity: LinkEntity = ENTITY_ALIASES[entityRaw] ?? "recording";
+  // Exact (artist, title) for the name-alias bridge — lets a row whose
+  // scrobble ListenBrainz never mapped to an MBID still pull a track's
+  // stored links (incl. Parachord submissions under a sibling MBID).
+  const artist = url.searchParams.get("artist")?.trim() || null;
+  const title = url.searchParams.get("title")?.trim() || null;
 
-  const links = await resolveTrackLinks({ mbid, seedUrl, entity });
+  const links = await resolveTrackLinks({ mbid, seedUrl, entity, artist, title });
   return NextResponse.json({ links }, { headers: CACHE_HEADERS });
 }

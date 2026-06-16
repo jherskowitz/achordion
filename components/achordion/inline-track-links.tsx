@@ -45,22 +45,42 @@ interface InlineTrackLinksProps {
    *  there. Pass any service URL we already have (e.g. from an LB
    *  scrobble). */
   seedUrl?: string | null;
+  /** Exact (artist, title) for the name-alias bridge. Lets a row with
+   *  no MBID still surface a track's stored links — including
+   *  Parachord submissions under a sibling MBID — when ListenBrainz's
+   *  mapper failed to map the scrobble. Pass the scrobble's
+   *  artist/track names verbatim; the server normalizes them. */
+  artist?: string | null;
+  title?: string | null;
 }
 
 export function InlineTrackLinks({
   recordingMbid,
   seedUrl,
+  artist,
+  title,
 }: InlineTrackLinksProps) {
   const [open, setOpen] = useState(false);
   const wrapperRef = useRef<HTMLSpanElement | null>(null);
-  const enabled = open && !!(recordingMbid || seedUrl);
-  const queryKey = ["track-links", recordingMbid ?? null, seedUrl ?? null];
+  const hasName = !!(artist && title);
+  const enabled = open && !!(recordingMbid || seedUrl || hasName);
+  const queryKey = [
+    "track-links",
+    recordingMbid ?? null,
+    seedUrl ?? null,
+    artist ?? null,
+    title ?? null,
+  ];
   const { data, isFetching, error } = useQuery<{ links: ResolvedLink[] }>({
     queryKey,
     queryFn: async () => {
       const params = new URLSearchParams();
       if (recordingMbid) params.set("mbid", recordingMbid);
       if (seedUrl) params.set("seedUrl", seedUrl);
+      if (artist && title) {
+        params.set("artist", artist);
+        params.set("title", title);
+      }
       const r = await fetch(`/api/track-links?${params.toString()}`);
       if (!r.ok) throw new Error(`track-links ${r.status}`);
       return r.json();
@@ -99,7 +119,7 @@ export function InlineTrackLinks({
   // Don't render the trigger at all when we have nothing to seed
   // the lookup with — the row's title link still goes to the
   // recording page where the full external-links block lives.
-  if (!recordingMbid && !seedUrl) return null;
+  if (!recordingMbid && !seedUrl && !hasName) return null;
 
   return (
     <span ref={wrapperRef} className="relative inline-flex shrink-0">
