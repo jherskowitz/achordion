@@ -80,9 +80,14 @@ export function StreamingLinksRow({
       if (!r.ok) throw new Error(`track-links ${r.status}`);
       return r.json();
     },
-    // Streaming mappings are stable once cached — keep the result
-    // for the session.
-    staleTime: Number.POSITIVE_INFINITY,
+    // A track's link set keeps growing over its first ~15 min of life
+    // (Parachord submit → Odesli merge → name back-fill), so an
+    // infinite staleTime froze the row at whatever subset it first
+    // resolved until a full reload. Match the API's 5-min cache: the
+    // row self-heals on revisit/remount once stale, while staying
+    // instant on first paint. Window-focus refetch stays off to avoid
+    // refetch storms on tab switches.
+    staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
   });
 

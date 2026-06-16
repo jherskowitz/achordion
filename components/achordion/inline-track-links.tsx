@@ -86,9 +86,12 @@ export function InlineTrackLinks({
       return r.json();
     },
     enabled,
-    // Streaming mappings are essentially static once Odesli has them
-    // indexed — keep the result for the session.
-    staleTime: Number.POSITIVE_INFINITY,
+    // A track's link set keeps growing over its first ~15 min of life
+    // (Parachord submit → Odesli merge → name back-fill), so an
+    // infinite staleTime froze the flyout at whatever subset it first
+    // resolved until a full reload. Match the API's 5-min cache so a
+    // re-expand picks up newly-merged links; first open stays instant.
+    staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
   });
 
