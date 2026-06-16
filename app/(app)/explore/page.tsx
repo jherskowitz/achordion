@@ -496,15 +496,19 @@ export default async function ExploreOverviewPage({
                 param="tracksFamiliarity"
                 kind="track"
               />
-              <Suspense
-                key={`tracks-pa-${tracksFamiliarity}`}
-                fallback={null}
-              >
-                <RecommendedTracksPlayAll
-                  username={username}
-                  familiarity={tracksFamiliarity}
-                />
-              </Suspense>
+              {/* Fixed-width slot so the slider's flex-1 doesn't reflow
+                  when Play-all re-suspends on a slider move. */}
+              <div className="flex w-40 shrink-0 justify-end">
+                <Suspense
+                  key={`tracks-pa-${tracksFamiliarity}`}
+                  fallback={<Skeleton className="h-7 w-24 rounded-lg" />}
+                >
+                  <RecommendedTracksPlayAll
+                    username={username}
+                    familiarity={tracksFamiliarity}
+                  />
+                </Suspense>
+              </div>
             </div>
             <Suspense
               key={`tracks-${tracksFamiliarity}`}

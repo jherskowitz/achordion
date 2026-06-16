@@ -1,11 +1,9 @@
-import { Suspense } from "react";
 import Link from "next/link";
 import type {
   RecommendedRecordingMbid,
   RecordingMetadata,
 } from "@/lib/clients/listenbrainz";
-import { ArtistAvatar } from "./artist-avatar";
-import { Skeleton } from "@/components/ui/skeleton";
+import { LazyArtistAvatar } from "./lazy-artist-avatar";
 
 interface ArtistAggregate {
   mbid: string;
@@ -98,17 +96,13 @@ export function RecommendedArtistsList({
               prefetch={false}
               className="hover:bg-muted/40 group flex min-w-0 items-center gap-2 rounded-md px-2 py-1.5"
             >
-              <Suspense
-                fallback={<Skeleton className="size-8 shrink-0 rounded-full" />}
-              >
-                <ArtistAvatar
-                  mbid={a.mbid}
-                  name={a.name}
-                  className="size-8 shrink-0"
-                  fallbackClassName="text-[10px]"
-                  width={96}
-                />
-              </Suspense>
+              <LazyArtistAvatar
+                mbid={a.mbid}
+                name={a.name}
+                className="size-8 shrink-0"
+                fallbackClassName="text-[10px]"
+                width={96}
+              />
               <span className="min-w-0 flex-1 truncate text-sm">{a.name}</span>
             </Link>
           </li>
@@ -125,17 +119,13 @@ export function RecommendedArtistsList({
             prefetch={false}
             className="border-border/60 hover:border-foreground/30 hover:bg-muted/30 group flex min-w-0 items-center gap-3 rounded-xl border p-4 transition-colors"
           >
-            <Suspense
-              fallback={<Skeleton className="size-12 shrink-0 rounded-full" />}
-            >
-              <ArtistAvatar
-                mbid={a.mbid}
-                name={a.name}
-                className="size-12 shrink-0"
-                fallbackClassName="text-sm"
-                width={128}
-              />
-            </Suspense>
+            <LazyArtistAvatar
+              mbid={a.mbid}
+              name={a.name}
+              className="size-12 shrink-0"
+              fallbackClassName="text-sm"
+              width={128}
+            />
             <div className="min-w-0">
               <p className="truncate text-sm font-medium">{a.name}</p>
               <p className="text-muted-foreground/80 mt-0.5 text-xs">

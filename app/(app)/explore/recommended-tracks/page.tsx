@@ -173,9 +173,19 @@ export default async function RecommendedTracksPage({
           param="familiarity"
           kind="track"
         />
-        <Suspense key={`pa-${familiarity}`} fallback={null}>
-          <PlayAll username={username} familiarity={familiarity} />
-        </Suspense>
+        {/* Fixed-width, right-aligned slot so the slider's flex-1
+            doesn't reflow when Play-all re-suspends on a slider move.
+            The skeleton fallback keeps the slot occupied instead of
+            collapsing to null (which let the slider expand, then snap
+            back when the button returned). */}
+        <div className="flex w-40 shrink-0 justify-end">
+          <Suspense
+            key={`pa-${familiarity}`}
+            fallback={<Skeleton className="h-7 w-24 rounded-lg" />}
+          >
+            <PlayAll username={username} familiarity={familiarity} />
+          </Suspense>
+        </div>
       </div>
       <Suspense key={`${familiarity}`} fallback={<Fallback />}>
         <Body username={username} familiarity={familiarity} />
