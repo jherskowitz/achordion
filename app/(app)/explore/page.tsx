@@ -243,17 +243,20 @@ async function WeeklyAlgoSection({
  */
 async function loadRecommendedTracks(username: string, familiarity: number) {
   const threshold = thresholdFromFamiliarity(familiarity);
-  // Filter by track (recording) play count, not artist play count —
-  // a familiar artist can still have a deep cut you've never heard,
-  // and we want to surface those. Pull a wider raw set when the
-  // slider asks for more discoveries so the visible 12 stays full.
-  const rawCount = threshold === null ? 25 : 100;
+  // Pull the full rec pool in one LB call. Like the dedicated
+  // /explore/recommended-tracks page, the discovery tracks
+  // (latest_listened_at === null) live deep in the score-sorted list
+  // — the first never-heard rec routinely sits past index ~90 — so a
+  // small raw count starves the discovery end of the slider, often
+  // down to a single row. LB returns the whole set (~1000) regardless
+  // of `count`, so 1000 surfaces them all at no extra LB cost.
+  //
   // Catch on every upstream so a 429 from MB / LB doesn't take the
   // entire /explore page down with a generic 429 response. Empty
   // metadata or an empty exclude set degrades the row gracefully —
   // no recommendations, but the rest of the page still renders.
   const [recordings, exclude] = await Promise.all([
-    getRecommendedRecordings(username, rawCount, "raw").catch(() => []),
+    getRecommendedRecordings(username, 1000, "raw").catch(() => []),
     buildExcludedRecordingSet(username, threshold).catch(
       () => new Set<string>(),
     ),
@@ -261,31 +264,36 @@ async function loadRecommendedTracks(username: string, familiarity: number) {
   if (recordings.length === 0) {
     return { top: [], metadata: new Map(), parachordTracks: [] };
   }
-  const metadata = await getRecordingMetadata(
-    recordings.map((r) => r.recording_mbid),
-  ).catch(() => new Map<string, never>());
-  // Hide anything LB knows the user has heard, at any non-zero
-  // slider value. `latest_listened_at` is the only reliable signal
-  // for "I've heard this exact recommendation" — MBID-based filters
-  // miss cases where the rec and the user's listen history use
-  // different MBIDs for the same conceptual track. The
-  // listen-count `exclude` set is kept as belt-and-braces for the
+  // Filter BEFORE resolving metadata so the per-track metadata lookup
+  // is only paid for the handful we might show, never the whole pool.
+  // `latest_listened_at` is the reliable "I've heard this exact rec"
+  // signal — MBID-based filters miss cases where the rec and the
+  // user's listen history use different MBIDs for the same conceptual
+  // track. The listen-count `exclude` set is belt-and-braces for the
   // graduated-strictness UX.
   const filtered = recordings.filter((r) => {
-    // Drop rows whose LB metadata lookup returned nothing — they'd
-    // render as "Unknown track" placeholders, which look broken
-    // even though the recommendation itself is valid. Niche /
-    // recently-uploaded MBIDs sometimes aren't in LB's metadata
-    // index; pulling a wider candidate pool above means we still
-    // have plenty of fully-resolved rows to fill the visible 12.
-    const m = metadata.get(r.recording_mbid);
-    if (!m?.recording?.name || !m?.artist?.name) return false;
     if (familiarity === 0) return true;
     if (r.latest_listened_at !== null) return false;
     if (exclude.has(r.recording_mbid)) return false;
     return true;
   });
-  const top = filtered.slice(0, 12);
+  // Overscan past the visible 12 so the occasional rec whose LB
+  // metadata lookup comes back empty (niche / freshly-uploaded MBID)
+  // can be dropped without leaving a gap — while still resolving far
+  // fewer than the full pool.
+  const candidates = filtered.slice(0, 24);
+  const metadata = await getRecordingMetadata(
+    candidates.map((r) => r.recording_mbid),
+  ).catch(() => new Map<string, never>());
+  // Drop rows whose metadata didn't resolve — they'd render as
+  // "Unknown track" placeholders, which read as broken even though
+  // the recommendation itself is valid.
+  const top = candidates
+    .filter((r) => {
+      const m = metadata.get(r.recording_mbid);
+      return !!m?.recording?.name && !!m?.artist?.name;
+    })
+    .slice(0, 12);
   const parachordTracks: ParachordTrack[] = top
     .map((r) => {
       const m = metadata.get(r.recording_mbid);
