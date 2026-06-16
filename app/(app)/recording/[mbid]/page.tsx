@@ -9,7 +9,7 @@ import {
   withLookupDeadline,
   type RecordingRelease,
 } from "@/lib/clients/musicbrainz";
-import { caaReleaseUrl } from "@/lib/clients/coverart";
+import { caaReleaseUrl, caaReleaseGroupUrl } from "@/lib/clients/coverart";
 import { mergeTagsAndGenres } from "@/lib/merge-tags-genres";
 import { parachordPlayAlbum, parachordPlayTrack } from "@/lib/parachord";
 import { CoverArt } from "@/components/achordion/cover-art";
@@ -80,7 +80,20 @@ async function RecordingBody({ mbid }: { mbid: string }) {
   // <EntityHeaderListenerStats> hitting `/api/recording/[mbid]/listeners`
   // — keeping the LB popularity call off this CDN-cached page's render
   // path so it can't wedge the page on its skeleton.
-  const cover = heroRelease ? caaReleaseUrl(heroRelease.id, 500) : null;
+  // Prefer the release-GROUP front cover: the Cover Art Archive
+  // resolves it to whichever edition in the group actually has a scan,
+  // so we don't paint a Disc3 placeholder just because the specific
+  // release picked for the hero happens to lack art — common, since
+  // most editions of an album have no per-release cover, only the
+  // group front does. (Recently Played dodges this by using LB's
+  // pre-resolved caa_release_mbid; this gives the recording page the
+  // same robustness.) Fall back to the picked release only when MB has
+  // no release-group for it (rare).
+  const cover = heroReleaseGroup
+    ? caaReleaseGroupUrl(heroReleaseGroup.id, 500)
+    : heroRelease
+      ? caaReleaseUrl(heroRelease.id, 500)
+      : null;
   const { urls } = partitionArtistRelations({
     relations: recording.relations,
   });
@@ -291,7 +304,7 @@ async function RecordingBody({ mbid }: { mbid: string }) {
                           className="block"
                         >
                           <CoverArt
-                            src={caaReleaseUrl(r.id, 250)}
+                            src={caaReleaseGroupUrl(rg.id, 250)}
                             alt={rg.title}
                             size={250}
                             className="aspect-square w-full transition-opacity group-hover:opacity-90"

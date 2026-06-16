@@ -4,7 +4,7 @@ import {
   formatArtistCredit,
   type RecordingRelease,
 } from "@/lib/clients/musicbrainz";
-import { caaReleaseUrl } from "@/lib/clients/coverart";
+import { caaReleaseUrl, caaReleaseGroupUrl } from "@/lib/clients/coverart";
 import { OgBrand } from "@/app/_og-brand";
 
 /**
@@ -41,7 +41,15 @@ export default async function RecordingOg({ params }: OgProps) {
 
   const credit = formatArtistCredit(recording["artist-credit"]);
   const heroRelease = pickHeroRelease(recording.releases);
-  const cover = heroRelease ? caaReleaseUrl(heroRelease.id, 500) : null;
+  const heroReleaseGroup = heroRelease?.["release-group"] ?? null;
+  // Release-group front resolves to whichever edition has art (most
+  // per-release fronts 404), so the card isn't blank just because the
+  // picked release lacks a scan. Mirrors the recording page.
+  const cover = heroReleaseGroup
+    ? caaReleaseGroupUrl(heroReleaseGroup.id, 500)
+    : heroRelease
+      ? caaReleaseUrl(heroRelease.id, 500)
+      : null;
   const length = formatLength(recording.length);
   const year = recording["first-release-date"]?.slice(0, 4) ?? null;
   // Compact meta line under the artist — "1968 · 7:11"
