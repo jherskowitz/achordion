@@ -78,6 +78,17 @@ interface CachedEntry {
   artist_name?: string;
   album_name?: string;
   /**
+   * ISRCs known for this recording (uppercased, deduped), accumulated
+   * across writes. These are ALSO written as alias keys
+   * (`track-links:isrc:<isrc>`) for ISRC→links lookup; storing them in
+   * the body too makes the entry self-describing — given an entry you
+   * can see its ISRCs without scanning the alias keyspace — and lets a
+   * read API surface them. Recording entries only; forward-filled, so
+   * older entries gain it on their next write. (See the name fields
+   * above for the same "store for future read features" rationale.)
+   */
+  isrcs?: string[];
+  /**
    * Whether we've run a one-time Odesli enrichment pass over this
    * entry. Entries born from a Parachord submit (or a partial MB
    * resolve) only carry the services that source knew about; the
@@ -161,6 +172,9 @@ export interface CachedTrackEntry {
   links: CachedLink[];
   /** Has the one-time Odesli enrichment pass already run? */
   odesliEnriched: boolean;
+  /** ISRCs known for this recording (uppercased). Empty for older
+   *  entries written before the field existed, until their next write. */
+  isrcs: string[];
 }
 
 /**
@@ -181,7 +195,11 @@ async function readCachedEntryFromRedis(
     if (!raw) return null;
     const entry = typeof raw === "string" ? (JSON.parse(raw) as CachedEntry) : raw;
     if (!Array.isArray(entry.links)) return null;
-    return { links: entry.links, odesliEnriched: entry.odesli_enriched === true };
+    return {
+      links: entry.links,
+      odesliEnriched: entry.odesli_enriched === true,
+      isrcs: Array.isArray(entry.isrcs) ? entry.isrcs : [],
+    };
   } catch {
     return null;
   }
@@ -356,10 +374,23 @@ export async function setCachedTrackLinks(
     // the write was a no-op — a re-submit of links we already had at
     // equal/higher priority shouldn't force a pointless revalidation.
     const changed = linksSignature(existingLinks) !== linksSignature(merged);
+    // Accumulate ISRCs (uppercased, deduped) across writes so the entry
+    // stays self-describing — a write that didn't pass ISRCs keeps the
+    // ones a prior write captured. Recording-only, like the alias keys.
+    const mergedIsrcs = Array.from(
+      new Set(
+        [...(prior?.isrcs ?? []), ...(aliases?.isrcs ?? [])]
+          .map((s) => s.trim().toUpperCase())
+          .filter(Boolean),
+      ),
+    );
     const entry: CachedEntry = {
       mbid: mbid.toLowerCase(),
       links: merged,
       resolved_at: Math.floor(Date.now() / 1000),
+      ...(entity === "recording" && mergedIsrcs.length > 0
+        ? { isrcs: mergedIsrcs }
+        : {}),
       ...(names?.trackName ?? prior?.track_name
         ? { track_name: names?.trackName ?? prior?.track_name }
         : {}),
