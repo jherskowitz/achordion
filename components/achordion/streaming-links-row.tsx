@@ -98,7 +98,16 @@ export function StreamingLinksRow({
   // the same service don't double up.
   const items = data?.links && data.links.length > 0
     ? mergeByHost(initialItems, data.links)
-    : initialItems;
+    // Dedupe the server set too: a recording/release can carry several
+    // MB url-rels for one service (Apple Music / Bandcamp across
+    // editions & stores), so the raw initial set has duplicate
+    // favicons. mergeByHost(items, []) collapses by canonical host.
+    // Matters whenever the client upgrade hasn't landed — first paint,
+    // a slow fetch, or a browser extension mutating anchors and
+    // breaking this island's hydration (it then stays on the server
+    // set). `mergeByHost` is a no-op-shaped dedupe here since there's
+    // no incoming set to merge.
+    : mergeByHost(initialItems, []);
 
   // Always render the row when we have an MBID — even with zero
   // resolved items the "+ Add sources" tile gives editors a path to
