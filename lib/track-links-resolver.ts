@@ -454,6 +454,15 @@ async function maybeEnrichWithOdesli(
  * insertion order — meaning a cache hit could surface Spotify
  * after YouTube, etc.). Hosts not in PLATFORM_ORDER fall to the
  * end in their original order (stable sort by `original` index).
+ *
+ * Also canonicalises each link's `host` on the way out. Cold-resolve
+ * items carry the raw host (`hostOf` returns `www.deezer.com` from the
+ * Deezer-by-ISRC seed, etc.) while the cache write normalises via
+ * `mergeLinks`, so a fresh resolve would otherwise return a different
+ * `host` than the next reader gets from cache — surfacing as a globe
+ * favicon for the first viewer (Google s2 404s `www.deezer.com`) and
+ * the real logo afterward. Since every return path funnels through
+ * here, normalising once guarantees returned hosts match stored ones.
  */
 function sortByPlatformPriority(items: ResolvedLink[]): ResolvedLink[] {
   const orderIndex = (host: string): number => {
@@ -466,7 +475,7 @@ function sortByPlatformPriority(items: ResolvedLink[]): ResolvedLink[] {
     .sort((a, b) =>
       a.idx !== b.idx ? a.idx - b.idx : a.original - b.original,
     )
-    .map(({ item }) => item);
+    .map(({ item }) => ({ ...item, host: canonicalHost(item.host) }));
 }
 
 /**
