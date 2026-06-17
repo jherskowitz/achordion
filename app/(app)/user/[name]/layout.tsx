@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Suspense } from "react";
+import { auth } from "@/auth";
 import {
   UserPageHeader,
   UserPageHeaderSkeleton,
@@ -14,9 +15,16 @@ export default async function UserLayout({
   params: Promise<{ name: string }>;
 }) {
   const { name } = await params;
-  // Fire-and-forget profile-view tracking for the /admin/profiles list.
-  // Runs for every profile + sub-tab render; never awaited.
-  recordProfileView(name);
+  // Profile-view tracking for the /admin/profiles list — but only for
+  // SIGNED-IN viewers. Anonymous traffic to /user/<name> is almost
+  // entirely crawlers enumerating real ListenBrainz accounts (incl.
+  // long-dormant email/domain-named spam signups), which buried the
+  // real signal. Authenticated views are the meaningful "who are people
+  // actually looking at" metric. `auth()` is request-cached (the header
+  // reads it too), so this adds no real cost; the write stays
+  // fire-and-forget.
+  const session = await auth();
+  if (session?.user?.mbUsername) recordProfileView(name);
   return (
     <>
       {/* Own Suspense boundary so the header's upstream calls (playing-

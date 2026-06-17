@@ -12,11 +12,14 @@ export default async function ProfilesAdminPage() {
   return (
     <div className="space-y-4">
       <p className="text-muted-foreground text-sm leading-6">
-        User profiles ranked by total render count. Each profile-page
-        view — including tab navigation within a profile — counts once,
-        so this is &ldquo;times rendered,&rdquo; not unique visitors.
-        Someone landing on their own profile is included. Crawlers are
-        challenged by Bot Protection, so these are mostly real views.
+        User profiles ranked by render count, counting{" "}
+        <strong>signed-in viewers only</strong>. Anonymous traffic
+        isn&rsquo;t recorded — it was almost entirely crawlers enumerating
+        real ListenBrainz accounts (including long-dormant email/domain-named
+        signups), which buried the real signal. Each render — including tab
+        navigation within a profile, and someone landing on their own
+        profile — counts once, so this is &ldquo;times rendered by a
+        logged-in user,&rdquo; not unique visitors.
       </p>
 
       {rows.length === 0 ? (
