@@ -43,8 +43,16 @@ const BLOCKED_UA =
  * Matches the same set we allow in `app/robots.ts`. Order doesn't
  * matter — the regex match is constant-time on UA length.
  */
+// `Slack-ImgProxy` is Slack's IMAGE fetcher (separate from the
+// `Slackbot-LinkExpanding` page unfurler): Slack reads the page with
+// the unfurler, then re-fetches the resolved og:image through the
+// proxy. Both must pass or the unfurl shows title/desc with a broken
+// image. NOTE: the same applies at the Vercel Firewall (Bot
+// Protection) layer, which runs BEFORE this middleware — Slack-ImgProxy
+// also needs a bypass rule there, since this allowlist can't un-do a
+// firewall challenge.
 const ALLOWLIST_UA =
-  /(facebookexternalhit|Facebot|Twitterbot|LinkedInBot|Slackbot-LinkExpanding|Slackbot|Discordbot|Bluesky Cardyb|Mastodon|WhatsApp|TelegramBot|Pinterest|redditbot)/i;
+  /(facebookexternalhit|Facebot|Twitterbot|LinkedInBot|Slackbot-LinkExpanding|Slackbot|Slack-ImgProxy|Discordbot|Bluesky Cardyb|Mastodon|WhatsApp|TelegramBot|Pinterest|redditbot)/i;
 
 /**
  * AS numbers (without the "AS" prefix) of cloud providers + bot
