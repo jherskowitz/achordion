@@ -1,6 +1,7 @@
 import "server-only";
 
 import { getOdesliLinks } from "@/lib/clients/odesli";
+import { lookupDeezerUrlByIsrc } from "@/lib/clients/deezer";
 import {
   formatArtistCredit,
   getRecording,
@@ -261,6 +262,26 @@ export async function resolveTrackLinks(
         nameHit.map(({ url, label, host }) => ({ url, label, host })),
       );
     }
+  }
+
+  // 2.7. ISRC → streaming-URL seed. The common "empty row" case: MB has
+  // no streaming url-rel for the recording, so there's nothing to seed
+  // Odesli with — even though the song is plainly on streaming. Most
+  // recordings DO carry an ISRC, and Deezer's free ISRC lookup turns it
+  // into a concrete streaming URL, which both renders as a link AND
+  // seeds Odesli for the rest. Only when we have no other seed (no MB
+  // rel, no caller seedUrl) and an ISRC to try — so it's one extra call
+  // exactly on the cold tracks that would otherwise show nothing, then
+  // cached via the write-through below. Pushed onto `mbStreamingUrls`
+  // so it survives as a link even if the Odesli call then fails.
+  if (
+    entity === "recording" &&
+    mbStreamingUrls.length === 0 &&
+    !seedUrl &&
+    isrcs.length > 0
+  ) {
+    const deezerUrl = await lookupDeezerUrlByIsrc(isrcs[0]);
+    if (deezerUrl) mbStreamingUrls.push({ url: deezerUrl });
   }
 
   // 3. Odesli.
