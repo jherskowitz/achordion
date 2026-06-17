@@ -27,10 +27,19 @@ const FAVICON_HOST_REWRITES: Array<{ match: RegExp; canonical: string }> = [
  * Falls through to the original host when no rewrite rule applies.
  */
 export function faviconHost(host: string): string {
-  const h = host.toLowerCase().trim();
+  let h = host.toLowerCase().trim();
   for (const rule of FAVICON_HOST_REWRITES) {
     if (rule.match.test(h)) return rule.canonical;
   }
+  // Google s2 resolves favicons by the EXACT domain passed: `deezer.com`
+  // returns the real logo (200) while `www.deezer.com` 404s to a generic
+  // globe. Stored hosts arrive in both forms depending on the resolver
+  // path (Odesli → `deezer.com`; the Deezer-by-ISRC seed → the API's
+  // `www.deezer.com`), so strip the variant prefix here to guarantee the
+  // canonical service icon on every surface — including the server-
+  // rendered rows (embed / playlist / pins) that don't canonicalise the
+  // host before building the URL. Mirrors `canonicalHost` in lib/host.ts.
+  h = h.replace(/^(?:www|m|mobile|open|play|listen)\./, "");
   return h;
 }
 
