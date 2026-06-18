@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ExternalLink, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
+import { PlayLinkIcon } from "./play-link-icon";
 import { cn } from "@/lib/utils";
 import { faviconUrl } from "@/lib/favicon";
 
@@ -142,7 +143,7 @@ export function InlineTrackLinks({
         {isFetching ? (
           <Loader2 className="size-3.5 animate-spin" />
         ) : (
-          <ExternalLink className="size-3.5" />
+          <PlayLinkIcon className="size-3.5" />
         )}
       </button>
 
