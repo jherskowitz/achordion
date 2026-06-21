@@ -257,25 +257,29 @@ async function PlaylistBody({ mbid }: { mbid: string }) {
                 creator={data.creator ?? "ListenBrainz"}
               />
             )}
-            {data.tracks.length > 0 &&
-              (isOwner ? (
-                <PlaylistOwnerToolsMenu
-                  mbid={mbid}
-                  owner={data.creator}
-                  initial={{
-                    title: data.title,
-                    annotation: data.annotation ?? "",
-                    isPublic: data.isPublic,
-                    collaborators: data.collaborators,
-                  }}
-                  tracks={parachordTracks}
-                  xspfUrl={`/api/playlist/${mbid}/xspf`}
-                  xspfFilename={(data.title || mbid)
-                    .replace(/[^\w\d\-]+/g, "_")
-                    .replace(/^_+|_+$/g, "")
-                    .slice(0, 80) || mbid}
-                />
-              ) : (
+            {/* Owner tools (edit / rename / visibility / delete) show
+                regardless of track count — an owner must be able to
+                manage an empty playlist. The non-owner play/export menu
+                only makes sense once there are tracks. */}
+            {isOwner ? (
+              <PlaylistOwnerToolsMenu
+                mbid={mbid}
+                owner={data.creator}
+                initial={{
+                  title: data.title,
+                  annotation: data.annotation ?? "",
+                  isPublic: data.isPublic,
+                  collaborators: data.collaborators,
+                }}
+                tracks={parachordTracks}
+                xspfUrl={`/api/playlist/${mbid}/xspf`}
+                xspfFilename={(data.title || mbid)
+                  .replace(/[^\w\d\-]+/g, "_")
+                  .replace(/^_+|_+$/g, "")
+                  .slice(0, 80) || mbid}
+              />
+            ) : (
+              data.tracks.length > 0 && (
                 <TrackListActionsMenu
                   title={data.title}
                   creator={data.creator ?? undefined}
@@ -287,7 +291,8 @@ async function PlaylistBody({ mbid }: { mbid: string }) {
                     .slice(0, 80) || mbid}
                   triggerLabel="Playlist actions"
                 />
-              ))}
+              )
+            )}
             {/* External streaming favicon tiles, inline with the
                 action row (matches the recording / release-group page
                 pattern). Sources merged:
