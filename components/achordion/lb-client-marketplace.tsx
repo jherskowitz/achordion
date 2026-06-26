@@ -94,6 +94,13 @@ const CATEGORIES: ClientCategory[] = [
         url: "https://github.com/vvdleun/audiostreamerscrobbler",
       },
       {
+        name: "dotsong",
+        platforms: ["Mac", "Windows", "Linux"],
+        blurb:
+          "Lightweight cross-platform tray app to scrobble from any music player on any platform (including macOS) to Last.fm, Libre.fm, and ListenBrainz.",
+        url: "https://github.com/thrzl/dotsong",
+      },
+      {
         name: "Eavesdrop.FM",
         platforms: ["Server"],
         blurb: "Submits Plex music listening data to ListenBrainz.",
