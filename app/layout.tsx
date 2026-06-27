@@ -64,7 +64,7 @@ export const metadata: Metadata = {
   },
   robots: {
     // Page-level <meta name="robots"> hint. The actual crawler
-    // policy is enforced by `app/robots.ts` + `middleware.ts`
+    // policy is enforced by `app/robots.ts` + `proxy.ts`
     // (UA / ASN blocking).
     index: true,
     follow: true,

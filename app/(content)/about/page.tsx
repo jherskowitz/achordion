@@ -263,8 +263,8 @@ export default function AboutPage() {
               robots.ts
             </Out>
             {" "}+{" "}
-            <Out href="https://github.com/jherskowitz/achordion/blob/main/middleware.ts">
-              middleware.ts
+            <Out href="https://github.com/jherskowitz/achordion/blob/main/proxy.ts">
+              proxy.ts
             </Out>
             {" "}are auditable in the public repo.
           </p>

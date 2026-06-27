@@ -53,7 +53,7 @@ const BLOCKED_UA =
 //   - `Applebot`         — Apple / iMessage / Spotlight previews.
 //   - `SkypeUriPreview`  — Skype / Teams link preview.
 // NOTE: the same gap exists at the Vercel Firewall (Bot Protection)
-// layer, which runs BEFORE this middleware — those image proxies also
+// layer, which runs BEFORE this proxy — those image proxies also
 // need a firewall bypass, since this allowlist can't un-do a firewall
 // challenge.
 const ALLOWLIST_UA =
@@ -84,8 +84,8 @@ const ALLOWLIST_UA =
  * routes (`/item/add`, `/edit`, visibility) are deliberately NOT
  * matched and stay fully protected.
  *
- * NOTE: this covers Layer 2 (this middleware) only. Vercel's Attack
- * Challenge Mode runs at the edge BEFORE middleware, so the same paths
+ * NOTE: this covers Layer 2 (this proxy) only. Vercel's Attack
+ * Challenge Mode runs at the edge BEFORE the proxy, so the same paths
  * also need a Firewall bypass rule — a `NextResponse.next()` here
  * cannot undo an edge challenge. See "Bot-protection exemptions" in
  * AGENTS.md.
@@ -136,7 +136,7 @@ const BLOCKED_ASNS = new Set([
   "53667", // FranTech / BuyVM
 ]);
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const ua = request.headers.get("user-agent") ?? "";
 
   // 0a. Public consume-side API short-circuit — runs before the
@@ -191,17 +191,17 @@ export async function middleware(request: NextRequest) {
     request.headers.get("purpose") === "prefetch";
   if (!isPrefetch) {
     // Defense-in-depth: never let the rate-limit path throw out of
-    // middleware. An uncaught throw here crashes the middleware
-    // invocation and Vercel serves a 503 for the page — a far worse
-    // outcome than skipping the limit. `checkRateLimit` already fails
-    // open internally; this catch is the belt to that suspenders.
+    // the proxy. An uncaught throw here crashes the proxy invocation
+    // and Vercel serves a 503 for the page — a far worse outcome than
+    // skipping the limit. `checkRateLimit` already fails open
+    // internally; this catch is the belt to that suspenders.
     try {
       const rl = await checkRateLimit("page", request);
       if (!rl.ok) {
         return rateLimitedResponse();
       }
     } catch (err) {
-      console.error("[middleware] rate-limit check failed — allowing:", err);
+      console.error("[proxy] rate-limit check failed — allowing:", err);
     }
   }
 
@@ -211,14 +211,14 @@ export async function middleware(request: NextRequest) {
 /**
  * Render a styled HTML 429 instead of plaintext "Too Many Requests".
  *
- * The middleware short-circuits before Next's routing, so the app's
+ * The proxy short-circuits before Next's routing, so the app's
  * `error.tsx` boundary never sees this — we have to ship a complete
  * HTML document ourselves. Kept minimal (inline styles, no JS) so it
  * works the same in edge runtime as it would on any static host.
  *
  * Copy parity with `app/(app)/error.tsx` for the upstream-rate-limit
  * page so users see consistent framing whether the rate-limit is on
- * MB / LB (upstream) or on Achordion's per-IP middleware (here).
+ * MB / LB (upstream) or on Achordion's per-IP proxy (here).
  */
 function rateLimitedResponse(): NextResponse {
   const body = `<!doctype html>
