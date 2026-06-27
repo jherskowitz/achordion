@@ -60,6 +60,40 @@ const ALLOWLIST_UA =
   /(facebookexternalhit|Facebot|Twitterbot|LinkedInBot|Slackbot-LinkExpanding|Slackbot|Slack-ImgProxy|Discordbot|Bluesky Cardyb|Mastodon|WhatsApp|TelegramBot|Pinterest|redditbot|Applebot|SkypeUriPreview)/i;
 
 /**
+ * Public, read-only, consume-side API routes that non-browser app
+ * clients fetch with a plain `fetch` — no browser, no JS engine.
+ * Parachord desktop + mobile load playlists by fetching the XSPF
+ * endpoint behind a `parachord://play/playlist?url=…/xspf` deep link,
+ * scrapers read `/meta` + `/preview`, and every desktop polls
+ * `/api/announcements` on launch. None of these can EVER solve a bot
+ * challenge, so any challenge / ASN block on them is a hard failure
+ * by design.
+ *
+ * Short-circuit them past the ASN/UA block + per-IP rate limit, the
+ * same way ALLOWLIST_UA short-circuits link-preview crawlers. Safe to
+ * fully un-gate because every route here serves PUBLIC data only:
+ *   - `/api/playlist/<mbid>/xspf|meta|preview` — public playlists
+ *     only (private ones 404 to tokenless callers) and CDN-cached
+ *     (`max-age`/`s-maxage` 300–3600s), so origin + upstream
+ *     ListenBrainz load stays bounded even under id enumeration.
+ *   - `/api/announcements` — the public banner feed; skipping the
+ *     limiter here also avoids the Upstash ops the launch-time poll
+ *     storm would otherwise cost.
+ *
+ * Scoped tight to these exact read verbs. Write / auth playlist
+ * routes (`/item/add`, `/edit`, visibility) are deliberately NOT
+ * matched and stay fully protected.
+ *
+ * NOTE: this covers Layer 2 (this middleware) only. Vercel's Attack
+ * Challenge Mode runs at the edge BEFORE middleware, so the same paths
+ * also need a Firewall bypass rule — a `NextResponse.next()` here
+ * cannot undo an edge challenge. See "Bot-protection exemptions" in
+ * AGENTS.md.
+ */
+const PUBLIC_CONSUME_API =
+  /^\/api\/(playlist\/[0-9a-f-]{36}\/(xspf|meta|preview)|announcements)$/i;
+
+/**
  * AS numbers (without the "AS" prefix) of cloud providers + bot
  * hosting infrastructure. Real residential / mobile ISP traffic
  * never originates from these.
@@ -105,7 +139,19 @@ const BLOCKED_ASNS = new Set([
 export async function middleware(request: NextRequest) {
   const ua = request.headers.get("user-agent") ?? "";
 
-  // 0. Link-preview UA allowlist — short-circuit BEFORE ASN /
+  // 0a. Public consume-side API short-circuit — runs before the
+  //     ASN / UA-block / rate-limit checks. These are the read-only
+  //     endpoints non-browser app clients (Parachord desktop +
+  //     mobile) and share-card scrapers fetch programmatically; they
+  //     can't solve a challenge, serve only public data, and are
+  //     CDN-cached, so let them straight through. (Vercel's edge
+  //     Attack Challenge Mode still needs a Firewall bypass for these
+  //     paths — see the PUBLIC_CONSUME_API doc comment.)
+  if (PUBLIC_CONSUME_API.test(request.nextUrl.pathname)) {
+    return NextResponse.next();
+  }
+
+  // 0b. Link-preview UA allowlist — short-circuit BEFORE ASN /
   //    UA-block / rate-limit checks. These bots scrape one URL
   //    on a paste, not the whole catalog, so the rate-limit
   //    concern doesn't apply; and they sometimes route through
