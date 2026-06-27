@@ -127,6 +127,11 @@ function bustCache(mbid: string, viewer: string) {
   revalidatePath(`/user/${viewer}`);
   revalidatePath(`/api/user/${viewer}/playlists`);
   revalidatePath(`/api/playlist/${mbid}/preview`);
+  // Public metadata endpoint scraped by parachord.com's share-card
+  // Worker (title / cover / description). Carries s-maxage=3600 at the
+  // edge, so a title / visibility edit would otherwise sit stale for
+  // up to an hour on shared-link previews without this bust.
+  revalidatePath(`/api/playlist/${mbid}/meta`);
 }
 
 export type VisibilityResult =
