@@ -94,6 +94,21 @@ const PUBLIC_CONSUME_API =
   /^\/api\/(playlist\/[0-9a-f-]{36}\/(xspf|meta|preview)|announcements)$/i;
 
 /**
+ * Bearer-authed ingest endpoint that a cloud service POSTs to. IFTTT
+ * (which still does the Metacritic scrape + score filter + AI summary
+ * for Critical Darlings) fires each pick at
+ * `/api/critical-darlings/ingest` — but IFTTT runs on AWS, whose ASN
+ * is in `BLOCKED_ASNS`, so its POST would 403 at the ASN block before
+ * reaching the route. Unlike `PUBLIC_CONSUME_API` this endpoint is NOT
+ * public — but it's safe to skip the edge bot-block here because the
+ * route's own `CRITICAL_DARLINGS_INGEST_TOKEN` bearer is the real gate;
+ * the ASN/UA/rate-limit block was only ever a reachability tax on it.
+ * (Attack Challenge Mode still needs a Firewall bypass for this path
+ * too — see AGENTS.md.)
+ */
+const AUTHED_INGEST_API = /^\/api\/critical-darlings\/ingest$/i;
+
+/**
  * AS numbers (without the "AS" prefix) of cloud providers + bot
  * hosting infrastructure. Real residential / mobile ISP traffic
  * never originates from these.
@@ -147,7 +162,10 @@ export async function proxy(request: NextRequest) {
   //     CDN-cached, so let them straight through. (Vercel's edge
   //     Attack Challenge Mode still needs a Firewall bypass for these
   //     paths — see the PUBLIC_CONSUME_API doc comment.)
-  if (PUBLIC_CONSUME_API.test(request.nextUrl.pathname)) {
+  if (
+    PUBLIC_CONSUME_API.test(request.nextUrl.pathname) ||
+    AUTHED_INGEST_API.test(request.nextUrl.pathname)
+  ) {
     return NextResponse.next();
   }
 

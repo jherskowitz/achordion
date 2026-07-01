@@ -1,10 +1,18 @@
 import "server-only";
 import { fetchWithTimeout } from "@/lib/fetch-timeout";
+import { getStoredCriticalDarlings } from "@/lib/critical-darlings-store";
 
 /**
  * Critical Darlings — top-rated albums from leading music publications.
  *
- * Mirrors Parachord's `loadCriticsPicks()` / `parseCriticsPicksRSS()`:
+ * Primary source is now the webhook-fed store: IFTTT (Metacritic
+ * scrape + score>80 filter + AI summary + Spotify lookup) POSTs each
+ * new pick to `/api/critical-darlings/ingest`. `getCriticalDarlings`
+ * reads that store first and only falls back to the legacy
+ * rssground.com feed while the store is still empty (cutover safety
+ * net — remove once ingestion is confirmed live).
+ *
+ * Parsing of the legacy feed mirrors Parachord's `loadCriticsPicks()`:
  *  1. Fetch the rssground.com/p/uncoveries feed
  *  2. Parse each item title as "Album Title by Artist Name"
  *  3. Pull a Spotify album URL out of the description if present
@@ -27,6 +35,9 @@ export interface CriticsPickAlbum {
   /** Spotify album URL extracted from the description, when present. */
   spotifyUrl: string | null;
   pubDate: string | null;
+  /** Metacritic metascore (0–100), when the source provides it. The
+   *  legacy RSS feed doesn't carry it; the webhook ingest does. */
+  score?: number;
 }
 
 function stripCdata(s: string): string {
@@ -85,6 +96,25 @@ function slug(title: string, artist: string): string {
   return `${title}|${artist}`.toLowerCase().replace(/[^a-z0-9|]+/g, "-");
 }
 
+/**
+ * Stable render id for a pick. Matches the legacy feed's `id` format
+ * (`critics-<slug>`) so items ingested via the webhook and items from
+ * the fallback feed dedupe against each other by the same key.
+ */
+export function criticsPickId(title: string, artist: string): string {
+  return `critics-${slug(title, artist)}`;
+}
+
+/**
+ * Sanitize a critic-review blurb / AI summary for display: strip HTML
+ * tags + bare URLs, decode entities, collapse whitespace. Exported for
+ * the ingest route so webhook summaries get the same treatment the
+ * legacy feed descriptions do.
+ */
+export function sanitizeCriticalDarlingText(html: string): string {
+  return cleanHtml(html);
+}
+
 function parseRss(xml: string): CriticsPickAlbum[] {
   const out: CriticsPickAlbum[] = [];
   const seen = new Set<string>();
@@ -134,6 +164,15 @@ function parseRss(xml: string): CriticsPickAlbum[] {
  * to render the empty state.
  */
 export async function getCriticalDarlings(): Promise<CriticsPickAlbum[]> {
+  // Primary: the webhook-fed store (IFTTT → /api/critical-darlings/
+  // ingest). Once ingestion is live this is the only branch that runs.
+  const stored = await getStoredCriticalDarlings().catch(() => []);
+  if (stored.length > 0) return stored;
+
+  // Transitional fallback to the legacy RSSground feed while the store
+  // is still empty — keeps the surface populated through the cutover
+  // and acts as a safety net if ingestion lapses. Remove once the
+  // store is reliably populated (and before RSSground goes away).
   try {
     const res = await fetchWithTimeout(RSS_URL, {
       headers: {

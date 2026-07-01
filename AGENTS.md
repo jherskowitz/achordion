@@ -287,19 +287,20 @@ Bot protection runs in **two independent layers**, and an exemption usually has 
 1. **Vercel Attack Challenge Mode** (the "Vercel Security Checkpoint" JS challenge) — runs at the **edge, before `proxy.ts`**. Intermittent: Vercel turns it on under attack load. A non-browser client (a programmatic `fetch`, cURL, the Parachord apps' deep-link loaders) can **never** solve the JS challenge, so any challenge on a route they must reach is a hard failure. **This layer is dashboard-managed** — `vercel.json` WAF config supports only `challenge`/`deny`, not `bypass`, so the exemption can't live in the repo.
 2. **`proxy.ts`** (the Next 16 rename of `middleware.ts`) — the ASN block + known-bad-UA block + per-IP rate limit. Runs in the Edge runtime after the firewall. A `NextResponse.next()` here **cannot** undo an edge challenge from layer 1.
 
-Two standing exemptions, each wired at **both** layers:
+Three standing exemptions, each wired at **both** layers:
 
 - **Link-preview crawlers** — `ALLOWLIST_UA` short-circuit in `proxy.ts` + a UA Bypass rule at the Firewall. Matches `facebookexternalhit` / `Slackbot` / `Discordbot` / `Applebot` / etc. so paste-unfurl cards work (see the table in the browser-extension section).
 - **Public consume-side API routes** — `PUBLIC_CONSUME_API` short-circuit in `proxy.ts` (regex `^/api/(playlist/[0-9a-f-]{36}/(xspf|meta|preview)|announcements)$`) + a **path Bypass rule** at the Firewall. These are the read-only, public, CDN-cached endpoints the Parachord apps fetch programmatically: `/api/playlist/<mbid>/xspf` (playlist load via `parachord://play/playlist?url=…/xspf`), `/meta` + `/preview` (share cards), and `/api/announcements` (polled on launch). Chosen path-based over a shared-secret client header because every route serves only **public** data (private playlists 404 to tokenless callers) — the challenge protected nothing there, and a header token is spoofable once extracted from the client binary. If scraping abuse ever appears, tighten to a header match (`X-Parachord-Client`) at both layers and have the apps send it.
+- **Critical Darlings ingest** — `AUTHED_INGEST_API` short-circuit in `proxy.ts` (`^/api/critical-darlings/ingest$`) + the same Firewall path Bypass rule. Unlike the public consume routes this endpoint is **bearer-authed** (`CRITICAL_DARLINGS_INGEST_TOKEN`) — but IFTTT POSTs to it from AWS, whose ASN is in `BLOCKED_ASNS`, so without the exemption the request 403s at the ASN block before the route's auth ever runs. Safe to edge-un-gate because the bearer is the real gate; the ASN/UA/rate-limit block was only a reachability tax.
 
 **The Firewall Bypass rule (layer 1) — must be set in the Vercel dashboard, it is not in this repo:**
 
 - Vercel dashboard → the project → **Firewall** → **⋯ → Configure → Add New → Rule**.
-- Condition: **Request Path** `matches` (regex) `^/api/(playlist/[0-9a-f-]{36}/(xspf|meta|preview)|announcements)$` — or describe it in the natural-language box: *"Bypass the firewall when the request path matches the regex …"*.
+- Condition: **Request Path** `matches` (regex) `^/api/(playlist/[0-9a-f-]{36}/(xspf|meta|preview)|announcements|critical-darlings/ingest)$` — or describe it in the natural-language box: *"Bypass the firewall when the request path matches the regex …"*.
 - Action: **Bypass**. Vercel's own docs point here: *"Automated tools and scripts cannot establish challenge sessions. For legitimate automation needs, use Bypass."* A custom-rule bypass skips custom + managed rules (incl. Attack Challenge Mode), though not system-level DDoS mitigation.
 - **Order it ABOVE any Challenge/Deny rules** — first-match-wins, the same ordering lesson as the OG-image-fetcher Bypass rule (a bypass sitting below a deny/challenge never runs).
 
-When adding a new programmatic endpoint a non-browser client must reach, extend `PUBLIC_CONSUME_API` **and** the Firewall Bypass rule's path regex together.
+When adding a new programmatic endpoint a non-browser client must reach, extend the `proxy.ts` short-circuit (`PUBLIC_CONSUME_API` for public reads, `AUTHED_INGEST_API` for bearer-authed writes) **and** the Firewall Bypass rule's path regex together.
 
 ## Feature flags
 
