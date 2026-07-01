@@ -76,8 +76,15 @@ function cleanHtml(html: string): string {
  * Parse "Album Title\nby Artist Name" — the feed uses literal newlines.
  * Splits on the LAST " by " so things like "Stand By Me by Ben E. King"
  * still parse correctly. Mirrors Parachord exactly.
+ *
+ * Exported so the ingest webhook can accept a single combined
+ * "Album by Artist" field (what the feed item title carries, and the
+ * easiest thing for IFTTT to pass) and split it the same way the feed
+ * parser does.
  */
-function parseTitle(raw: string): { title: string; artist: string } | null {
+export function parseCriticsPickTitle(
+  raw: string,
+): { title: string; artist: string } | null {
   const normalised = raw.replace(/\s+/g, " ").trim();
   const idx = normalised.lastIndexOf(" by ");
   if (idx <= 0) return null;
@@ -130,7 +137,7 @@ function parseRss(xml: string): CriticsPickAlbum[] {
       stripCdata(titleRe.exec(item)?.[1] ?? "").trim(),
     );
     if (!titleRaw) continue;
-    const parsed = parseTitle(titleRaw);
+    const parsed = parseCriticsPickTitle(titleRaw);
     if (!parsed) continue;
     const id = slug(parsed.title, parsed.artist);
     if (seen.has(id)) continue;

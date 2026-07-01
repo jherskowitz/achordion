@@ -3,6 +3,7 @@ import { revalidatePath, revalidateTag } from "next/cache";
 import { z } from "zod";
 import {
   criticsPickId,
+  parseCriticsPickTitle,
   sanitizeCriticalDarlingText,
 } from "@/lib/clients/critical-darlings";
 import {
@@ -43,14 +44,28 @@ export const dynamic = "force-dynamic";
 const NO_STORE: Record<string, string> = { "Cache-Control": "private, no-store" };
 
 const ItemSchema = z.object({
-  title: z.string().trim().min(1).max(300),
-  artist: z.string().trim().min(1).max(300),
+  // `title` may be just the album ("Blue"), or the combined
+  // "Album by Artist" the feed item carries — in which case `artist`
+  // can be omitted and we split it out below. This lets an IFTTT body
+  // pass a single `title={{EntryTitle}}` ingredient.
+  title: z.string().trim().min(1).max(600),
+  artist: z.string().trim().min(1).max(300).optional(),
   score: z.coerce.number().int().min(0).max(100).optional(),
   summary: z.string().trim().max(4000).optional(),
   reviewUrl: z.string().trim().regex(/^https?:\/\//i).max(2000).optional(),
   spotifyUrl: z.string().trim().regex(/^https?:\/\//i).max(2000).optional(),
   pubDate: z.string().trim().max(100).optional(),
 });
+
+/** Resolve title + artist, splitting a combined "Album by Artist"
+ *  title when `artist` wasn't sent separately. Returns null when we
+ *  can't determine both. */
+function resolveTitleArtist(
+  item: z.infer<typeof ItemSchema>,
+): { title: string; artist: string } | null {
+  if (item.artist) return { title: item.title, artist: item.artist };
+  return parseCriticsPickTitle(item.title);
+}
 
 function readToken(request: NextRequest): string | null {
   const header = request.headers.get("authorization") ?? "";
@@ -127,17 +142,35 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 
   const now = Date.now();
-  const items: StoredCriticalDarling[] = parsed.map((p) => ({
-    id: criticsPickId(p.title, p.artist),
-    title: p.title,
-    artist: p.artist,
-    link: p.reviewUrl ?? null,
-    description: p.summary ? sanitizeCriticalDarlingText(p.summary) : "",
-    spotifyUrl: p.spotifyUrl ?? null,
-    pubDate: p.pubDate ?? new Date(now).toISOString(),
-    score: p.score,
-    ingestedAt: now,
-  }));
+  const items: StoredCriticalDarling[] = [];
+  for (const p of parsed) {
+    const ta = resolveTitleArtist(p);
+    if (!ta) {
+      issues.push(
+        `title: could not determine artist from "${p.title}" — send an "artist" field or a "title" like "Album by Artist"`,
+      );
+      continue;
+    }
+    items.push({
+      id: criticsPickId(ta.title, ta.artist),
+      title: ta.title,
+      artist: ta.artist,
+      link: p.reviewUrl ?? null,
+      description: p.summary ? sanitizeCriticalDarlingText(p.summary) : "",
+      spotifyUrl: p.spotifyUrl ?? null,
+      pubDate: p.pubDate ?? new Date(now).toISOString(),
+      score: p.score,
+      ingestedAt: now,
+    });
+  }
+
+  if (items.length === 0) {
+    console.warn(`[crit-darlings] ingest: no resolvable items — ${issues.join(" | ")}`);
+    return NextResponse.json(
+      { error: "no valid items", issues },
+      { status: 400, headers: NO_STORE },
+    );
+  }
 
   const recorded = await ingestCriticalDarlings(items);
 
