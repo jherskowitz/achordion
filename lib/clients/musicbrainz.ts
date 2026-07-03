@@ -777,15 +777,35 @@ const ArtistSearchSchema = z.object({
 /**
  * Lower-case + trim + collapse internal whitespace. Applied to the
  * search-query string before it becomes part of the path that `mbFetch`
- * uses as its cache key. MB Lucene queries are already case-insensitive
+ * uses as its cache key. MB Lucene *term* matching is case-insensitive
  * server-side, so two queries that differ only in case or whitespace
  * return the same data — without this normalization they each hash to
  * a distinct cache entry, fragmenting the cache and giving an attacker
  * a cheap way to inflate it. Pure cosmetic correctness, not a security
  * fix on its own, but it removes a minor abuse vector.
+ *
+ * EXCEPTION — the Lucene boolean operators `AND` / `OR` / `NOT` are
+ * case-SENSITIVE: only when upper-cased does MB treat them as operators;
+ * lower-cased they become literal search terms. Blanket-lowercasing a
+ * structured query like `recording:"title" AND artist:"name"` therefore
+ * turned it into a loose OR match, which silently resolved the lookup
+ * routes (recording / release-group) and the cover-art resolver to the
+ * wrong same-artist recording/release. So we lowercase every token
+ * except a standalone upper-case operator. (Terms inside quotes are
+ * still lowercased — harmless, since term matching is case-insensitive
+ * — because splitting on whitespace and rejoining preserves the quotes.)
  */
 function normalizeSearchQuery(query: string): string {
-  return query.trim().toLowerCase().replace(/\s+/g, " ");
+  return query
+    .trim()
+    .replace(/\s+/g, " ")
+    .split(" ")
+    .map((token) =>
+      token === "AND" || token === "OR" || token === "NOT"
+        ? token
+        : token.toLowerCase(),
+    )
+    .join(" ");
 }
 
 export async function searchArtists(query: string, limit = 8) {
