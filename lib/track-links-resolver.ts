@@ -261,9 +261,20 @@ export async function resolveTrackLinks(
   // variants carry MB's parenthetical ETI, so they key differently
   // and never inherit the studio recording's links). Back-fill the
   // per-MBID cache on a hit so the next lookup is a direct hit.
+  //
+  // ONLY short-circuit when the recording has no url-rels of its own.
+  // The name alias can hold a SUBSET (e.g. a scrobble that resolved
+  // just Spotify+Tidal from its played origin), so returning it early
+  // when the recording actually carries a fuller MB url-rel set would
+  // discard those links — the same song then renders 2 links on one
+  // surface and 4 on another depending on which resolve populated the
+  // alias first. When the recording has its own rels, fall through to
+  // the full assembly, which re-adds the name-alias links via step 4.0
+  // and merges them with the MB rels + Odesli. No links are lost.
   if (
     entity === "recording" &&
     mbid &&
+    mbStreamingUrls.length === 0 &&
     mbNames.artistName &&
     mbNames.trackName
   ) {
