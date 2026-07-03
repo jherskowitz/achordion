@@ -34,6 +34,9 @@ export function LazyTrackCover({
   size = 40,
   initialSrc,
   onResolved,
+  className,
+  rounded,
+  recordingMbid,
 }: {
   artist: string;
   title: string;
@@ -41,11 +44,21 @@ export function LazyTrackCover({
   alt: string;
   size?: number;
   initialSrc?: string | null;
+  /** When known, the recording MBID. `/api/track-cover` resolves it via
+   *  the recording → release-group → CAA (the same path the recording
+   *  page uses), which works even when there's no album name to search
+   *  on. Preferred over the artist/title/album search when present. */
+  recordingMbid?: string | null;
   /** Fires once when the lookup completes (resolved or null). Use
    *  the `mbid` to swap a lookup-href for a direct
    *  `/release-group/<mbid>` link. Same callback semantics as
    *  `<LazyAlbumCover>` — see that file for details. */
   onResolved?: (data: { url: string | null; mbid: string | null }) => void;
+  /** Forwarded to CoverArt. Pass a `w-`/`aspect-` class to fill a
+   *  parent container (a full-bleed tile, e.g. a pin card); omit for
+   *  the default fixed-`size` tile used in dense rows. */
+  className?: string;
+  rounded?: "none" | "sm" | "md";
 }) {
   // Resolve the cover only once the tile is on/near screen — a 50-row
   // rewind tracklist firing all lookups on mount bursts MB's 1-req/sec
@@ -74,6 +87,7 @@ export function LazyTrackCover({
     let cancelled = false;
     const params = new URLSearchParams({ artist, title });
     if (album) params.set("album", album);
+    if (recordingMbid) params.set("mbid", recordingMbid);
     // Route through the page-wide limiter so a fast scroll can't open
     // dozens of cover requests at once.
     limitCoverFetch(() => {
@@ -93,14 +107,20 @@ export function LazyTrackCover({
     return () => {
       cancelled = true;
     };
-  }, [artist, title, album, initialSrc, inView]);
+  }, [artist, title, album, recordingMbid, initialSrc, inView]);
 
   // Wrapper carries the IntersectionObserver ref (CoverArt doesn't
   // forward one); `contents`-free shrink-0 div is layout-neutral inside
   // the flex rows these covers live in.
   return (
-    <div ref={ref} className="shrink-0">
-      <CoverArt src={src} alt={alt} size={size} />
+    <div ref={ref} className={className ? "w-full" : "shrink-0"}>
+      <CoverArt
+        src={src}
+        alt={alt}
+        size={size}
+        className={className}
+        rounded={rounded}
+      />
     </div>
   );
 }

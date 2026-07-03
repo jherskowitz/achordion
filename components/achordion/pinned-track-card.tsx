@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { Pin } from "lucide-react";
-import { CoverArt } from "./cover-art";
+import { LazyTrackCover } from "./lazy-track-cover";
 import { PlayOnHoverFab } from "./play-on-hover-fab";
 import { relativeFromNow } from "./relative-time";
 import { caaUrlFromListen } from "@/lib/clients/coverart";
@@ -231,10 +231,21 @@ export function PinnedTrackCard({
             isHero ? "w-32 sm:w-40" : "w-20 sm:w-24",
           )}
         >
-          <CoverArt
-            src={cover}
+          {/* Prefer the cover LB embedded in the pin metadata; when
+              that's absent (LB's mapper left the pin with no release —
+              common for a freshly-added single), resolve it from the
+              artist+title via /api/track-cover and swap it in, the same
+              lazy path radio-rewind rows use. Without this the recording
+              page (which does its own MB → release-group → CAA lookup)
+              shows art the pin can't. */}
+          <LazyTrackCover
+            artist={meta.artist_name}
+            title={meta.track_name}
+            album={meta.release_name}
+            recordingMbid={recordingMbid}
             alt={meta.release_name ?? meta.track_name}
             size={isHero ? 500 : 250}
+            initialSrc={cover}
             className="aspect-square w-full"
             rounded="none"
           />

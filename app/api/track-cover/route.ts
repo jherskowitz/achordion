@@ -1,4 +1,5 @@
 import {
+  getRecording,
   searchReleaseGroups,
   withLookupDeadline,
 } from "@/lib/clients/musicbrainz";
@@ -54,18 +55,44 @@ export async function GET(request: Request) {
   const artist = url.searchParams.get("artist")?.trim() ?? "";
   const title = url.searchParams.get("title")?.trim() ?? "";
   const album = url.searchParams.get("album")?.trim() ?? "";
+  const mbid = url.searchParams.get("mbid")?.trim() ?? "";
   if (!artist || !title)
     // 400 is not cached; missing-arg requests don't make sense to
     // memoize and we want bad callers to fix themselves.
     return Response.json({ url: null, mbid: null }, { status: 400 });
 
+  const nullResponse = () =>
+    Response.json({ url: null, mbid: null }, { headers: CACHE_HEADERS });
+
+  // Recording-MBID path — mirrors the recording page: look the recording
+  // up, take its release-group, build the CAA URL. This is how a caller
+  // that HAS an MBID but no album (e.g. a pin whose ListenBrainz mapping
+  // left it without a release) gets the same art the recording page
+  // shows. Tried first; falls through to the album search below if it
+  // finds nothing.
+  if (mbid) {
+    try {
+      const resolved = await withLookupDeadline(
+        (async (): Promise<{ url: string; mbid: string } | null> => {
+          const rec = await getRecording(mbid);
+          const rg = (rec.releases ?? [])
+            .map((r) => r["release-group"])
+            .find((g) => g?.id);
+          return rg?.id
+            ? { url: caaReleaseGroupUrl(rg.id, 250), mbid: rg.id }
+            : null;
+        })(),
+      );
+      if (resolved) return Response.json(resolved, { headers: CACHE_HEADERS });
+    } catch {
+      // MB error / deadline → fall through to the album search.
+    }
+  }
+
   // Quote tokens so MB lucene treats them as exact-phrase matches.
   // Otherwise a multi-word artist like "The National" gets OR'd
   // across "the" / "national" and pulls in irrelevant groups.
   const quoted = (s: string) => `"${s.replace(/"/g, '\\"')}"`;
-
-  const nullResponse = () =>
-    Response.json({ url: null, mbid: null }, { headers: CACHE_HEADERS });
 
   // No album → no way to resolve a cover. (A recording search can't
   // help: MB's recording-search response doesn't carry release-group
