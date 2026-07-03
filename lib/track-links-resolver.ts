@@ -5,8 +5,10 @@ import { lookupDeezerUrlByIsrc } from "@/lib/clients/deezer";
 import {
   formatArtistCredit,
   getRecording,
+  getRelease,
   getReleaseGroup,
   partitionArtistRelations,
+  pickCanonicalRelease,
 } from "@/lib/clients/musicbrainz";
 import {
   canonicalHost,
@@ -169,16 +171,34 @@ export async function resolveTrackLinks(
   } else if (mbid) {
     try {
       if (entity === "release-group") {
-        // For release-groups the rg-level url-rels are often sparse,
-        // but we don't fetch the linked releases here — that'd be a
-        // second roundtrip per resolution. Callers that need richer
-        // url coverage (e.g. the album page) pre-fetch + dedup
-        // release-level rels themselves and pass via `prefetched`.
         const rg = await getReleaseGroup(mbid);
         const { urls } = partitionArtistRelations(rg);
         mbStreamingUrls = urls
           .filter((u) => STREAMING_HOST_PATTERN.test(u.url))
           .map((u) => ({ url: u.url, type: u.type }));
+        // RG-level url-rels are frequently empty — MB editors attach
+        // streaming links to a specific RELEASE, not the group. When the
+        // group itself has none, fall back to the canonical release's
+        // streaming rels so the album page's favicon row isn't blank.
+        // These are album-level links, which belong on the album page
+        // (a track page never takes this path). One extra MB call, gated
+        // on the empty case, cached + off the page's critical render
+        // path (the client island resolves it after mount).
+        if (mbStreamingUrls.length === 0) {
+          const canonical = pickCanonicalRelease(rg);
+          if (canonical?.id) {
+            try {
+              const rel = await getRelease(canonical.id);
+              mbStreamingUrls = partitionArtistRelations({
+                relations: rel.relations,
+              })
+                .urls.filter((u) => STREAMING_HOST_PATTERN.test(u.url))
+                .map((u) => ({ url: u.url, type: u.type }));
+            } catch {
+              // best-effort — degrade to Odesli-only
+            }
+          }
+        }
         const credit = formatArtistCredit(rg["artist-credit"]);
         mbNames = {
           albumName: rg.title,
