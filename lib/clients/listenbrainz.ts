@@ -759,23 +759,28 @@ const PinnedTrackMetaSchema = z
     track_name: z.string(),
     artist_name: z.string(),
     release_name: z.string().nullish(),
+    // LB sends `null` (not just omits) for MBID fields it couldn't
+    // resolve — e.g. a single whose release it didn't map leaves
+    // `mbid_mapping.release_mbid: null`. `.optional()` rejects null and
+    // fails the WHOLE pins parse (→ "Couldn't load pins" for every pin),
+    // so every MBID field here must be `.nullish()`.
     additional_info: z
       .object({
-        recording_mbid: z.string().optional(),
-        recording_msid: z.string().optional(),
-        release_mbid: z.string().optional(),
-        artist_mbids: z.array(z.string()).optional(),
+        recording_mbid: z.string().nullish(),
+        recording_msid: z.string().nullish(),
+        release_mbid: z.string().nullish(),
+        artist_mbids: z.array(z.string()).nullish(),
       })
       .partial()
       .passthrough()
       .optional(),
     mbid_mapping: z
       .object({
-        recording_mbid: z.string().optional(),
-        release_mbid: z.string().optional(),
-        artist_mbids: z.array(z.string()).optional(),
-        caa_id: z.union([z.number(), z.string()]).optional(),
-        caa_release_mbid: z.string().optional(),
+        recording_mbid: z.string().nullish(),
+        release_mbid: z.string().nullish(),
+        artist_mbids: z.array(z.string()).nullish(),
+        caa_id: z.union([z.number(), z.string()]).nullish(),
+        caa_release_mbid: z.string().nullish(),
       })
       .partial()
       .passthrough()

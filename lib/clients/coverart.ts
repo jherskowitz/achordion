@@ -23,15 +23,18 @@ export function caaReleaseGroupUrl(mbid: string, size: CaaSize = 500): string {
  */
 export function caaUrlFromListen(
   metadata: {
+    // LB sends `null` (not just omits) for MBIDs it couldn't resolve,
+    // so every field here is nullable. The function null-checks each
+    // one regardless — this just keeps the types honest.
     additional_info?: {
-      release_mbid?: string;
-      release_group_mbid?: string;
-    };
+      release_mbid?: string | null;
+      release_group_mbid?: string | null;
+    } | null;
     mbid_mapping?: {
-      release_mbid?: string;
-      caa_id?: number | string;
-      caa_release_mbid?: string;
-    };
+      release_mbid?: string | null;
+      caa_id?: number | string | null;
+      caa_release_mbid?: string | null;
+    } | null;
   },
   size: CaaSize = 250,
 ): string | null {
