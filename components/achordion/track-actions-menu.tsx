@@ -492,10 +492,20 @@ function AddToPlaylistSub({
   );
 
   if (disabled) {
+    // A DropdownMenuSubTrigger MUST live inside a DropdownMenuSub —
+    // base-ui throws "SubmenuTrigger must be placed in SubmenuRoot" if
+    // it doesn't, which crashed the whole ⋮ menu on any scrobble with
+    // no recording MBID. When there's no submenu to open, render a
+    // plain disabled item (same shape as PinItem's disabled state).
     return (
       <Tooltip>
         <TooltipTrigger asChild>
-          <span>{trigger}</span>
+          <span>
+            <DropdownMenuItem disabled>
+              <ListMusic />
+              Add to playlist
+            </DropdownMenuItem>
+          </span>
         </TooltipTrigger>
         <TooltipContent side="left">
           No MusicBrainz ID for this recording.
@@ -675,10 +685,17 @@ function RecommendSub({
   );
 
   if (disabled) {
+    // See AddToPlaylistSub: an orphaned DropdownMenuSubTrigger throws
+    // in base-ui. Disabled → render a plain disabled item instead.
     return (
       <Tooltip>
         <TooltipTrigger asChild>
-          <span>{trigger}</span>
+          <span>
+            <DropdownMenuItem disabled>
+              <Megaphone />
+              Recommend
+            </DropdownMenuItem>
+          </span>
         </TooltipTrigger>
         <TooltipContent side="left">
           No MusicBrainz ID for this recording.
