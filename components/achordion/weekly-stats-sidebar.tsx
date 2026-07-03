@@ -23,7 +23,7 @@ interface AlbumEntry {
   release_group_name: string;
   release_group_mbid?: string | null;
   artist_name: string;
-  artist_mbids?: string[];
+  artist_mbids?: string[] | null;
   listen_count: number;
   caa_id?: number | string | null;
   caa_release_mbid?: string | null;
@@ -33,7 +33,7 @@ interface TrackEntry {
   track_name: string;
   recording_mbid?: string | null;
   artist_name: string;
-  artist_mbids?: string[];
+  artist_mbids?: string[] | null;
   release_mbid?: string | null;
   listen_count: number;
   caa_id?: number | string | null;

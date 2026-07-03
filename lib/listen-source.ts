@@ -27,8 +27,8 @@ export interface ListenSource {
 }
 
 interface SourceFields {
-  origin_url?: string;
-  spotify_id?: string;
+  origin_url?: string | null;
+  spotify_id?: string | null;
   music_service?: string;
   music_service_name?: string;
 }

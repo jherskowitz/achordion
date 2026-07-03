@@ -11,7 +11,7 @@ interface TrackEntry {
   track_name: string;
   recording_mbid?: string | null;
   artist_name: string;
-  artist_mbids?: string[];
+  artist_mbids?: string[] | null;
   release_name?: string | null;
   release_mbid?: string | null;
   listen_count: number;

@@ -125,22 +125,22 @@ const ListenSchema = z.object({
     release_name: z.string().nullish(),
     additional_info: z
       .object({
-        recording_mbid: z.string().optional(),
-        release_mbid: z.string().optional(),
-        release_group_mbid: z.string().optional(),
-        artist_mbids: z.array(z.string()).optional(),
+        recording_mbid: z.string().nullish(),
+        release_mbid: z.string().nullish(),
+        release_group_mbid: z.string().nullish(),
+        artist_mbids: z.array(z.string()).nullish(),
         duration_ms: z.number().optional(),
-        spotify_id: z.string().optional(),
+        spotify_id: z.string().nullish(),
         // Exact recording identifier, when the scrobbling client knows
         // it (streaming services ship it for free). Lets the row link
         // to the exact recording via the ISRC resolver when LB's mapper
         // gave no recording_mbid — see `recordingHref({ isrc })`.
-        isrc: z.string().optional(),
+        isrc: z.string().nullish(),
         // Streamed-from source, enriched by Parachord ≥ v0.9.4.
         // `origin_url` is the URL actually played; `music_service` is
         // its canonical host (e.g. "spotify.com"); `music_service_name`
         // is the human label (e.g. "Spotify"). See `deriveListenSource`.
-        origin_url: z.string().optional(),
+        origin_url: z.string().nullish(),
         music_service: z.string().optional(),
         music_service_name: z.string().optional(),
       })
@@ -149,11 +149,11 @@ const ListenSchema = z.object({
       .optional(),
     mbid_mapping: z
       .object({
-        recording_mbid: z.string().optional(),
-        release_mbid: z.string().optional(),
-        artist_mbids: z.array(z.string()).optional(),
-        caa_id: z.union([z.number(), z.string()]).optional(),
-        caa_release_mbid: z.string().optional(),
+        recording_mbid: z.string().nullish(),
+        release_mbid: z.string().nullish(),
+        artist_mbids: z.array(z.string()).nullish(),
+        caa_id: z.union([z.number(), z.string()]).nullish(),
+        caa_release_mbid: z.string().nullish(),
       })
       .partial()
       .passthrough()
@@ -393,7 +393,7 @@ const SitewideStatsReleaseGroupsSchema = z.object({
         release_group_name: z.string(),
         release_group_mbid: z.string().nullish(),
         artist_name: z.string(),
-        artist_mbids: z.array(z.string()).optional(),
+        artist_mbids: z.array(z.string()).nullish(),
         listen_count: z.number(),
         caa_id: z.union([z.number(), z.string()]).nullish(),
         caa_release_mbid: z.string().nullish(),
@@ -422,7 +422,7 @@ const SitewideStatsRecordingsSchema = z.object({
         track_name: z.string(),
         recording_mbid: z.string().nullish(),
         artist_name: z.string(),
-        artist_mbids: z.array(z.string()).optional(),
+        artist_mbids: z.array(z.string()).nullish(),
         release_name: z.string().nullish(),
         release_mbid: z.string().nullish(),
         listen_count: z.number(),
@@ -522,7 +522,7 @@ const TopRecordingForArtistSchema = z.object({
   recording_mbid: z.string(),
   recording_name: z.string(),
   artist_name: z.string(),
-  artist_mbids: z.array(z.string()).optional(),
+  artist_mbids: z.array(z.string()).nullish(),
   release_name: z.string().nullish(),
   release_mbid: z.string().nullish(),
   caa_id: z.union([z.number(), z.string()]).nullish(),
@@ -941,9 +941,9 @@ const RecordingMetadataEntrySchema = z.object({
     .object({
       name: z.string().optional(),
       mbid: z.string().optional(),
-      caa_id: z.union([z.number(), z.string()]).optional(),
-      caa_release_mbid: z.string().optional(),
-      release_group_mbid: z.string().optional(),
+      caa_id: z.union([z.number(), z.string()]).nullish(),
+      caa_release_mbid: z.string().nullish(),
+      release_group_mbid: z.string().nullish(),
     })
     .partial()
     .passthrough()
@@ -1297,7 +1297,7 @@ const StatTopReleaseGroupsSchema = z.object({
         release_group_name: z.string(),
         release_group_mbid: z.string().nullish(),
         artist_name: z.string(),
-        artist_mbids: z.array(z.string()).optional(),
+        artist_mbids: z.array(z.string()).nullish(),
         listen_count: z.number(),
         caa_id: z.union([z.number(), z.string()]).nullish(),
         caa_release_mbid: z.string().nullish(),
@@ -1335,7 +1335,7 @@ const StatTopRecordingsSchema = z.object({
         track_name: z.string(),
         recording_mbid: z.string().nullish(),
         artist_name: z.string(),
-        artist_mbids: z.array(z.string()).optional(),
+        artist_mbids: z.array(z.string()).nullish(),
         release_name: z.string().nullish(),
         release_mbid: z.string().nullish(),
         listen_count: z.number(),
@@ -1439,7 +1439,7 @@ const TopReleaseGroupForArtistSchema = z.object({
   release_group_mbid: z.string(),
   release_group_name: z.string(),
   artist_name: z.string(),
-  artist_mbids: z.array(z.string()).optional(),
+  artist_mbids: z.array(z.string()).nullish(),
   caa_id: z.union([z.number(), z.string()]).nullish(),
   caa_release_mbid: z.string().nullish(),
   total_listen_count: z.number().optional(),
@@ -1453,7 +1453,7 @@ const ReleaseGroupListenersSchema = z.object({
     release_group_mbid: z.string(),
     release_group_name: z.string().optional(),
     artist_name: z.string().optional(),
-    artist_mbids: z.array(z.string()).optional(),
+    artist_mbids: z.array(z.string()).nullish(),
     total_listen_count: z.number().optional(),
     total_user_count: z.number().optional(),
     listeners: z
@@ -1642,7 +1642,7 @@ export type ArtistListeners = z.infer<typeof ArtistListenersSchema>["payload"];
 const FreshReleaseSchema = z.object({
   release_name: z.string(),
   artist_credit_name: z.string(),
-  artist_mbids: z.array(z.string()).optional(),
+  artist_mbids: z.array(z.string()).nullish(),
   release_mbid: z.string(),
   release_group_mbid: z.string().nullish(),
   release_group_primary_type: z.string().nullish(),
@@ -2127,7 +2127,7 @@ const SimilarArtistSchema = z.object({
   comment: z.string().nullish(),
   type: z.string().nullish(),
   score: z.number(),
-  reference_mbid: z.string().optional(),
+  reference_mbid: z.string().nullish(),
 });
 
 export type SimilarArtist = z.infer<typeof SimilarArtistSchema>;
@@ -2214,7 +2214,7 @@ const YimRecordingEntrySchema = z
     recording_mbid: z.string().nullish(),
     track_name: z.string().optional(),
     artist_name: z.string().optional(),
-    artist_mbids: z.array(z.string()).optional(),
+    artist_mbids: z.array(z.string()).nullish(),
     release_name: z.string().nullish(),
     release_mbid: z.string().nullish(),
     listen_count: z.number(),
@@ -2228,7 +2228,7 @@ const YimReleaseGroupEntrySchema = z
     release_group_name: z.string(),
     release_group_mbid: z.string().nullish(),
     artist_name: z.string(),
-    artist_mbids: z.array(z.string()).optional(),
+    artist_mbids: z.array(z.string()).nullish(),
     listen_count: z.number(),
     caa_id: z.union([z.number(), z.string()]).nullish(),
     caa_release_mbid: z.string().nullish(),
@@ -2238,7 +2238,7 @@ const YimReleaseGroupEntrySchema = z
 const YimNewReleaseSchema = z
   .object({
     artist_credit_name: z.string(),
-    artist_credit_mbids: z.array(z.string()).optional(),
+    artist_credit_mbids: z.array(z.string()).nullish(),
     title: z.string(),
     release_group_mbid: z.string().nullish(),
     caa_id: z.union([z.number(), z.string()]).nullish(),
