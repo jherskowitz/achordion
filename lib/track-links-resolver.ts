@@ -14,6 +14,7 @@ import {
   getCachedTrackLinksByIsrcs,
   getCachedTrackLinksByName,
   setCachedTrackLinks,
+  setCachedTrackLinksByName,
   type CachedLink,
   type LinkEntity,
   type TrackNames,
@@ -357,7 +358,7 @@ export async function resolveTrackLinks(
   // 5. Write-through. Tag each link with its origin so future
   // Parachord submissions can override on priority. Background-write
   // — let the response return immediately.
-  if (mbid && items.length > 0) {
+  if (items.length > 0) {
     const tagged: CachedLink[] = items.map((item) => {
       const fromOdesli =
         !!odesli?.linksByPlatform &&
@@ -372,21 +373,34 @@ export async function resolveTrackLinks(
       }
       return { ...item, source: "mb" as const };
     });
-    void setCachedTrackLinks(
-      mbid,
-      tagged,
-      mbNames,
-      entity,
-      // ISRC aliases are recording-only; the writer ignores them
-      // when entity is "release-group". Pass even on miss-then-
-      // resolve so future cross-MBID lookups via ISRC work.
-      isrcs.length > 0 ? { isrcs } : undefined,
-      // We consulted Odesli on this miss (got a response, even if it
-      // had no links) → mark enriched so a later cache hit doesn't
-      // re-run the one-time enrichment pass. A failed/throttled Odesli
-      // call (null) leaves it unmarked so enrichment retries later.
-      { odesliEnriched: odesli != null },
-    );
+    if (mbid) {
+      void setCachedTrackLinks(
+        mbid,
+        tagged,
+        mbNames,
+        entity,
+        // ISRC aliases are recording-only; the writer ignores them
+        // when entity is "release-group". Pass even on miss-then-
+        // resolve so future cross-MBID lookups via ISRC work.
+        isrcs.length > 0 ? { isrcs } : undefined,
+        // We consulted Odesli on this miss (got a response, even if it
+        // had no links) → mark enriched so a later cache hit doesn't
+        // re-run the one-time enrichment pass. A failed/throttled Odesli
+        // call (null) leaves it unmarked so enrichment retries later.
+        { odesliEnriched: odesli != null },
+      );
+    } else if (entity === "recording" && bridgeArtist && bridgeTitle) {
+      // No MBID to key a primary entry — this is the unmapped-scrobble
+      // path (a `?seedUrl=…&artist=…&title=…` call). Persist the links
+      // we just resolved (Odesli, played-source) under the (artist,
+      // title) name alias so a later recording-page resolve for the same
+      // song inherits them via the name-alias bridge instead of showing
+      // an empty row. Without this the resolution was thrown away.
+      void setCachedTrackLinksByName(bridgeArtist, bridgeTitle, tagged, {
+        artistName: bridgeArtist,
+        trackName: bridgeTitle,
+      });
+    }
   }
 
   return sortByPlatformPriority(items);

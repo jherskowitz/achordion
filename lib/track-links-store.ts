@@ -461,6 +461,65 @@ export async function setCachedTrackLinks(
 }
 
 /**
+ * Write a resolved link set under the (artist, title) name-alias key
+ * ONLY — no primary MBID key. This is how a scrobble that ListenBrainz
+ * never mapped to a recording MBID still contributes its Odesli-resolved
+ * links: the resolver has an exact (artist, title) but no MBID to key a
+ * primary entry, so it persists under the name alias. A later
+ * recording-page resolve — which HAS the MBID — then finds these via the
+ * name-alias bridge (`getCachedTrackLinksByName`) and back-fills its own
+ * MBID key.
+ *
+ * Recording-only (name aliasing is meaningless for release groups).
+ * Merges with any existing name-alias entry so services accumulate
+ * across plays from different sources. Best-effort.
+ */
+export async function setCachedTrackLinksByName(
+  artist: string,
+  title: string,
+  incoming: CachedLink[],
+  names?: TrackNames,
+): Promise<void> {
+  if (!redis || incoming.length === 0) return;
+  const aliasKey = nameAliasKey(artist, title);
+  if (!aliasKey) return;
+  try {
+    let prior: CachedEntry | null = null;
+    try {
+      const raw = await redis.get<CachedEntry | string | null>(aliasKey);
+      prior = raw
+        ? typeof raw === "string"
+          ? (JSON.parse(raw) as CachedEntry)
+          : raw
+        : null;
+    } catch {
+      prior = null;
+    }
+    const existingLinks = Array.isArray(prior?.links) ? prior.links : [];
+    const merged = mergeLinks(existingLinks, incoming);
+    const entry: CachedEntry = {
+      // No primary MBID for this entry — reads by name only use `links`,
+      // so the mbid field is cosmetic. Preserve one a prior write kept.
+      mbid: prior?.mbid ?? "",
+      links: merged,
+      resolved_at: Math.floor(Date.now() / 1000),
+      ...(names?.trackName ?? prior?.track_name
+        ? { track_name: names?.trackName ?? prior?.track_name }
+        : {}),
+      ...(names?.artistName ?? prior?.artist_name
+        ? { artist_name: names?.artistName ?? prior?.artist_name }
+        : {}),
+      ...(names?.albumName ?? prior?.album_name
+        ? { album_name: names?.albumName ?? prior?.album_name }
+        : {}),
+    };
+    await redis.set(aliasKey, JSON.stringify(entry), { ex: TTL_SECONDS });
+  } catch {
+    // Best-effort — the next resolve re-derives if this didn't land.
+  }
+}
+
+/**
  * Order-independent signature of a link set's user-visible fields
  * (canonical host + url + label). Two sets with the same signature
  * render identically, so a write whose signature matches the prior
