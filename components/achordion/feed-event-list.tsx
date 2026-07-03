@@ -16,6 +16,7 @@ import {
   Link2,
 } from "lucide-react";
 import { CoverArt } from "./cover-art";
+import { LazyTrackCover } from "./lazy-track-cover";
 import { InlineTrackLinks } from "./inline-track-links";
 import { RelativeTime } from "./relative-time";
 import { ThanksButton } from "./thanks-button";
@@ -175,7 +176,19 @@ function TrackEventBody({
         title="Play in Parachord"
         className="group/cover relative shrink-0 overflow-hidden rounded-md"
       >
-        <CoverArt src={cover} alt={trackName} size={48} />
+        {/* Prefer the cover LB embedded in the event metadata; when
+            it's absent (a fresh single LB never mapped to a release),
+            resolve it from the recording MBID via /api/track-cover —
+            the same path the recording page and pin card use — so the
+            activity row doesn't sit on a placeholder. */}
+        <LazyTrackCover
+          artist={artistName}
+          title={trackName}
+          recordingMbid={recordingMbid}
+          alt={trackName}
+          size={48}
+          initialSrc={cover}
+        />
         <span
           aria-hidden
           className="absolute inset-0 flex items-center justify-center bg-black/55 opacity-0 transition-opacity group-hover/cover:opacity-100 pointer-coarse:opacity-100 pointer-coarse:bg-black/30"
