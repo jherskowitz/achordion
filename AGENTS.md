@@ -290,13 +290,13 @@ Bot protection runs in **two independent layers**, and an exemption usually has 
 Three standing exemptions, each wired at **both** layers:
 
 - **Link-preview crawlers** — `ALLOWLIST_UA` short-circuit in `proxy.ts` + a UA Bypass rule at the Firewall. Matches `facebookexternalhit` / `Slackbot` / `Discordbot` / `Applebot` / etc. so paste-unfurl cards work (see the table in the browser-extension section).
-- **Public consume-side API routes** — `PUBLIC_CONSUME_API` short-circuit in `proxy.ts` (regex `^/api/(playlist/[0-9a-f-]{36}/(xspf|meta|preview)|announcements)$`) + a **path Bypass rule** at the Firewall. These are the read-only, public, CDN-cached endpoints the Parachord apps fetch programmatically: `/api/playlist/<mbid>/xspf` (playlist load via `parachord://play/playlist?url=…/xspf`), `/meta` + `/preview` (share cards), and `/api/announcements` (polled on launch). Chosen path-based over a shared-secret client header because every route serves only **public** data (private playlists 404 to tokenless callers) — the challenge protected nothing there, and a header token is spoofable once extracted from the client binary. If scraping abuse ever appears, tighten to a header match (`X-Parachord-Client`) at both layers and have the apps send it.
+- **Public consume-side API routes** — `PUBLIC_CONSUME_API` short-circuit in `proxy.ts` (regex `^/api/(playlist/[0-9a-f-]{36}/(xspf|meta|preview)|announcements|critical-darlings/feed\.xml)$`) + a **path Bypass rule** at the Firewall. These are the read-only, public, CDN-cached endpoints the Parachord apps fetch programmatically: `/api/playlist/<mbid>/xspf` (playlist load via `parachord://play/playlist?url=…/xspf`), `/meta` + `/preview` (share cards), `/api/announcements` (polled on launch), and `/api/critical-darlings/feed.xml` (the Critical Darlings RSS feed). Chosen path-based over a shared-secret client header because every route serves only **public** data (private playlists 404 to tokenless callers) — the challenge protected nothing there, and a header token is spoofable once extracted from the client binary. If scraping abuse ever appears, tighten to a header match (`X-Parachord-Client`) at both layers and have the apps send it.
 - **Critical Darlings ingest** — `AUTHED_INGEST_API` short-circuit in `proxy.ts` (`^/api/critical-darlings/ingest$`) + the same Firewall path Bypass rule. Unlike the public consume routes this endpoint is **bearer-authed** (`CRITICAL_DARLINGS_INGEST_TOKEN`) — but IFTTT POSTs to it from AWS, whose ASN is in `BLOCKED_ASNS`, so without the exemption the request 403s at the ASN block before the route's auth ever runs. Safe to edge-un-gate because the bearer is the real gate; the ASN/UA/rate-limit block was only a reachability tax.
 
 **The Firewall Bypass rule (layer 1) — must be set in the Vercel dashboard, it is not in this repo:**
 
 - Vercel dashboard → the project → **Firewall** → **⋯ → Configure → Add New → Rule**.
-- Condition: **Request Path** `matches` (regex) `^/api/(playlist/[0-9a-f-]{36}/(xspf|meta|preview)|announcements|critical-darlings/ingest)$` — or describe it in the natural-language box: *"Bypass the firewall when the request path matches the regex …"*.
+- Conditions as deployed (2026-07), split across two rules (a single regex covering everything works too — the split just reflects how they were created): one with **Request Path** `matches` (regex) `^/api/(playlist/[0-9a-f-]{36}/(xspf|meta|preview)|announcements)$` for the playlist/announcements consume routes, plus an "Allow Critical Darlings" rule with **Request Path** `Contains` `api/critical-darlings/` covering both the ingest webhook and the RSS feed. (`Contains` is safe here: the prefix `/api/` keeps it from matching the `/explore/critical-darlings` page.)
 - Action: **Bypass**. Vercel's own docs point here: *"Automated tools and scripts cannot establish challenge sessions. For legitimate automation needs, use Bypass."* A custom-rule bypass skips custom + managed rules (incl. Attack Challenge Mode), though not system-level DDoS mitigation.
 - **Order it ABOVE any Challenge/Deny rules** — first-match-wins, the same ordering lesson as the OG-image-fetcher Bypass rule (a bypass sitting below a deny/challenge never runs).
 
@@ -949,6 +949,22 @@ Parachord can ask Achordion for the canonical Achordion URL for any artist / alb
 - **Cache:** `private, no-store`. Auth'd responses aren't safely edge-cacheable without `Vary: Authorization`, and at current volume the function-per-request cost is negligible. Revisit if usage grows.
 
 Use case: every Parachord surface that wants a "View on Achordion" link (Now Playing card, library detail views, share sheet) can resolve through this endpoint without coordinating route shapes with Achordion.
+
+### Critical Darlings feed (GET `/api/critical-darlings/feed.xml`)
+
+RSS 2.0 feed of the Critical Darlings picks — the drop-in replacement for the retired RSSground feed (`rssground.com/p/uncoveries`) that Parachord desktop + android used to poll via `loadCriticsPicks()` / `parseCriticsPicksRSS()`. **Parachord's migration is a URL swap only** — the item shape is byte-compatible with the old feed:
+
+- `<title>` is `"Album Title by Artist Name"` (split on the last `" by "`).
+- `<description>` carries the critic-summary blurb with the Spotify album URL appended, so the existing `extractSpotifyUrl`-style regex finds it.
+- `<link>` is the Metacritic review URL; `<guid isPermaLink="false">` is Achordion's stable pick id; `<pubDate>` is RFC-822.
+
+Details:
+
+- **Auth:** none — public, read-only.
+- **Source:** the webhook-fed store (`critical-darlings:json` in Upstash, populated by IFTTT via `POST /api/critical-darlings/ingest`). No rssground fallback — this feed is only as fresh as ingestion.
+- **Cache:** `public, s-maxage=1800, stale-while-revalidate=86400`; the ingest route revalidates the path on every new pick, so Parachord sees new entries on its next poll without waiting out the window.
+- **Reachability:** in the `PUBLIC_CONSUME_API` proxy short-circuit + the Firewall Bypass rule (see "Bot-protection exemptions") so Parachord's programmatic fetch is never challenged.
+- Parachord resolves cover art itself (MB + CAA) after parsing, same as with the old feed — no cover URLs in the items.
 
 ### Embed-code lookup (GET `/api/embed-code`)
 

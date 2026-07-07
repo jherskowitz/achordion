@@ -178,6 +178,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   // appear on the next visit instead of waiting out the 12h window.
   revalidateTag("critical-darlings", "max");
   revalidatePath("/explore/critical-darlings");
+  // The RSS feed Parachord polls is CDN-cached (s-maxage=1800); bust it
+  // too so a new pick reaches Parachord without waiting out that window.
+  revalidatePath("/api/critical-darlings/feed.xml");
 
   console.log(
     `[crit-darlings] ingest: items=${items.length} recorded=${recorded} first="${items[0].title} by ${items[0].artist}"`,

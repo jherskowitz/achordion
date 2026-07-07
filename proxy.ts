@@ -91,7 +91,7 @@ const ALLOWLIST_UA =
  * AGENTS.md.
  */
 const PUBLIC_CONSUME_API =
-  /^\/api\/(playlist\/[0-9a-f-]{36}\/(xspf|meta|preview)|announcements)$/i;
+  /^\/api\/(playlist\/[0-9a-f-]{36}\/(xspf|meta|preview)|announcements|critical-darlings\/feed\.xml)$/i;
 
 /**
  * Bearer-authed ingest endpoint that a cloud service POSTs to. IFTTT
