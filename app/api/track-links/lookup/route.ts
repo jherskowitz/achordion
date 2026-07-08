@@ -60,8 +60,10 @@ function parseEntity(raw: string | null): LinkEntity | null {
 export async function GET(request: NextRequest): Promise<NextResponse> {
   // Per-IP rate limit (the proxy's limiter is bypassed for this path so
   // datacenter callers can reach it at all — this route-level check is
-  // what keeps a runaway crawl from hammering Upstash).
-  const limit = await checkRateLimit("cover", request);
+  // what keeps a runaway crawl from hammering Upstash). Set to ≈1 req/sec
+  // to MIRROR MusicBrainz's own API limit — reciprocal by design; see the
+  // consumer doc.
+  const limit = await checkRateLimit("track-links-lookup", request);
   if (!limit.ok) {
     return NextResponse.json(
       { error: "rate limited" },

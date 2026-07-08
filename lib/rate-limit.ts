@@ -41,6 +41,13 @@ const imageLimiter = makeLimiter("ip:image", 60, "60 s");
 // far more than any legitimate client should need but blocks a script
 // that tries to inflate counters.
 const announcementEventLimiter = makeLimiter("ip:announcement-event", 60, "60 s");
+// Public track-links lookup (the open MBID→streaming-URL corpus shared
+// with MusicBrainz/MetaBrainz). Deliberately set to 60/min ≈ 1 req/sec —
+// the SAME ceiling MusicBrainz rate-limits its own API at. The symmetry
+// is the point: we consume MB at 1 req/sec, they consume us at 1 req/sec,
+// and if higher throughput is mutually useful we raise both together
+// rather than one side unilaterally. See docs/musicbrainz-track-links-api.md.
+const trackLinksLookupLimiter = makeLimiter("ip:track-links-lookup", 60, "60 s");
 // Page-route limiter has to be generous: a real user opening a tab
 // triggers the page request itself + N RSC prefetches for hovered
 // links + N async API XHRs (reviews, social-proof, tags, etc.), so
@@ -82,7 +89,12 @@ export function getClientIp(request: Request): string {
  * when the IP is over its budget.
  */
 export async function checkRateLimit(
-  kind: "cover" | "image" | "page" | "announcement-event",
+  kind:
+    | "cover"
+    | "image"
+    | "page"
+    | "announcement-event"
+    | "track-links-lookup",
   request: Request,
 ): Promise<{ ok: boolean }> {
   const limiter =
@@ -92,7 +104,9 @@ export async function checkRateLimit(
         ? imageLimiter
         : kind === "announcement-event"
           ? announcementEventLimiter
-          : pageLimiter;
+          : kind === "track-links-lookup"
+            ? trackLinksLookupLimiter
+            : pageLimiter;
   if (!limiter) return { ok: true };
   const ip = getClientIp(request);
   // FAIL OPEN. `limiter.limit()` is a network call to Upstash; it

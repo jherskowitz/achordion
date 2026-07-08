@@ -6,7 +6,9 @@
 
 [Achordion](https://achordion.xyz) maintains a community-curated mapping from **MusicBrainz recording and release-group MBIDs to the streaming-service URLs where that music is actually playable** (Spotify, Apple Music, Bandcamp, Tidal, Deezer, Qobuz, YouTube Music, …). It exists to fill the gap between MusicBrainz's identity layer and the "where can I play this right now?" question — see the framing on [achordion.xyz/about](https://achordion.xyz/about).
 
-The dataset's distinguishing feature is its highest-trust source: **playback-confirmed matches**. Every time a listener plays an MBID through a streaming service in [Parachord](https://parachord.com) and audio comes out, the client submits that (MBID, service URL) pairing. The match is human-validated by virtue of someone actually listening to it — no editing step required. These accumulate as a side effect of listening, which is what lets coverage scale past hand-edited URL relationships.
+The dataset's distinguishing feature is its highest-trust source: **playback-confirmed matches**. When a listener plays a recording through a streaming service in [Parachord](https://parachord.com) and audio comes out, that play validates the recording's identity — a human confirmed "this MBID *is* this song," no editing step required.
+
+Crucially, on that confirmation Parachord submits **every high-confidence cross-service match it has resolved for the recording — not just the single URL the listener happened to stream.** Parachord resolves a track across services (Spotify, Apple Music, Tidal, Bandcamp, …) and holds the ones it's confident about; when a play confirms the identity, the whole confident set is contributed at `parachord` trust. So a `parachord`-sourced entry is typically **multi-service**, and each of those links is playback-grade, not just the one that was streamed. This is what lets coverage scale past hand-edited URL relationships — one confirmed play seeds a fully-linked recording.
 
 We'd like MusicBrainz to be able to use this data — most obviously as candidate URL relationships for editors/bots, or as a companion lookup for anything MBID-keyed.
 
@@ -108,7 +110,7 @@ Every link is tagged with where it came from. **This is the field that matters f
 
 | `source` | Meaning | Import guidance |
 |---|---|---|
-| `parachord` | **Playback-confirmed.** A listener played this MBID via this URL in Parachord and it produced audio. Implicit human curation. | The interesting subset. Suitable as candidate URL-rels (subject to your own review norms). |
+| `parachord` | **Playback-confirmed.** A listener played this recording in Parachord and audio came out, confirming the MBID's identity — and Parachord contributed *all* its high-confidence service matches for that recording (see intro), not only the streamed URL. Implicit human curation. | The interesting subset. Suitable as candidate URL-rels (subject to your own review norms). |
 | `odesli` | Resolved via the Odesli/song.link cross-service API. Algorithmic best-effort match. | Treat as unverified hints. |
 | `mb` | Mirrored **from MusicBrainz's own URL relationships**. | **Never re-import** — it's your data reflected back (circular). |
 | `parachord-scrobble` | The `origin_url` a scrobble passively reported. Real URL, but the MBID attribution came from ListenBrainz's mapper and may be a sibling recording. | Lowest trust; hint only. |
@@ -122,10 +124,17 @@ This is a **living cache, not an archive**:
 - Coverage is driven by what people actually play and look at. It skews toward actively-listened music and grows continuously.
 - Links are deduplicated per streaming host, with higher-trust sources overriding lower on conflicts (`parachord` > `odesli` > `mb` > `parachord-scrobble`).
 
-## Rate limits & bulk access
+## Rate limits & reciprocity
 
-- The endpoint is CDN-cached and carries a per-IP rate limit intended for interactive/moderate use. Please keep sustained crawls at or under **a few requests per second** and set a descriptive `User-Agent` with contact info (the same courtesy MusicBrainz asks of its own API consumers).
-- Enumerating the whole corpus MBID-by-MBID is the wrong tool. If MetaBrainz wants **bulk access — periodic JSON dumps or a replication-style feed — ask; we're happy to build it.** The per-MBID endpoint ships first because it's the smallest useful surface.
+We rate-limit this endpoint at **~1 request/second per IP — deliberately the same ceiling MusicBrainz applies to its own API.** The symmetry is intentional: Achordion consumes the MusicBrainz web service at your 1 req/sec limit, and we limit you to the same rate in return. Neither side is advantaged.
+
+**We'd rather raise both together than either alone.** If a higher throughput is mutually useful — you pulling from us faster, us pulling from you faster — we'd happily agree a **symmetric increase**: you lift Achordion's rate against the MusicBrainz API, we lift yours against this endpoint by the same factor. A reciprocal bump costs neither party anything it isn't already extending to the other.
+
+Please set a descriptive `User-Agent` with contact info (the courtesy MusicBrainz asks of its own consumers), and expect `429` with `Retry-After` when over budget. Responses are CDN-cached, so re-fetching hot MBIDs is effectively free and doesn't count against the limit.
+
+## Bulk access
+
+Enumerating the whole corpus MBID-by-MBID is the wrong tool regardless of rate limit. If MetaBrainz wants **bulk access — a periodic JSON dump or a replication-style feed — ask; we're happy to build it.** That's the right shape for ingesting the corpus at scale (and it sidesteps the per-request path entirely on both sides). The per-MBID endpoint ships first because it's the smallest useful surface.
 
 ## License
 
