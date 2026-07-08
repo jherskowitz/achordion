@@ -79,10 +79,20 @@ const ALLOWLIST_UA =
  *   - `/api/announcements` — the public banner feed; skipping the
  *     limiter here also avoids the Upstash ops the launch-time poll
  *     storm would otherwise cost.
+ *   - `/api/critical-darlings/feed.xml` — the public Critical
+ *     Darlings RSS feed Parachord polls (RSSground replacement).
+ *   - `/api/track-links/lookup` — the open MBID→streaming-links
+ *     lookup shared with MusicBrainz/MetaBrainz + other third
+ *     parties (docs/musicbrainz-track-links-api.md). Pure Redis
+ *     read (no resolver side-effects) and it carries its OWN
+ *     route-level per-IP limiter, so skipping the proxy limiter
+ *     here doesn't leave it unguarded.
  *
  * Scoped tight to these exact read verbs. Write / auth playlist
  * routes (`/item/add`, `/edit`, visibility) are deliberately NOT
- * matched and stay fully protected.
+ * matched and stay fully protected. The site's own resolver
+ * (`/api/track-links`, no `/lookup`) is deliberately NOT matched —
+ * it fans out to MB/Odesli on miss and stays behind the full block.
  *
  * NOTE: this covers Layer 2 (this proxy) only. Vercel's Attack
  * Challenge Mode runs at the edge BEFORE the proxy, so the same paths
@@ -91,7 +101,7 @@ const ALLOWLIST_UA =
  * AGENTS.md.
  */
 const PUBLIC_CONSUME_API =
-  /^\/api\/(playlist\/[0-9a-f-]{36}\/(xspf|meta|preview)|announcements|critical-darlings\/feed\.xml)$/i;
+  /^\/api\/(playlist\/[0-9a-f-]{36}\/(xspf|meta|preview)|announcements|critical-darlings\/feed\.xml|track-links\/lookup)$/i;
 
 /**
  * Bearer-authed ingest endpoint that a cloud service POSTs to. IFTTT

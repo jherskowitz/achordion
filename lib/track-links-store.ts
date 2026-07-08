@@ -235,6 +235,69 @@ export async function getCachedTrackEntry(
 }
 
 /**
+ * Full public read of a cache entry — the shape the open lookup API
+ * (`GET /api/track-links/lookup`, consumed by MusicBrainz/MetaBrainz
+ * and other third parties) serves. Unlike the resolver path this is a
+ * PURE read: a miss returns null and triggers nothing. Includes the
+ * point-in-time name snapshots + ISRCs + resolved_at so a consumer can
+ * assess each entry without an MB round-trip. Per-link `source` tags
+ * ride along on the links themselves (provenance is the whole point
+ * for external consumers).
+ */
+export interface PublicTrackLinksEntry {
+  links: CachedLink[];
+  trackName: string | null;
+  artistName: string | null;
+  albumName: string | null;
+  isrcs: string[];
+  resolvedAt: number | null;
+}
+
+function toPublicEntry(entry: CachedEntry): PublicTrackLinksEntry | null {
+  if (!Array.isArray(entry.links) || entry.links.length === 0) return null;
+  return {
+    links: entry.links,
+    trackName: entry.track_name ?? null,
+    artistName: entry.artist_name ?? null,
+    albumName: entry.album_name ?? null,
+    isrcs: Array.isArray(entry.isrcs) ? entry.isrcs : [],
+    resolvedAt: typeof entry.resolved_at === "number" ? entry.resolved_at : null,
+  };
+}
+
+async function readPublicEntryAtKey(
+  redisKey: string,
+): Promise<PublicTrackLinksEntry | null> {
+  if (!redis) return null;
+  try {
+    const raw = await redis.get<CachedEntry | string | null>(redisKey);
+    if (!raw) return null;
+    const entry =
+      typeof raw === "string" ? (JSON.parse(raw) as CachedEntry) : raw;
+    return toPublicEntry(entry);
+  } catch {
+    return null;
+  }
+}
+
+/** Public lookup by (entity, MBID). Pure read — no resolution. */
+export async function getPublicTrackLinksEntry(
+  mbid: string,
+  entity: LinkEntity = "recording",
+): Promise<PublicTrackLinksEntry | null> {
+  if (!mbid) return null;
+  return readPublicEntryAtKey(key(mbid, entity));
+}
+
+/** Public lookup by ISRC alias (recording entries only). Pure read. */
+export async function getPublicTrackLinksEntryByIsrc(
+  isrc: string,
+): Promise<PublicTrackLinksEntry | null> {
+  if (!isrc.trim()) return null;
+  return readPublicEntryAtKey(isrcKey(isrc));
+}
+
+/**
  * Look up cached external links for an entity. Returns null on
  * miss / expired / Upstash-not-configured. Caller should treat null
  * as "go resolve and write back."
