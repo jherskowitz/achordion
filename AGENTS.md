@@ -578,7 +578,7 @@ Companion read-through: `GET /api/admin/playlist-links?mbid=<uuid>` returns the 
 - **`categoriseLinks(urls)`** further splits url-rels into `streaming` / `social` / `other`. Filters dead hosts (Google+, Rdio, Vine, Grooveshark, etc. — see `DEAD_HOST_FRAGMENTS`) at the data layer so they never reach any sidebar / row. Streaming goes in the favicon row; other goes in the sidebar's "Other Links."
 - **`pickCanonicalRelease(rg)`** picks the **XW (worldwide) release first**, then earliest. MB editors conventionally attach Spotify/Apple url-rels to the XW release because those links apply globally — the album page merges url-rels from both the rg and the canonical release.
 - **`searchArtists` / `searchReleaseGroups` / `searchRecordings`** power the lookup routes; quote the name to bias toward exact-phrase matches.
-- **`bucketDiscography(groups)`** filters out non-studio secondary types (Compilation, Live, Remix, Soundtrack, Demo, Mixtape, Audio drama, Spokenword, Interview, DJ-mix) and groups Albums / EPs / Singles. The artist page combines Album + EP into a synthetic "Studio" bucket sorted by date for the "Albums + EPs" filter, with `<ReleaseTypeChip>` overlays so users can tell formats apart.
+- **`bucketDiscography(groups)`** filters out non-studio secondary types (Compilation, Live, Remix, Soundtrack, Demo, Audio drama, Spokenword, Interview, DJ-mix) and groups Albums / EPs / Singles. Mixtape/Street is deliberately NOT filtered — mixtapes are a first-class released format in hip-hop/rap (see #82). The artist page combines Album + EP into a synthetic "Studio" bucket sorted by date for the "Albums + EPs" filter, with `<ReleaseTypeChip>` overlays so users can tell formats apart.
 
 ### Streaming favicon row — priority + URL canonicalization
 

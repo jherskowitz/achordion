@@ -722,8 +722,12 @@ type StudioType = (typeof STUDIO_TYPES)[number];
 /**
  * Bucket an artist's release groups into Albums / EPs / Singles.
  * Studio releases only — anything tagged as a Compilation, Live, Remix,
- * Soundtrack, Demo, Mixtape/Street, Audio drama, or Spokenword secondary
- * type is filtered out.
+ * Soundtrack, Demo, Audio drama, or Spokenword secondary type is
+ * filtered out.
+ *
+ * NOT filtered: Mixtape/Street. Mixtapes are a first-class, formally
+ * released format in hip-hop/rap (often on major labels and every major
+ * streaming service), so hiding them erases real discography (see #82).
  */
 export function bucketDiscography(
   groups: ReleaseGroup[],
@@ -734,7 +738,6 @@ export function bucketDiscography(
     "Remix",
     "Soundtrack",
     "Demo",
-    "Mixtape/Street",
     "Audio drama",
     "Spokenword",
     "Interview",
