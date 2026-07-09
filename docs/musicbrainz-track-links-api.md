@@ -126,9 +126,7 @@ This is a **living cache, not an archive**:
 
 ## Rate limits & reciprocity
 
-We rate-limit this endpoint at **~1 request/second per IP — deliberately the same ceiling MusicBrainz applies to its own API.** The symmetry is intentional: Achordion consumes the MusicBrainz web service at your 1 req/sec limit, and we limit you to the same rate in return. Neither side is advantaged.
-
-**We'd rather raise both together than either alone.** If a higher throughput is mutually useful — you pulling from us faster, us pulling from you faster — we'd happily agree a **symmetric increase**: you lift Achordion's rate against the MusicBrainz API, we lift yours against this endpoint by the same factor. A reciprocal bump costs neither party anything it isn't already extending to the other.
+The endpoint is rate-limited at **~1 request/second per IP — deliberately the same ceiling MusicBrainz applies to its own API.** If a higher throughput is mutually useful — let's talk about it!
 
 Please set a descriptive `User-Agent` with contact info (the courtesy MusicBrainz asks of its own consumers), and expect `429` with `Retry-After` when over budget. Responses are CDN-cached, so re-fetching hot MBIDs is effectively free and doesn't count against the limit.
 
