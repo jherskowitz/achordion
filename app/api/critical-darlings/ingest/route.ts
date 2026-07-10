@@ -10,6 +10,7 @@ import {
   ingestCriticalDarlings,
   type StoredCriticalDarling,
 } from "@/lib/critical-darlings-store";
+import { parseIftttForm } from "@/lib/critical-darlings-form";
 
 /**
  * Critical Darlings ingest webhook.
@@ -117,8 +118,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       const body = await request.json();
       rawItems = Array.isArray(body) ? body : [body];
     } else {
-      const form = await request.formData();
-      rawItems = [Object.fromEntries(form.entries())];
+      // Form-encoded. Parse tolerantly rather than with request.formData():
+      // IFTTT does raw (unencoded) substitution of its ingredient values,
+      // so a bare `&` inside a summary/title/artist ("R&B", "Panda Bear &
+      // Sonic Boom") truncates the field under a stock urlencoded parse.
+      // See lib/critical-darlings-form.ts.
+      rawItems = [parseIftttForm(await request.text())];
     }
   } catch {
     console.warn("[crit-darlings] ingest: invalid body");
