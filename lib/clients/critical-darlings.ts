@@ -7,10 +7,12 @@ import { getStoredCriticalDarlings } from "@/lib/critical-darlings-store";
  *
  * Primary source is now the webhook-fed store: IFTTT (Metacritic
  * scrape + score>80 filter + AI summary + Spotify lookup) POSTs each
- * new pick to `/api/critical-darlings/ingest`. `getCriticalDarlings`
- * reads that store first and only falls back to the legacy
- * rssground.com feed while the store is still empty (cutover safety
- * net — remove once ingestion is confirmed live).
+ * new pick to `/api/critical-darlings/ingest`. During the cutover
+ * `getCriticalDarlings` UNIONs that store with the legacy rssground.com
+ * feed (store wins on id conflict) so freshly-ingested picks layer on
+ * top of the existing backlog instead of replacing it. Drop the
+ * rssground half once the store stands on its own — see #81. The
+ * Parachord-facing feed.xml stays store-only regardless.
  *
  * Parsing of the legacy feed mirrors Parachord's `loadCriticsPicks()`:
  *  1. Fetch the rssground.com/p/uncoveries feed
@@ -172,14 +174,21 @@ function parseRss(xml: string): CriticsPickAlbum[] {
  */
 export async function getCriticalDarlings(): Promise<CriticsPickAlbum[]> {
   // Primary: the webhook-fed store (IFTTT → /api/critical-darlings/
-  // ingest). Once ingestion is live this is the only branch that runs.
+  // ingest).
   const stored = await getStoredCriticalDarlings().catch(() => []);
-  if (stored.length > 0) return stored;
 
-  // Transitional fallback to the legacy RSSground feed while the store
-  // is still empty — keeps the surface populated through the cutover
-  // and acts as a safety net if ingestion lapses. Remove once the
-  // store is reliably populated (and before RSSground goes away).
+  // Transitional: UNION the store with the legacy RSSground feed rather
+  // than either/or. A store entry always wins on id conflict, so newly-
+  // ingested picks layer on top of the existing RSSground backlog
+  // instead of replacing it — no "content cliff" where the page
+  // collapses to a handful of items the moment the first pick ingests.
+  // Remove the RSSground half (and this whole fallback) once the store
+  // has enough history to stand alone, before RSSground goes away — #81.
+  //
+  // NOTE: this union is page-only. The feed at /api/critical-darlings/
+  // feed.xml that Parachord polls stays store-only by design, so it
+  // ships only clean, first-party picks.
+  let fallback: CriticsPickAlbum[] = [];
   try {
     const res = await fetchWithTimeout(RSS_URL, {
       headers: {
@@ -188,10 +197,22 @@ export async function getCriticalDarlings(): Promise<CriticsPickAlbum[]> {
       },
       next: { revalidate: 60 * 60 * 12, tags: ["critical-darlings"] },
     });
-    if (!res.ok) return [];
-    const xml = await res.text();
-    return parseRss(xml);
+    if (res.ok) fallback = parseRss(await res.text());
   } catch {
-    return [];
+    // RSSground unreachable — the store alone is a fine result.
   }
+
+  const seen = new Set<string>();
+  const merged: CriticsPickAlbum[] = [];
+  for (const p of [...stored, ...fallback]) {
+    if (seen.has(p.id)) continue; // store iterated first → store wins
+    seen.add(p.id);
+    merged.push(p);
+  }
+  // Newest-first by pubDate; missing/unparseable dates sort last.
+  merged.sort(
+    (a, b) =>
+      (Date.parse(b.pubDate ?? "") || 0) - (Date.parse(a.pubDate ?? "") || 0),
+  );
+  return merged;
 }
