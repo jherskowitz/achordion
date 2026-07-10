@@ -1,4 +1,5 @@
 import { getStoredCriticalDarlings } from "@/lib/critical-darlings-store";
+import { decodeHtmlEntities } from "@/lib/clients/critical-darlings";
 
 /**
  * RSS 2.0 feed of Critical Darlings picks — the drop-in replacement for
@@ -47,9 +48,10 @@ export async function GET(): Promise<Response> {
       const title = `${p.title} by ${p.artist}`;
       // AI summary + Spotify album URL, so the parser's Spotify
       // extraction has the URL to find (RSSground appended it too).
-      const description = p.spotifyUrl
-        ? `${p.description} ${p.spotifyUrl}`.trim()
-        : p.description;
+      // Decode on read so store entries written with a residual "&amp;"
+      // (double-encoded upstream) ship clean, matching the page.
+      const desc = decodeHtmlEntities(p.description);
+      const description = p.spotifyUrl ? `${desc} ${p.spotifyUrl}`.trim() : desc;
       const link = p.link || CHANNEL_LINK;
       // RFC-822 pubDate when the stored value parses; otherwise omit.
       const parsed = p.pubDate ? new Date(p.pubDate) : null;

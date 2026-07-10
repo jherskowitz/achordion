@@ -78,7 +78,7 @@ function decodeHtmlEntitiesOnce(s: string): string {
  * against a pathological input. Album blurbs never legitimately want a
  * literal `&amp;`, so over-decoding is a non-issue here.
  */
-function decodeHtmlEntities(s: string): string {
+export function decodeHtmlEntities(s: string): string {
   let out = s;
   for (let i = 0; i < 5; i++) {
     const next = decodeHtmlEntitiesOnce(out);
