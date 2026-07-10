@@ -46,7 +46,7 @@ function stripCdata(s: string): string {
   return s.replace(/<!\[CDATA\[/g, "").replace(/\]\]>/g, "");
 }
 
-function decodeHtmlEntities(s: string): string {
+function decodeHtmlEntitiesOnce(s: string): string {
   return (
     s
       // Numeric character references — decimal (`&#039;`) and hex (`&#x27;`).
@@ -58,13 +58,34 @@ function decodeHtmlEntities(s: string): string {
       .replace(/&#x([0-9a-fA-F]+);/g, (_, code) =>
         String.fromCodePoint(Number.parseInt(code, 16)),
       )
-      // Named entities, decoded last so &amp; doesn't double-decode.
+      // Named entities, decoded last so &amp; doesn't double-decode
+      // within a single pass.
       .replace(/&lt;/g, "<")
       .replace(/&gt;/g, ">")
       .replace(/&quot;/g, '"')
       .replace(/&apos;/g, "'")
       .replace(/&amp;/g, "&")
   );
+}
+
+/**
+ * Decode HTML entities, repeating until stable. The upstream text is
+ * sometimes DOUBLE-encoded — IFTTT's AI-summary ingredient already
+ * contains `&amp;` and IFTTT re-escapes it on substitution, yielding
+ * `&amp;amp;`. A single pass would leave a literal `&amp;` on screen
+ * ("Panda Bear &amp; Sonic Boom", "R&amp;B"). Looping to a fixpoint
+ * collapses any depth of over-encoding; the 5-iteration cap guards
+ * against a pathological input. Album blurbs never legitimately want a
+ * literal `&amp;`, so over-decoding is a non-issue here.
+ */
+function decodeHtmlEntities(s: string): string {
+  let out = s;
+  for (let i = 0; i < 5; i++) {
+    const next = decodeHtmlEntitiesOnce(out);
+    if (next === out) break;
+    out = next;
+  }
+  return out;
 }
 
 function cleanHtml(html: string): string {
@@ -214,5 +235,11 @@ export async function getCriticalDarlings(): Promise<CriticsPickAlbum[]> {
     (a, b) =>
       (Date.parse(b.pubDate ?? "") || 0) - (Date.parse(a.pubDate ?? "") || 0),
   );
-  return merged;
+  // Normalize descriptions on read. Store entries written under the old
+  // single-pass decoder kept a residual `&amp;`; re-decoding here repairs
+  // them without a re-ingest (idempotent for already-clean text).
+  return merged.map((p) => ({
+    ...p,
+    description: decodeHtmlEntities(p.description),
+  }));
 }
