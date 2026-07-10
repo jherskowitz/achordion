@@ -2,7 +2,11 @@
 
 import { useState, useTransition } from "react";
 import { Check, AlertCircle } from "lucide-react";
-import { revalidateMbEntity, revalidatePlaylist } from "../actions";
+import {
+  revalidateMbEntity,
+  revalidatePlaylist,
+  revalidateCriticalDarlings,
+} from "../actions";
 
 const ENTITIES = [
   "recording",
@@ -22,6 +26,26 @@ export function CacheBustForm() {
     | { kind: "ok"; entity: string; mbid: string }
     | { kind: "error"; message: string }
   >({ kind: "idle" });
+
+  const [cdPending, startCdTransition] = useTransition();
+  const [cdStatus, setCdStatus] = useState<
+    { kind: "idle" } | { kind: "ok" } | { kind: "error"; message: string }
+  >({ kind: "idle" });
+
+  function onBustCriticalDarlings() {
+    setCdStatus({ kind: "idle" });
+    startCdTransition(async () => {
+      try {
+        await revalidateCriticalDarlings();
+        setCdStatus({ kind: "ok" });
+      } catch (err) {
+        setCdStatus({
+          kind: "error",
+          message: err instanceof Error ? err.message : "Unknown error.",
+        });
+      }
+    });
+  }
 
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -46,6 +70,7 @@ export function CacheBustForm() {
   }
 
   return (
+    <div className="space-y-6">
     <form onSubmit={onSubmit} className="space-y-3">
       <label className="block">
         <span className="text-muted-foreground mb-1 block text-xs">
@@ -107,5 +132,40 @@ export function CacheBustForm() {
         )}
       </div>
     </form>
+
+      <div className="border-border/60 space-y-2 border-t pt-4">
+        <div>
+          <p className="text-sm font-medium">Critical Darlings</p>
+          <p className="text-muted-foreground/70 text-[11px]">
+            No id — busts the whole surface (page + feed). Use after a
+            manual Upstash store edit (a <code>DEL</code> or hand-fixed
+            entry), which doesn&apos;t trigger the ingest route&apos;s
+            revalidation on its own.
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={onBustCriticalDarlings}
+            disabled={cdPending}
+            className="bg-primary text-primary-foreground inline-flex h-8 items-center rounded-md px-3 text-xs font-medium hover:opacity-90 disabled:opacity-50"
+          >
+            {cdPending ? "Busting…" : "Bust Critical Darlings cache"}
+          </button>
+          {cdStatus.kind === "ok" && (
+            <span className="text-emerald-700 dark:text-emerald-300 inline-flex items-center gap-1 text-xs">
+              <Check className="size-3" />
+              Busted critical-darlings
+            </span>
+          )}
+          {cdStatus.kind === "error" && (
+            <span className="text-destructive inline-flex items-center gap-1 text-xs">
+              <AlertCircle className="size-3" />
+              {cdStatus.message}
+            </span>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }

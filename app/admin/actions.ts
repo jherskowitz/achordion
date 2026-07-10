@@ -267,3 +267,19 @@ export async function revalidatePlaylist(input: unknown): Promise<void> {
   revalidateTag(`lb:playlist:${mbid}`, "max");
   revalidatePath(`/playlist/${mbid}`);
 }
+
+/**
+ * Bust the Critical Darlings surface. Unlike the MB/playlist busts this
+ * takes no id — the picks live in a single Upstash row behind one tag.
+ * Needed because a manual store edit in Upstash (a `DEL`, a hand-fixed
+ * entry) does NOT trigger the `revalidateTag`/`revalidatePath` the
+ * ingest route fires, so the page + feed keep serving the pre-edit
+ * cache for up to their 12h revalidate window. Mirrors the ingest
+ * route's bust set.
+ */
+export async function revalidateCriticalDarlings(): Promise<void> {
+  await requireAdmin();
+  revalidateTag("critical-darlings", "max");
+  revalidatePath("/explore/critical-darlings");
+  revalidatePath("/api/critical-darlings/feed.xml");
+}
