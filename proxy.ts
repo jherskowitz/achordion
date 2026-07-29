@@ -81,6 +81,8 @@ const ALLOWLIST_UA =
  *     storm would otherwise cost.
  *   - `/api/critical-darlings/feed.xml` — the public Critical
  *     Darlings RSS feed Parachord polls (RSSground replacement).
+ *   - `/api/critical-darlings/metacritic.xml` — the Metacritic
+ *     new-releases source feed IFTTT polls (FetchRSS replacement).
  *   - `/api/track-links/lookup` — the open MBID→streaming-links
  *     lookup shared with MusicBrainz/MetaBrainz + other third
  *     parties (docs/musicbrainz-track-links-api.md). Pure Redis
@@ -101,7 +103,7 @@ const ALLOWLIST_UA =
  * AGENTS.md.
  */
 const PUBLIC_CONSUME_API =
-  /^\/api\/(playlist\/[0-9a-f-]{36}\/(xspf|meta|preview)|announcements|critical-darlings\/feed\.xml|track-links\/lookup)$/i;
+  /^\/api\/(playlist\/[0-9a-f-]{36}\/(xspf|meta|preview)|announcements|critical-darlings\/(feed|metacritic)\.xml|track-links\/lookup)$/i;
 
 /**
  * Bearer-authed ingest endpoint that a cloud service POSTs to. IFTTT
