@@ -46,3 +46,47 @@ export async function lookupDeezerUrlByIsrc(
     return null;
   }
 }
+
+/**
+ * Album artwork from Deezer's public search API — the SECONDARY
+ * catalog cover source, tried when Apple/iTunes Search has no match
+ * (see lib/clients/album-art.ts).
+ *
+ * Deezer's catalog and search index differ from Apple's — it reliably
+ * carries indie / smaller-label releases that iTunes Search either
+ * hasn't indexed yet or doesn't stock. Confirmed against titles that
+ * return nothing on iTunes Search but are plainly on streaming: The
+ * Afghan Whigs' "Soft Control" (on the Apple *store* — but its iTunes
+ * Search index lags — and on Deezer), Squirrel Flower's "Say a Prayer
+ * to the Gods of Getting Going". Independent of Cover Art Archive.
+ *
+ * No auth. The `artist:"…" album:"…"` field query is precise — it
+ * avoids the wrong-artist matches a bare album-title search produces.
+ * Returns a 500px cover URL or null; fail-soft.
+ */
+export async function getDeezerAlbumArtwork(
+  artist: string,
+  album: string,
+): Promise<string | null> {
+  if (!artist.trim() || !album.trim()) return null;
+  // Drop embedded quotes so they can't break out of the field query.
+  const esc = (s: string) => s.replace(/"/g, " ");
+  try {
+    const params = new URLSearchParams({
+      q: `artist:"${esc(artist)}" album:"${esc(album)}"`,
+      limit: "1",
+    });
+    const res = await fetchWithTimeout(
+      `https://api.deezer.com/search/album?${params.toString()}`,
+      { next: { revalidate: 60 * 60 * 24 * 7 } },
+    );
+    if (!res.ok) return null;
+    const data = (await res.json()) as {
+      data?: { cover_big?: string; cover_medium?: string }[];
+    };
+    const hit = data.data?.[0];
+    return hit?.cover_big ?? hit?.cover_medium ?? null;
+  } catch {
+    return null;
+  }
+}

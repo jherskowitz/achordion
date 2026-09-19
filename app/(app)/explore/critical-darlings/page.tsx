@@ -1,5 +1,5 @@
 import { getCriticalDarlings } from "@/lib/clients/critical-darlings";
-import { getItunesAlbumArtwork } from "@/lib/clients/itunes";
+import { getAlbumArtwork } from "@/lib/clients/album-art";
 import { PageShell } from "@/components/achordion/page-shell";
 import { EmptyState } from "@/components/achordion/empty-state";
 import { CriticalDarlingCard } from "@/components/achordion/critical-darling-card";
@@ -16,17 +16,19 @@ export const revalidate = 43200;
 
 export default async function CriticalDarlingsPage() {
   const albums = await getCriticalDarlings();
-  // Resolve cover art from Apple/iTunes server-side — the PRIMARY source
-  // for this surface. These are brand-new releases, which Cover Art
-  // Archive frequently lacks or fails to serve (archive.org node
-  // flakiness), so the old per-card track-cover → CAA path left
-  // placeholders. Apple has store artwork on release day and serves it
-  // reliably; we hand each card its cover as `initialSrc`, which makes
+  // Resolve cover art from streaming catalogs server-side (iTunes →
+  // Deezer) — the PRIMARY source for this surface. These are brand-new
+  // releases, which Cover Art Archive frequently lacks or fails to
+  // serve (archive.org node flakiness), so the old per-card track-cover
+  // → CAA path left placeholders. Streaming catalogs have artwork on
+  // release day and serve it reliably; two of them because neither
+  // index is complete (iTunes Search misses some indie titles Deezer
+  // has). We hand each card its cover as `initialSrc`, which makes
   // <LazyAlbumCover> skip the track-cover/CAA fetch entirely. A null
-  // (Apple miss) falls through to the CAA path as before. Runs on the
-  // 12h page revalidation only; fail-soft per pick.
+  // (both catalogs miss) falls through to the CAA path as before. Runs
+  // on the 12h page revalidation only; fail-soft per pick.
   const covers = await Promise.all(
-    albums.map((a) => getItunesAlbumArtwork(a.artist, a.title)),
+    albums.map((a) => getAlbumArtwork(a.artist, a.title)),
   );
   if (albums.length === 0) {
     return (
