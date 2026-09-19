@@ -120,6 +120,11 @@ export function LazyTrackCover({
         size={size}
         className={className}
         rounded={rounded}
+        // Catalog fallback when CAA fails — album search if we have the
+        // album name (more precise), else search by the track title.
+        fallbackArtist={artist}
+        fallbackAlbum={album ?? undefined}
+        fallbackTrack={album ? undefined : title}
       />
     </div>
   );

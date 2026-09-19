@@ -64,12 +64,47 @@ export function LazyAlbumCover({
   // snapping, and re-fires when src changes (initialSrc → fetched
   // URL) so chart grids stay calm during cover-streaming.
   const [loaded, setLoaded] = useState(false);
-  // Reset fade state when src changes (initialSrc → fetched URL) —
-  // textbook prop-driven reset. Lint rule still warns.
+  // Streaming-catalog fallback (iTunes → Deezer via /api/album-cover):
+  // set only when the CAA image fails AND we have artist+album to search.
+  // Once set it takes over as the rendered source; if it too fails we
+  // fall to the placeholder. Attempted at most once per `src`.
+  const [fallbackSrc, setFallbackSrc] = useState<string | null>(null);
+  const [triedFallback, setTriedFallback] = useState(false);
+  // Reset fade + fallback state when src changes (initialSrc → fetched
+  // URL) — textbook prop-driven reset. Lint rule still warns.
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+    /* eslint-disable react-hooks/set-state-in-effect */
     setLoaded(false);
+    setFallbackSrc(null);
+    setTriedFallback(false);
+    /* eslint-enable react-hooks/set-state-in-effect */
   }, [src]);
+
+  function handleImageError() {
+    // Catalog fallback also failed → give up.
+    if (fallbackSrc) {
+      setErrored(true);
+      return;
+    }
+    // Try the streaming catalog once, if we have something to search on.
+    if (!artist || !album || triedFallback) {
+      setErrored(true);
+      return;
+    }
+    setTriedFallback(true);
+    const params = new URLSearchParams({ artist, album });
+    fetch(`/api/album-cover?${params.toString()}`)
+      .then((r) => (r.ok ? r.json() : { url: null }))
+      .then((d: { url: string | null }) => {
+        if (d.url) {
+          setLoaded(false);
+          setFallbackSrc(d.url);
+        } else {
+          setErrored(true);
+        }
+      })
+      .catch(() => setErrored(true));
+  }
 
   // Capture the latest onResolved in a ref so it doesn't have to be
   // a useEffect dep. Callers can pass an inline callback without
@@ -149,12 +184,12 @@ export function LazyAlbumCover({
       )}
       {src && !errored && (
         <Image
-          src={src}
+          src={fallbackSrc ?? src}
           alt={alt}
           width={500}
           height={500}
           onLoad={() => setLoaded(true)}
-          onError={() => setErrored(true)}
+          onError={handleImageError}
           className={cn(
             "absolute inset-0 h-full w-full object-cover transition-opacity duration-300 ease-out",
             loaded ? "opacity-100" : "opacity-0",

@@ -11,6 +11,17 @@ interface CoverArtProps {
   size?: number;
   className?: string;
   rounded?: "none" | "sm" | "md";
+  /** Catalog cover-art fallback. When the CAA `src` image fails to load
+   *  (after the cache-busted retry), fetch streaming-catalog artwork
+   *  (iTunes → Deezer, via /api/album-cover) for this artist + album or
+   *  track and swap to it before the Disc3 placeholder — CAA's
+   *  archive.org nodes flake on fresh releases, and CAA lacks art for
+   *  many new/niche albums entirely. Provide `fallbackArtist` plus one
+   *  of `fallbackAlbum` / `fallbackTrack`; omit to keep the old
+   *  retry-then-placeholder behavior. */
+  fallbackArtist?: string | null;
+  fallbackAlbum?: string | null;
+  fallbackTrack?: string | null;
 }
 
 // Caller's className already governs size — skip the fixed-pixel inline
@@ -50,6 +61,9 @@ export function CoverArt({
   size = 64,
   className,
   rounded = "sm",
+  fallbackArtist,
+  fallbackAlbum,
+  fallbackTrack,
 }: CoverArtProps) {
   const radius =
     rounded === "none" ? "" : rounded === "sm" ? "rounded-md" : "rounded-lg";
@@ -76,6 +90,13 @@ export function CoverArt({
   // transitions between covers (e.g. when LazyTrackCover's lookup
   // resolves) feel calm rather than flickery.
   const [loaded, setLoaded] = useState(false);
+  // Catalog cover-art fallback (iTunes → Deezer): populated only when
+  // the CAA image fails its retry AND fallback props were provided.
+  // Once set it takes over as the rendered source; if it ALSO fails we
+  // fall through to the placeholder. Guarded so we attempt it at most
+  // once per `src`.
+  const [fallbackSrc, setFallbackSrc] = useState<string | null>(null);
+  const [triedFallback, setTriedFallback] = useState(false);
 
   // Reset error + loaded state when the image source changes (user
   // switched album editions, parent revalidated cache, lazy lookup
@@ -83,13 +104,49 @@ export function CoverArt({
   // Setting state in response to a prop change is the textbook valid
   // case — the lint rule still warns generically.
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+    /* eslint-disable react-hooks/set-state-in-effect */
     setErrored(false);
     setLoaded(false);
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setRetry(0);
+    setFallbackSrc(null);
+    setTriedFallback(false);
+    /* eslint-enable react-hooks/set-state-in-effect */
   }, [src]);
 
+  function handleError() {
+    // The catalog fallback image also failed — nothing left to try.
+    if (fallbackSrc) {
+      setErrored(true);
+      return;
+    }
+    // Transient CAA/archive.org failure: retry once (cache-busted).
+    if (retry < MAX_COVER_RETRIES) {
+      setRetry((r) => r + 1);
+      return;
+    }
+    // CAA retries exhausted — try the streaming-catalog fallback once.
+    const canFallback =
+      !!fallbackArtist && !!(fallbackAlbum || fallbackTrack) && !triedFallback;
+    if (!canFallback) {
+      setErrored(true);
+      return;
+    }
+    setTriedFallback(true);
+    const params = new URLSearchParams({ artist: fallbackArtist! });
+    if (fallbackAlbum) params.set("album", fallbackAlbum);
+    else if (fallbackTrack) params.set("track", fallbackTrack);
+    fetch(`/api/album-cover?${params.toString()}`)
+      .then((r) => (r.ok ? r.json() : { url: null }))
+      .then((d: { url: string | null }) => {
+        if (d.url) {
+          setLoaded(false);
+          setFallbackSrc(d.url);
+        } else {
+          setErrored(true);
+        }
+      })
+      .catch(() => setErrored(true));
+  }
 
   if (!src || errored) {
     return (
@@ -105,8 +162,12 @@ export function CoverArt({
   // On retry, cache-bust so the browser re-issues the request (and CAA
   // re-resolves its redirect to a fresh node) rather than serving the
   // failed response. The `key` on <Image> forces a remount per attempt.
+  // The catalog fallback URL, once resolved, takes over as the source
+  // (rendered as-is — no cache-buster). Otherwise the CAA src, cache-
+  // busted on retry.
   const effectiveSrc =
-    retry > 0 ? `${src}${src.includes("?") ? "&" : "?"}cb=${retry}` : src;
+    fallbackSrc ??
+    (retry > 0 ? `${src}${src.includes("?") ? "&" : "?"}cb=${retry}` : src);
 
   // Layer the placeholder BEHIND the image. While the image's bytes are
   // still loading it sits at `opacity-0`, so the Disc3 placeholder shows
@@ -139,12 +200,7 @@ export function CoverArt({
         height={size}
         unoptimized
         onLoad={() => setLoaded(true)}
-        onError={() => {
-          // Retry once (cache-busted) on a transient CAA/archive.org
-          // failure before falling back to the placeholder.
-          if (retry < MAX_COVER_RETRIES) setRetry((r) => r + 1);
-          else setErrored(true);
-        }}
+        onError={handleError}
         className={cn(
           "absolute inset-0 h-full w-full object-cover transition-opacity duration-300 ease-out",
           loaded ? "opacity-100" : "opacity-0",

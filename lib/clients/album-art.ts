@@ -1,6 +1,6 @@
 import "server-only";
-import { getItunesAlbumArtwork } from "./itunes";
-import { getDeezerAlbumArtwork } from "./deezer";
+import { getItunesAlbumArtwork, getItunesTrackArtwork } from "./itunes";
+import { getDeezerAlbumArtwork, getDeezerTrackArtwork } from "./deezer";
 
 /**
  * Resolve album cover art from streaming catalogs, most-reliable
@@ -23,5 +23,20 @@ export async function getAlbumArtwork(
   return (
     (await getItunesAlbumArtwork(artist, album)) ??
     (await getDeezerAlbumArtwork(artist, album))
+  );
+}
+
+/**
+ * Track cover art (the matched track's album cover), same iTunes →
+ * Deezer chain as `getAlbumArtwork`. For track-oriented surfaces that
+ * have a track title rather than an album name.
+ */
+export async function getTrackArtwork(
+  artist: string,
+  track: string,
+): Promise<string | null> {
+  return (
+    (await getItunesTrackArtwork(artist, track)) ??
+    (await getDeezerTrackArtwork(artist, track))
   );
 }

@@ -90,3 +90,34 @@ export async function getDeezerAlbumArtwork(
     return null;
   }
 }
+
+/**
+ * Track cover artwork from Deezer's track search — the matched track's
+ * album cover. Secondary catalog source for track-oriented covers when
+ * iTunes Search misses. Keyless, fail-soft.
+ */
+export async function getDeezerTrackArtwork(
+  artist: string,
+  track: string,
+): Promise<string | null> {
+  if (!artist.trim() || !track.trim()) return null;
+  const esc = (s: string) => s.replace(/"/g, " ");
+  try {
+    const params = new URLSearchParams({
+      q: `artist:"${esc(artist)}" track:"${esc(track)}"`,
+      limit: "1",
+    });
+    const res = await fetchWithTimeout(
+      `https://api.deezer.com/search?${params.toString()}`,
+      { next: { revalidate: 60 * 60 * 24 * 7 } },
+    );
+    if (!res.ok) return null;
+    const data = (await res.json()) as {
+      data?: { album?: { cover_big?: string; cover_medium?: string } }[];
+    };
+    const album = data.data?.[0]?.album;
+    return album?.cover_big ?? album?.cover_medium ?? null;
+  } catch {
+    return null;
+  }
+}

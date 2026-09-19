@@ -146,6 +146,8 @@ async function RecordingBody({ mbid }: { mbid: string }) {
               size={500}
               className="aspect-square w-full transition-opacity group-hover:opacity-90"
               rounded="md"
+              fallbackArtist={credit.name}
+              fallbackTrack={recording.title}
             />
             <PlayOnHoverFab
               href={parachordPlayTrack({

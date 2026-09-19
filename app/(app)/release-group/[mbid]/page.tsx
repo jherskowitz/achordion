@@ -167,6 +167,8 @@ async function AlbumBody({ mbid }: { mbid: string }) {
               size={500}
               className="aspect-square w-full transition-opacity group-hover:opacity-90"
               rounded="md"
+              fallbackArtist={credit.name}
+              fallbackAlbum={rg.title}
             />
             {/* Play by release-group MBID — no track list needed, so
                 the fab works on first paint before getRelease. */}

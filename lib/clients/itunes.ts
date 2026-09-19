@@ -50,3 +50,36 @@ export async function getItunesAlbumArtwork(
     return null;
   }
 }
+
+/**
+ * Track cover artwork from iTunes Search (the `song` entity) — its
+ * album's art. Used for the track-oriented cover surfaces (radio
+ * rewinds, recording pages) when Cover Art Archive fails. Same
+ * keyless/fail-soft contract as the album variant.
+ */
+export async function getItunesTrackArtwork(
+  artist: string,
+  track: string,
+): Promise<string | null> {
+  const term = `${artist} ${track}`.trim();
+  if (!term) return null;
+  try {
+    const params = new URLSearchParams({
+      term,
+      entity: "song",
+      limit: "1",
+    });
+    const res = await fetchWithTimeout(
+      `https://itunes.apple.com/search?${params.toString()}`,
+      { next: { revalidate: 60 * 60 * 24 * 7 } },
+    );
+    if (!res.ok) return null;
+    const data = (await res.json()) as {
+      results?: { artworkUrl100?: string }[];
+    };
+    const art = data.results?.[0]?.artworkUrl100 ?? null;
+    return art ? art.replace(/100x100/g, "500x500") : null;
+  } catch {
+    return null;
+  }
+}
