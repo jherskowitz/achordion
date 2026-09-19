@@ -27,8 +27,15 @@ import type { CriticsPickAlbum } from "@/lib/clients/critical-darlings";
  */
 export function CriticalDarlingCard({
   album,
+  coverUrl,
 }: {
   album: CriticsPickAlbum;
+  /** Apple/iTunes artwork resolved server-side (the page's primary
+   *  cover source — CAA is unreliable for brand-new releases). When
+   *  present it's handed to `<LazyAlbumCover initialSrc>`, which then
+   *  short-circuits the track-cover/CAA fetch entirely. A null falls
+   *  through to the normal CAA path. */
+  coverUrl?: string | null;
 }) {
   // No MBID at this point — `releaseGroupHref` builds a /lookup URL
   // that resolves canonically on the destination server. Same
@@ -55,6 +62,7 @@ export function CriticalDarlingCard({
             artist={album.artist}
             album={album.title}
             alt={album.title}
+            initialSrc={coverUrl}
           />
         </Link>
         <PlayOnHoverFab

@@ -1,4 +1,5 @@
 import { getCriticalDarlings } from "@/lib/clients/critical-darlings";
+import { getItunesAlbumArtwork } from "@/lib/clients/itunes";
 import { PageShell } from "@/components/achordion/page-shell";
 import { EmptyState } from "@/components/achordion/empty-state";
 import { CriticalDarlingCard } from "@/components/achordion/critical-darling-card";
@@ -7,14 +8,26 @@ export const metadata = { title: "Critical Darlings" };
 
 // Page-level cache mirrors the RSS-fetch cache (12h). Two refreshes
 // a day is plenty for "what critics are loving" — the underlying feed
-// doesn't move that fast, and a cold revalidation kicks off ~30
-// MB-rate-limited cover-art lookups (one per card), so we'd rather
-// not blast through that budget on every visit. Next 16's segment-
+// doesn't move that fast, and a cold revalidation resolves one
+// iTunes artwork lookup per card (fast, not on MB's 1-req/sec queue),
+// so we'd rather not repeat that on every visit. Next 16's segment-
 // config validator wants a literal number; 12h = 43200s.
 export const revalidate = 43200;
 
 export default async function CriticalDarlingsPage() {
   const albums = await getCriticalDarlings();
+  // Resolve cover art from Apple/iTunes server-side — the PRIMARY source
+  // for this surface. These are brand-new releases, which Cover Art
+  // Archive frequently lacks or fails to serve (archive.org node
+  // flakiness), so the old per-card track-cover → CAA path left
+  // placeholders. Apple has store artwork on release day and serves it
+  // reliably; we hand each card its cover as `initialSrc`, which makes
+  // <LazyAlbumCover> skip the track-cover/CAA fetch entirely. A null
+  // (Apple miss) falls through to the CAA path as before. Runs on the
+  // 12h page revalidation only; fail-soft per pick.
+  const covers = await Promise.all(
+    albums.map((a) => getItunesAlbumArtwork(a.artist, a.title)),
+  );
   if (albums.length === 0) {
     return (
       <PageShell className="pt-8">
@@ -46,8 +59,12 @@ export default async function CriticalDarlingsPage() {
           boundaries that used to gate on a server-side MB lookup
           aren't needed anymore. */}
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-        {albums.map((album) => (
-          <CriticalDarlingCard key={album.id} album={album} />
+        {albums.map((album, i) => (
+          <CriticalDarlingCard
+            key={album.id}
+            album={album}
+            coverUrl={covers[i]}
+          />
         ))}
       </div>
     </PageShell>

@@ -46,10 +46,11 @@ const CSP = [
   // (commons.wikimedia.org — image and JSON paths share host;
   // thumb.wikimedia.org — Wikimedia's dedicated thumbnail host, which
   // many /wikipedia/commons/thumb/... URLs now resolve to) +
-  // DiceBear avatars + Apple Music cover art (is1-ssl.mzstatic.com,
-  // surfaced from /charts/apple-music) + Spinbin station logos.
+  // DiceBear avatars + Apple cover art (*.mzstatic.com — is1-5-ssl;
+  // surfaced from /charts/apple-music and the Critical Darlings
+  // iTunes artwork lookup) + Spinbin station logos.
   // data: + blob: cover dynamic SVG / canvas-derived URLs.
-  "img-src 'self' data: blob: https://archive.org https://*.archive.org https://coverartarchive.org https://musicbrainz.org https://gravatar.com https://api.dicebear.com https://upload.wikimedia.org https://commons.wikimedia.org https://thumb.wikimedia.org https://www.google.com https://*.gstatic.com https://is1-ssl.mzstatic.com https://jherskowitz.github.io https://assets.fanart.tv https://cdn.bsky.app",
+  "img-src 'self' data: blob: https://archive.org https://*.archive.org https://coverartarchive.org https://musicbrainz.org https://gravatar.com https://api.dicebear.com https://upload.wikimedia.org https://commons.wikimedia.org https://thumb.wikimedia.org https://www.google.com https://*.gstatic.com https://*.mzstatic.com https://jherskowitz.github.io https://assets.fanart.tv https://cdn.bsky.app",
   // Same-origin XHR / fetch / WS plus every external API the
   // server-side code reaches through the browser at any point. The
   // bulk are server-only (LB, MB, Wikidata, Odesli, RSS feeds, Earshot)
