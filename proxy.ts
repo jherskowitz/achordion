@@ -355,7 +355,15 @@ export const config = {
   // Skip Next internals + static assets — no point bot-checking every
   // chunk fetch, and we don't want to rate-limit a real user out of
   // their own page-data fetches. Page routes + /api routes only.
+  //
+  // Also skip the edge-cached cover / artist-image lookups. A grid page
+  // fires dozens of these per view, and the proxy runs (and bills an
+  // invocation + an Upstash op) even when the response is an edge-cache
+  // hit. Each route carries its own per-IP limiter (`cover` / `image`
+  // in lib/rate-limit.ts), so they aren't left unguarded — they only
+  // lose the ASN/UA block, which mattered for MB-fanout page renders,
+  // not for these small cached lookups.
   matcher: [
-    "/((?!_next/static|_next/image|_next/data|favicon.ico|icon.svg|robots.txt|parachord-hero.png).*)",
+    "/((?!_next/static|_next/image|_next/data|favicon.ico|icon.svg|robots.txt|parachord-hero.png|api/album-cover|api/track-cover|api/artist-image).*)",
   ],
 };

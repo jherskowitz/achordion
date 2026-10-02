@@ -18,6 +18,16 @@ const CACHE_HEADERS = {
     "public, max-age=3600, s-maxage=3600, stale-while-revalidate=86400",
 };
 
+// Misses are the long tail — every visitor to a grid of art-less
+// albums would otherwise re-run the iTunes → Deezer chain once an hour
+// per album. Cache them for a day. Not longer: the catalog clients
+// return the same null on an upstream error as on a genuine miss, so
+// the TTL also bounds how long a transient iTunes/Deezer outage sticks.
+const MISS_CACHE_HEADERS = {
+  "Cache-Control":
+    "public, max-age=86400, s-maxage=86400, stale-while-revalidate=86400",
+};
+
 export async function GET(request: Request) {
   // Same per-IP cover limiter as /api/track-cover — one client can't
   // burst hundreds of catalog lookups.
@@ -40,5 +50,8 @@ export async function GET(request: Request) {
     ? await getAlbumArtwork(artist, album)
     : await getTrackArtwork(artist, track);
 
-  return Response.json({ url: cover }, { headers: CACHE_HEADERS });
+  return Response.json(
+    { url: cover },
+    { headers: cover ? CACHE_HEADERS : MISS_CACHE_HEADERS },
+  );
 }
