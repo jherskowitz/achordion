@@ -302,6 +302,24 @@ Three standing exemptions, each wired at **both** layers:
 
 When adding a new programmatic endpoint a non-browser client must reach, extend the `proxy.ts` short-circuit (`PUBLIC_CONSUME_API` for public reads, `AUTHED_INGEST_API` for bearer-authed writes) **and** the Firewall Bypass rule's path regex together.
 
+## Bot Management, scraper cost, and the reactive-ACM posture
+
+Standing config (Firewall → **Bot Management**): **Bot Protection = Challenge** ("challenge non-browser sources, excluding verified bots") + **AI Bots = Deny** ("block known AI bots and scrapers"). Leave both on. Do **not** wire up BotID (the `npm i botid` Kasada integration) unless a recurring sophisticated attack justifies the code integration — it's the escalation, not the baseline.
+
+Two hard-won facts about what these actually buy you:
+
+1. **Bot Management IS bypassable by custom rules — the opposite of Attack Challenge Mode.** Verified 2026-10-06 with Bot Protection live: `curl`-ing `/api/critical-darlings/*` (covered by the "Allow Critical Darlings" Bypass) returned 200/405, while the same non-browser client hitting `/` returned `429 x-vercel-mitigated: challenge`. So the existing Bypass rules keep IFTTT and the Parachord apps exempt from Bot Management, and verified crawlers (Googlebot/Bingbot) are auto-excluded — none of ACM's collateral. Watch the Parachord bearer-authed *read* endpoints though (`/api/entity-link`, `/api/embed-code`): they're non-browser callers not on any Bypass path, so if Parachord reports them 429'ing, add them to a Bypass (by path, or on the `Authorization` header).
+
+2. **Bot Management does NOT stop a sophisticated residential-proxy scraper**, and neither does the rate-limit rule. The Sep–Oct 2026 scraper ran up ~$37/cycle (7M function invocations, 2M firewall rate-limit hits) *with Bot Protection + AI Bots + the "Throttle entity crawl" rate limit all already on*. It mimics real browsers (passes the challenge) and is distributed across residential IPs (evades per-IP limits). The only thing that reliably stops it is **Attack Challenge Mode** — which is unbypassable (breaks IFTTT + crawlers), so it is a **reactive brake, not standing policy**.
+
+**Why it's expensive, and the structural mitigation.** The cost is almost entirely **Fluid Provisioned Memory** — Vercel bills wall-clock while a function is alive, including time parked on I/O. A bot enumerating *unique* MBIDs forces a cold entity render per URL (CDN cache can't help — each unique URL is cold exactly once), and each cold render blocks on `getReleaseGroup`/`getArtist`/`getRecording` through the per-instance 1-req/sec MB queue. Those getters are `cache()`-wrapped (commit d559f7c) so the page body + `generateMetadata` share one queue slot instead of two — a real ~2× cut — but a cold render **must** call MB, so enumeration can never be made free. Caching/leanness reduce the per-render cost; they don't eliminate the attack surface.
+
+**Standing posture (do this, in order):**
+- Bot Protection = Challenge + AI Bots = Deny (free, catches the naive majority; IFTTT/Parachord bypassed).
+- **Spend alerts** (Settings → Billing → Spend Management): notify at **$10** and **$25** (baseline quiet months are ~$2–5; the scraper month was ~$37, so $25 is the pre-pain warning). These are the early-warning trigger, and matter more than any rule.
+- **Attack Challenge Mode as the manual brake:** when a spend alert fires (scraper's back at scale), flip ACM **on** for the 2–3 days of the spike, then **off**. That turns a ~$30 month into ~$3. Accept the temporary IFTTT/crawler breakage during an *active* attack — it's the right trade only then.
+- **$75 ceiling** with action = **Pause** as the final circuit breaker. Do **not** set the ceiling action to auto-enable ACM (it would silently break IFTTT without context); the $10/$25 alerts are what should prompt the manual ACM flip.
+
 ## Feature flags
 
 `lib/flags.ts` gates new surfaces behind a runtime allowlist so we can dogfood / canary in production without redeploying. Identity is the MusicBrainz username from the Auth.js session (`session.user.mbUsername`). Logged-out users are never on an allowlist — only flags whose default is `on` reach them.
