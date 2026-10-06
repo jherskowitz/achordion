@@ -1,5 +1,6 @@
 import "server-only";
 
+import { cache } from "react";
 import { z } from "zod";
 
 const MB_BASE = "https://musicbrainz.org/ws/2";
@@ -335,13 +336,22 @@ export function partitionArtistRelations(detail: {
   return { members, memberOf, collaborators, urls };
 }
 
-export async function getArtist(mbid: string): Promise<ArtistDetail> {
-  return mbFetch(
-    `/artist/${encodeURIComponent(mbid)}?inc=tags+genres+aliases+ratings+artist-rels+url-rels`,
-    ArtistDetailSchema,
-    { tags: [cacheTagsMB.artist(mbid)] },
-  );
-}
+// Request-memoized via React `cache()` so the entity page's body AND its
+// `generateMetadata` (both of which call this in the same request) share a
+// single MB queue slot + fetch instead of taking two serial 1-req/sec
+// slots. Halves the per-cold-render MB wall-clock a bot's unique-MBID
+// enumeration would otherwise rack up (see the Fluid-Memory cost notes in
+// AGENTS.md "Bot-protection"). cache() only dedupes within one request —
+// cross-request caching is still the Next data cache in `mbFetch`.
+export const getArtist = cache(
+  async (mbid: string): Promise<ArtistDetail> => {
+    return mbFetch(
+      `/artist/${encodeURIComponent(mbid)}?inc=tags+genres+aliases+ratings+artist-rels+url-rels`,
+      ArtistDetailSchema,
+      { tags: [cacheTagsMB.artist(mbid)] },
+    );
+  },
+);
 
 const ArtistCreditSchema = z.array(
   z
@@ -428,13 +438,16 @@ const ReleaseGroupDetailSchema = ReleaseGroupSchema.extend({
 export type ReleaseGroupDetail = z.infer<typeof ReleaseGroupDetailSchema>;
 export type ReleaseStub = z.infer<typeof ReleaseStubSchema>;
 
-export async function getReleaseGroup(mbid: string): Promise<ReleaseGroupDetail> {
-  return mbFetch(
-    `/release-group/${encodeURIComponent(mbid)}?inc=artist-credits+releases+tags+genres+url-rels+ratings`,
-    ReleaseGroupDetailSchema,
-    { tags: [cacheTagsMB.releaseGroup(mbid)] },
-  );
-}
+// Request-memoized (see getArtist) — body + generateMetadata share one slot.
+export const getReleaseGroup = cache(
+  async (mbid: string): Promise<ReleaseGroupDetail> => {
+    return mbFetch(
+      `/release-group/${encodeURIComponent(mbid)}?inc=artist-credits+releases+tags+genres+url-rels+ratings`,
+      ReleaseGroupDetailSchema,
+      { tags: [cacheTagsMB.releaseGroup(mbid)] },
+    );
+  },
+);
 
 const TrackSchema = z
   .object({
@@ -546,13 +559,16 @@ const RecordingDetailSchema = z
 export type RecordingDetail = z.infer<typeof RecordingDetailSchema>;
 export type RecordingRelease = z.infer<typeof RecordingReleaseSchema>;
 
-export async function getRecording(mbid: string): Promise<RecordingDetail> {
-  return mbFetch(
-    `/recording/${encodeURIComponent(mbid)}?inc=artist-credits+releases+release-groups+tags+genres+url-rels+isrcs+ratings`,
-    RecordingDetailSchema,
-    { tags: [cacheTagsMB.recording(mbid)] },
-  );
-}
+// Request-memoized (see getArtist) — body + generateMetadata share one slot.
+export const getRecording = cache(
+  async (mbid: string): Promise<RecordingDetail> => {
+    return mbFetch(
+      `/recording/${encodeURIComponent(mbid)}?inc=artist-credits+releases+release-groups+tags+genres+url-rels+isrcs+ratings`,
+      RecordingDetailSchema,
+      { tags: [cacheTagsMB.recording(mbid)] },
+    );
+  },
+);
 
 const IsrcLookupSchema = z.object({
   recordings: z.array(z.object({ id: z.string() }).passthrough()).optional(),
