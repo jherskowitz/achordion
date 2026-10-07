@@ -12,6 +12,8 @@ on:
   push:
     branches: [main]
   pull_request:
+  schedule:
+    - cron: '0 9 * * *'
 
 # Cancel in-progress runs on the same ref when a new commit lands —
 # we don't need stale failures stacking up.
