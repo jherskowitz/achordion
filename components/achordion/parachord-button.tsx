@@ -218,6 +218,9 @@ export function PlayOverCover({
   label = "Play in Parachord",
   containerClassName,
   rounded = "md",
+  fallbackArtist,
+  fallbackAlbum,
+  fallbackTrack,
 }: {
   src: string | null;
   alt: string;
@@ -225,6 +228,11 @@ export function PlayOverCover({
   label?: string;
   containerClassName?: string;
   rounded?: "none" | "sm" | "md";
+  /** Forwarded to `<CoverArt>` for the iTunes→Deezer catalog fallback when
+   *  the CAA `src` fails. See CoverArt's props for the album-vs-track rule. */
+  fallbackArtist?: string | null;
+  fallbackAlbum?: string | null;
+  fallbackTrack?: string | null;
 }) {
   const running = useParachordPresence();
 
@@ -232,7 +240,15 @@ export function PlayOverCover({
   // element differs (anchor vs. disabled span).
   const inner = (
     <>
-      <CoverArt src={src} alt={alt} size={48} rounded={rounded} />
+      <CoverArt
+        src={src}
+        alt={alt}
+        size={48}
+        rounded={rounded}
+        fallbackArtist={fallbackArtist}
+        fallbackAlbum={fallbackAlbum}
+        fallbackTrack={fallbackTrack}
+      />
       <span
         aria-hidden
         className={cn(

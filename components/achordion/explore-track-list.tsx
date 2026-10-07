@@ -58,7 +58,14 @@ export function ExploreTrackList({
               href={parachordPlayTrack({ artist: artistName, title })}
               className="w-5"
             />
-            <CoverArt src={coverFor(meta)} alt={releaseName ?? title} size={40} />
+            <CoverArt
+              src={coverFor(meta)}
+              alt={releaseName ?? title}
+              size={40}
+              fallbackArtist={artistName}
+              fallbackAlbum={releaseName ?? undefined}
+              fallbackTrack={releaseName ? undefined : title}
+            />
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-medium">
                 <Link

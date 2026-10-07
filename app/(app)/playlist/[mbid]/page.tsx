@@ -386,6 +386,9 @@ async function PlaylistBody({ mbid }: { mbid: string }) {
                   src={cover}
                   alt={t.releaseName ?? t.title}
                   size={40}
+                  fallbackArtist={t.artistName}
+                  fallbackAlbum={t.releaseName ?? undefined}
+                  fallbackTrack={t.releaseName ? undefined : t.title}
                 />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium">

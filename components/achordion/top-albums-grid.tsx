@@ -68,6 +68,8 @@ export function TopAlbumsGrid({ albums }: { albums: AlbumEntry[] }) {
                   size={240}
                   className="aspect-square h-auto w-full transition-opacity group-hover:opacity-90"
                   rounded="md"
+                  fallbackArtist={rg.artist_name}
+                  fallbackAlbum={rg.release_group_name}
                 />
               </Link>
               <span

@@ -56,6 +56,8 @@ export function NewReleasesGrid({
                   size={240}
                   className="aspect-square h-auto w-full transition-opacity group-hover:opacity-90"
                   rounded="md"
+                  fallbackArtist={r.artist_credit_name}
+                  fallbackAlbum={r.title}
                 />
               </Link>
               <PlayOnHoverFab

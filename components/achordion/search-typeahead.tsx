@@ -362,6 +362,8 @@ function AlbumRowComponent({ row }: { row: AlbumRow }) {
             src={caaReleaseGroupUrl(row.id, 250)}
             alt={row.title}
             size={40}
+            fallbackArtist={row.artists[0]?.name}
+            fallbackAlbum={row.title}
           />
         </Link>
         <div className="min-w-0 flex-1">
@@ -410,7 +412,13 @@ function SongRowComponent({ row }: { row: SongRow }) {
               lookup gives us a release identifier even for releases
               without cover art on file. Same component the album row
               uses, so song / album fallbacks look identical. */}
-          <CoverArt src={songCoverUrl(row)} alt={row.title} size={40} />
+          <CoverArt
+            src={songCoverUrl(row)}
+            alt={row.title}
+            size={40}
+            fallbackArtist={row.artists[0]?.name}
+            fallbackTrack={row.title}
+          />
         </Link>
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-medium">

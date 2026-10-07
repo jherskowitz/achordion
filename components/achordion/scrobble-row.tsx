@@ -59,6 +59,9 @@ export function ScrobbleRow({
           title: meta.track_name,
         })}
         label={`Play "${meta.track_name}" by ${meta.artist_name} in Parachord`}
+        fallbackArtist={meta.artist_name}
+        fallbackAlbum={meta.release_name ?? undefined}
+        fallbackTrack={meta.release_name ? undefined : meta.track_name}
       />
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium">

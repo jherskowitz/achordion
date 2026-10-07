@@ -183,6 +183,9 @@ async function LovesBody({ name }: { name: string }) {
                   src={t.cover}
                   alt={t.releaseName ?? t.trackName}
                   size={40}
+                  fallbackArtist={t.artistName}
+                  fallbackAlbum={t.releaseName ?? undefined}
+                  fallbackTrack={t.releaseName ? undefined : t.trackName}
                 />
                 <span
                   aria-hidden

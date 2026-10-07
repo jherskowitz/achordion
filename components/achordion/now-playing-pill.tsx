@@ -37,7 +37,14 @@ export async function NowPlayingPill({
 
   return (
     <div className="border-border/60 bg-card/40 flex items-center gap-3 rounded-xl border p-3">
-      <CoverArt src={cover} alt={meta.release_name ?? meta.track_name} size={56} />
+      <CoverArt
+        src={cover}
+        alt={meta.release_name ?? meta.track_name}
+        size={56}
+        fallbackArtist={meta.artist_name}
+        fallbackAlbum={meta.release_name ?? undefined}
+        fallbackTrack={meta.release_name ? undefined : meta.track_name}
+      />
       <div className="min-w-0 flex-1">
         <p className="text-muted-foreground text-xs tracking-wide uppercase">
           <span className="bg-primary/80 mr-2 inline-block size-1.5 animate-pulse rounded-full align-middle" />

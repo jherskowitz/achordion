@@ -128,6 +128,8 @@ function renderTile(r: FreshRelease) {
             size={500}
             className="aspect-square h-auto w-full transition-opacity group-hover:opacity-90"
             rounded="md"
+            fallbackArtist={r.artist_credit_name}
+            fallbackAlbum={r.release_name}
           />
         </Link>
         <PlayOnHoverFab

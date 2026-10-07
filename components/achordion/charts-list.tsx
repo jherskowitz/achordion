@@ -51,6 +51,12 @@ export function ChartsSongsList({ items }: { items: AppleChartItem[] }) {
               alt={t.name}
               size={48}
               className="size-12"
+              // Apple ships mzstatic artwork inline, but when a URL 404s
+              // (or Apple omits one) fall back to the iTunes→Deezer
+              // catalog lookup instead of dropping to the Disc3 glyph.
+              // Songs have no album name here, so search by track title.
+              fallbackArtist={t.artistName}
+              fallbackTrack={t.name}
             />
             <span
               aria-hidden

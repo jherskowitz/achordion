@@ -114,7 +114,13 @@ function AlbumRow({ entry }: { entry: AlbumEntry }) {
   return (
     <li className="flex items-center gap-2.5">
       <Link href={albumLink} className="shrink-0">
-        <CoverArt src={cover} alt={entry.release_group_name} size={36} />
+        <CoverArt
+          src={cover}
+          alt={entry.release_group_name}
+          size={36}
+          fallbackArtist={entry.artist_name}
+          fallbackAlbum={entry.release_group_name}
+        />
       </Link>
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium">
@@ -149,7 +155,13 @@ function TrackRow({ entry }: { entry: TrackEntry }) {
   return (
     <li className="flex items-center gap-2.5">
       <Link href={trackLink} className="shrink-0">
-        <CoverArt src={cover} alt={entry.track_name} size={36} />
+        <CoverArt
+          src={cover}
+          alt={entry.track_name}
+          size={36}
+          fallbackArtist={entry.artist_name}
+          fallbackTrack={entry.track_name}
+        />
       </Link>
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium">

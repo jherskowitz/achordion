@@ -56,6 +56,9 @@ export function TopTracksList({ tracks }: { tracks: TrackEntry[] }) {
               src={coverFor(t)}
               alt={t.release_name ?? t.track_name}
               size={40}
+              fallbackArtist={t.artist_name}
+              fallbackAlbum={t.release_name ?? undefined}
+              fallbackTrack={t.release_name ? undefined : t.track_name}
             />
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-medium">

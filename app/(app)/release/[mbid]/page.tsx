@@ -36,6 +36,8 @@ async function ReleaseBody({ mbid }: { mbid: string }) {
           size={500}
           className="aspect-square h-auto w-full max-w-[220px] sm:max-w-none"
           rounded="md"
+          fallbackArtist={credit.name}
+          fallbackAlbum={release.title}
         />
         <div className="flex min-w-0 flex-col justify-end">
           <p className="text-muted-foreground text-xs tracking-wide uppercase">
