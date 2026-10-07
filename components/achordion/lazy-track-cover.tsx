@@ -100,6 +100,24 @@ export function LazyTrackCover({
         if (cancelled) return;
         if (data.url && !initialSrc) setSrc(data.url);
         callback?.({ url: data.url ?? null, mbid: data.mbid ?? null });
+        // Null-src gap: track-cover resolved no CAA cover and we have no
+        // initialSrc, so CoverArt will show a permanent Disc3 placeholder
+        // — its catalog fallback only fires on an <Image> load error, and
+        // no <Image> renders with a null src. Resolve the iTunes→Deezer
+        // catalog here instead and feed it to CoverArt as the src.
+        if (!data.url && !initialSrc) {
+          const p = new URLSearchParams({ artist });
+          if (album) p.set("album", album);
+          else p.set("track", title);
+          fetch(`/api/album-cover?${p}`)
+            .then((r) => (r.ok ? r.json() : { url: null }))
+            .then((d: { url: string | null }) => {
+              if (!cancelled && d.url) setSrc(d.url);
+            })
+            .catch(() => {
+              // Silent — CoverArt placeholder stays.
+            });
+        }
       })
       .catch(() => {
         // Silent — CoverArt placeholder stays.

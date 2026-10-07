@@ -80,13 +80,16 @@ export function LazyAlbumCover({
     /* eslint-enable react-hooks/set-state-in-effect */
   }, [src]);
 
-  function handleImageError() {
-    // Catalog fallback also failed → give up.
-    if (fallbackSrc) {
-      setErrored(true);
-      return;
-    }
-    // Try the streaming catalog once, if we have something to search on.
+  // Query the streaming catalog (iTunes→Deezer via /api/album-cover) for
+  // this artist+album and swap to the result. Fired in TWO cases:
+  //   1. the CAA/`initialSrc` <Image> 404s on load (handleImageError), and
+  //   2. the track-cover lookup resolves NO cover at all — the common
+  //      "missing cover" case on text-only charts (NACC college radio,
+  //      etc.). In that case the <Image> never renders (src stays null),
+  //      so onError can never fire; without this proactive call the
+  //      catalog fallback would be dead for every null-cover row.
+  // Attempted at most once per `src` (triedFallback resets on src change).
+  function runCatalogFallback() {
     if (!artist || !album || triedFallback) {
       setErrored(true);
       return;
@@ -104,6 +107,15 @@ export function LazyAlbumCover({
         }
       })
       .catch(() => setErrored(true));
+  }
+
+  function handleImageError() {
+    // Catalog fallback image also failed → give up.
+    if (fallbackSrc) {
+      setErrored(true);
+      return;
+    }
+    runCatalogFallback();
   }
 
   // Capture the latest onResolved in a ref so it doesn't have to be
@@ -154,6 +166,11 @@ export function LazyAlbumCover({
         // a worse match. Only fill in when we had no source yet.
         if (data.url && !initialSrc) setSrc(data.url);
         callback?.({ url: data.url ?? null, mbid: data.mbid ?? null });
+        // Null-src gap: track-cover found no CAA cover and we have no
+        // initialSrc, so the <Image> will never render and onError will
+        // never fire. Proactively try the streaming catalog so these
+        // rows aren't stuck on a permanent Disc3 placeholder.
+        if (!data.url && !initialSrc) runCatalogFallback();
       })
       .catch(() => {
         // Silent — placeholder stays. onResolved isn't called on
@@ -162,6 +179,9 @@ export function LazyAlbumCover({
     return () => {
       cancelled = true;
     };
+    // runCatalogFallback is a stable in-component helper closed over props/
+    // state; adding it would re-run this lookup effect on every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [artist, album, initialSrc, inView]);
 
   // One layered tile for every state: the Disc3 placeholder sits behind
@@ -169,6 +189,8 @@ export function LazyAlbumCover({
   // resolve never flashes a blank box (placeholder → cover, never
   // placeholder → blank → cover). The container always carries the
   // in-view observer ref. `group-hover:opacity-90` dims the whole tile.
+  // `shown` is the catalog fallback (if resolved) else the CAA/initialSrc.
+  const shown = fallbackSrc ?? src;
   return (
     <div
       ref={ref}
@@ -177,14 +199,14 @@ export function LazyAlbumCover({
         className,
       )}
     >
-      {(!src || errored || !loaded) && (
+      {(!shown || errored || !loaded) && (
         <span className="absolute inset-0 flex items-center justify-center">
           <Disc3 className="size-1/3" aria-hidden />
         </span>
       )}
-      {src && !errored && (
+      {shown && !errored && (
         <Image
-          src={fallbackSrc ?? src}
+          src={shown}
           alt={alt}
           width={500}
           height={500}
