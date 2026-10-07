@@ -1,8 +1,14 @@
 import "server-only";
 import { fetchWithTimeout } from "@/lib/fetch-timeout";
 
-const SONGS_BASE = "https://rss.marketingtools.apple.com/api/v2";
-const ALBUMS_BASE = "https://rss.applemarketingtools.com/api/v2";
+// Apple serves both the songs and albums feeds from this host. The albums
+// chart historically used a second hostname (rss.applemarketingtools.com),
+// but Apple now 301-redirects that to this one — pointing both at the
+// canonical 200 host avoids a dependency on the redirect staying in place
+// (a 301 that one day points elsewhere, or is retired, would break only
+// the albums chart while songs kept working — looks like an intermittent
+// per-page failure). Verified 2026-10-07: identical path + JSON shape.
+const FEED_BASE = "https://rss.marketingtools.apple.com/api/v2";
 
 const USER_AGENT =
   "Achordion/0.1 (+https://github.com/jherskowitz/achordion)";
@@ -93,22 +99,21 @@ export async function getAppleSongsChart(
   countryCode = "us",
 ): Promise<AppleChartItem[] | null> {
   const json = await fetchFeed(
-    `${SONGS_BASE}/${encodeURIComponent(countryCode)}/music/most-played/50/songs.json`,
+    `${FEED_BASE}/${encodeURIComponent(countryCode)}/music/most-played/50/songs.json`,
   );
   if (!json) return null;
   return parseResults(json, countryCode);
 }
 
 /**
- * Top 50 albums for a given country. Apple uses a different host for
- * albums than songs (rss.applemarketingtools vs rss.marketingtools);
- * both work, mirroring Parachord's exact endpoints.
+ * Top 50 albums for a given country, from the same Apple feed host as
+ * songs (see FEED_BASE).
  */
 export async function getAppleAlbumsChart(
   countryCode = "us",
 ): Promise<AppleChartItem[] | null> {
   const json = await fetchFeed(
-    `${ALBUMS_BASE}/${encodeURIComponent(countryCode)}/music/most-played/50/albums.json`,
+    `${FEED_BASE}/${encodeURIComponent(countryCode)}/music/most-played/50/albums.json`,
   );
   if (!json) return null;
   return parseResults(json, countryCode);
