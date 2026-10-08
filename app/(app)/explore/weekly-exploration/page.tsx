@@ -14,7 +14,9 @@ import { EmptyState } from "@/components/achordion/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 
-export const metadata = { title: "Weekly Explorations" };
+import { sectionMetadata } from "@/lib/section-og";
+
+export const metadata = sectionMetadata("explore/weekly-exploration");
 
 const JSPF_PLAYLIST_KEY = "https://musicbrainz.org/doc/jspf#playlist";
 

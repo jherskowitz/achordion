@@ -106,6 +106,42 @@ export const SECTIONS = {
       "Listeners whose taste overlaps with yours, computed from your ListenBrainz listen history.",
     alt: "Similar Users on Achordion",
   },
+  "explore/recommended-artists": {
+    eyebrow: "Explore · Recommended",
+    title: "Recommended Artists",
+    subtitle:
+      "Artists picked for you from your ListenBrainz listening history.",
+    description:
+      "Artists picked for you from your ListenBrainz listening history.",
+    alt: "Recommended Artists on Achordion",
+  },
+  "explore/recommended-tracks": {
+    eyebrow: "Explore · Recommended",
+    title: "Recommended Tracks",
+    subtitle:
+      "Tracks picked for you from your ListenBrainz listening history.",
+    description:
+      "Tracks picked for you from your ListenBrainz listening history.",
+    alt: "Recommended Tracks on Achordion",
+  },
+  "explore/weekly-jams": {
+    eyebrow: "Explore · Weekly",
+    title: "Weekly Jams",
+    subtitle:
+      "A fresh playlist of familiar favourites, refreshed every week by ListenBrainz.",
+    description:
+      "A fresh playlist of familiar favourites, refreshed every week by ListenBrainz.",
+    alt: "Weekly Jams on Achordion",
+  },
+  "explore/weekly-exploration": {
+    eyebrow: "Explore · Weekly",
+    title: "Weekly Exploration",
+    subtitle:
+      "A fresh playlist of new-to-you music, refreshed every week by ListenBrainz.",
+    description:
+      "A fresh playlist of new-to-you music, refreshed every week by ListenBrainz.",
+    alt: "Weekly Exploration on Achordion",
+  },
   radio: {
     eyebrow: "Radio",
     title: "Radio",
