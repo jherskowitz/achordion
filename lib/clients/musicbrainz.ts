@@ -2,6 +2,7 @@ import "server-only";
 
 import { cache } from "react";
 import { z } from "zod";
+import { recordMbRateLimit } from "@/lib/mb-rate-limit-metric";
 
 const MB_BASE = "https://musicbrainz.org/ws/2";
 const USER_AGENT = "Achordion/0.1 (jherskow@gmail.com)";
@@ -179,6 +180,13 @@ async function mbFetch<T>(
     }
     if (!res.ok) {
       const body = await res.text().catch(() => "");
+      if (res.status === 429) {
+        // User-impacting rate limit (survived the single retry above).
+        // Record it (fire-and-forget) + log so MB pressure is visible in
+        // Upstash (/admin) and Vercel logs — mbFetch is otherwise silent.
+        recordMbRateLimit();
+        console.warn(`[mb-429] rate limited after retry: ${path}`);
+      }
       throw new MusicBrainzError(res.status, `MB ${res.status}: ${body.slice(0, 200)}`);
     }
     const json = await res.json();

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import { getAdminStats, type AdminStats } from "@/lib/admin-stats";
+import { getMbRateLimitStats } from "@/lib/mb-rate-limit-metric";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function AdminIndexPage() {
@@ -13,6 +14,10 @@ export default function AdminIndexPage() {
 
       <Suspense fallback={<StatsSkeleton />}>
         <StatsBlock />
+      </Suspense>
+
+      <Suspense fallback={<StatsSkeleton />}>
+        <MbRateLimitBlock />
       </Suspense>
 
       <section className="space-y-3">
@@ -148,6 +153,45 @@ async function StatsBlock() {
         at most every 5 minutes.
       </p>
     </>
+  );
+}
+
+async function MbRateLimitBlock() {
+  const s = await getMbRateLimitStats();
+  return (
+    <section className="space-y-3">
+      <h2 className="text-muted-foreground text-xs tracking-wide uppercase">
+        MusicBrainz rate limits (429s)
+      </h2>
+      <ul className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <StatCard
+          label="Today"
+          value={s.today.toLocaleString()}
+          sub="user-impacting 429s (post-retry)"
+        />
+        <StatCard
+          label="Last 7 days"
+          value={s.last7d.toLocaleString()}
+          sub="total rate-limit error pages"
+        />
+      </ul>
+      {s.byDay.length > 0 && (
+        <ul className="text-muted-foreground/80 flex flex-wrap gap-x-4 gap-y-1 text-[11px] tabular-nums">
+          {s.byDay.map((d) => (
+            <li key={d.date}>
+              <span className="text-muted-foreground">{d.date.slice(5)}</span>{" "}
+              {d.count.toLocaleString()}
+            </li>
+          ))}
+        </ul>
+      )}
+      <p className="text-muted-foreground/70 text-[11px] leading-4">
+        MB 429s that survived mbFetch&apos;s single retry and became a
+        rate-limit error page. Sustained non-zero days mean the chart
+        pages&apos; per-row track-cover MB fan-out is worth cutting. Also
+        greppable in Vercel logs as <code>[mb-429]</code>.
+      </p>
+    </section>
   );
 }
 
