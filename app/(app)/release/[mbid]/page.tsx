@@ -1,7 +1,11 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { formatArtistCredit, getRelease } from "@/lib/clients/musicbrainz";
+import {
+  formatArtistCredit,
+  getRelease,
+  MusicBrainzError,
+} from "@/lib/clients/musicbrainz";
 import { caaReleaseUrl } from "@/lib/clients/coverart";
 import { CoverArt } from "@/components/achordion/cover-art";
 import { TrackList } from "@/components/achordion/track-list";
@@ -16,8 +20,12 @@ async function ReleaseBody({ mbid }: { mbid: string }) {
   let release;
   try {
     release = await getRelease(mbid);
-  } catch {
-    notFound();
+  } catch (e) {
+    // Only a genuine MB "not found" (404) is a real miss → notFound().
+    // Transient MB failures (429/5xx/timeout, parse error) go to the
+    // refreshable error boundary instead of caching a bogus 404.
+    if (e instanceof MusicBrainzError && e.status === 404) notFound();
+    throw e;
   }
 
   // /release-group is the canonical "album" page; if this release has one,

@@ -19,7 +19,10 @@ const MIN_INTERVAL_MS = 1000;
 // well under the function limit and far above MB's healthy latency.
 const MB_FETCH_TIMEOUT_MS = 8000;
 
-class MusicBrainzError extends Error {
+// Exported so entity pages can tell a genuine "not found" (status 404 →
+// notFound()) from a transient failure (429/5xx/timeout → rethrow to the
+// refreshable error boundary) instead of caching a bogus 404.
+export class MusicBrainzError extends Error {
   // Next.js preserves `digest` across the server→client error boundary
   // even in production (where the message is sanitized), so we tag
   // 429s with a known string and let `app/(app)/error.tsx` show

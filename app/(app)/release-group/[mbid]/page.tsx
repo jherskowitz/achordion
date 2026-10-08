@@ -5,6 +5,7 @@ import {
   formatArtistCredit,
   getRelease,
   getReleaseGroup,
+  MusicBrainzError,
   partitionArtistRelations,
   pickCanonicalRelease,
   withLookupDeadline,
@@ -71,11 +72,13 @@ async function AlbumBody({ mbid }: { mbid: string }) {
   try {
     rg = await withLookupDeadline(getReleaseGroup(mbid));
   } catch (e) {
-    // Deadline (MB-queue saturation) → fast uncached 500 via the error
-    // boundary (refreshable) rather than hanging to maxDuration or
-    // caching a transient 404; real miss → 404.
-    if (e instanceof Error && /exceeded/.test(e.message)) throw e;
-    notFound();
+    // Only a genuine MB "not found" (404) is a real miss → notFound().
+    // A deadline (queue saturation) or any transient MB failure
+    // (429/5xx/timeout, parse error) goes to the refreshable error
+    // boundary instead — otherwise a throttled COLD render turns a real
+    // album into a 404 on first click that "fixes itself" on retry.
+    if (e instanceof MusicBrainzError && e.status === 404) notFound();
+    throw e;
   }
 
   const credit = formatArtistCredit(rg["artist-credit"]);
