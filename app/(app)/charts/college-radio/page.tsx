@@ -11,7 +11,9 @@ import { getNaccTop30 } from "@/lib/clients/nacc";
 import { CollegeChartsAlbumsGrid } from "@/components/achordion/college-charts-list";
 import { CountryPicker } from "@/components/achordion/country-picker";
 
-export const metadata = { title: "College radio charts" };
+import { sectionMetadata } from "@/lib/section-og";
+
+export const metadata = sectionMetadata("charts/college-radio");
 
 interface PageProps {
   searchParams: Promise<{ country?: string }>;

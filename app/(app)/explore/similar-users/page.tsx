@@ -9,7 +9,9 @@ import { EmptyState } from "@/components/achordion/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 
-export const metadata = { title: "Similar listeners" };
+import { sectionMetadata } from "@/lib/section-og";
+
+export const metadata = sectionMetadata("explore/similar-users");
 
 async function Body({ username }: { username: string }) {
   const users = await getSimilarUsers(username, 60).catch(() => []);

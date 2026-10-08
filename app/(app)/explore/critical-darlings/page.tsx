@@ -4,7 +4,9 @@ import { PageShell } from "@/components/achordion/page-shell";
 import { EmptyState } from "@/components/achordion/empty-state";
 import { CriticalDarlingCard } from "@/components/achordion/critical-darling-card";
 
-export const metadata = { title: "Critical Darlings" };
+import { sectionMetadata } from "@/lib/section-og";
+
+export const metadata = sectionMetadata("explore/critical-darlings");
 
 // Page-level cache mirrors the RSS-fetch cache (12h). Two refreshes
 // a day is plenty for "what critics are loving" — the underlying feed

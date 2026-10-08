@@ -15,7 +15,9 @@ import { topRecordingsToParachordTracks } from "@/lib/parachord-listens";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
-export const metadata = { title: "ListenBrainz charts" };
+import { sectionMetadata } from "@/lib/section-og";
+
+export const metadata = sectionMetadata("charts/listenbrainz");
 
 interface PageProps {
   searchParams: Promise<{ tab?: string; range?: string }>;

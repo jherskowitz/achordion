@@ -24,7 +24,9 @@ import { NewReleasesGrid } from "@/components/achordion/year-in-music/new-releas
 import { YimPlaylistCard } from "@/components/achordion/year-in-music/yim-playlist-card";
 import { YearPicker } from "@/components/achordion/year-in-music/year-picker";
 
-export const metadata = { title: "Year in Music" };
+import { sectionMetadata } from "@/lib/section-og";
+
+export const metadata = sectionMetadata("explore/year-in-music");
 
 interface PageParams {
   searchParams: Promise<{ year?: string }>;

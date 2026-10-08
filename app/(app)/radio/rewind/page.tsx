@@ -1,7 +1,9 @@
 import { PageShell } from "@/components/achordion/page-shell";
 import { RadioRewindGrid } from "@/components/achordion/radio-rewind-grid";
 
-export const metadata = { title: "Radio Rewinds" };
+import { sectionMetadata } from "@/lib/section-og";
+
+export const metadata = sectionMetadata("radio/rewind");
 
 export default function RadioRewindsPage() {
   return (

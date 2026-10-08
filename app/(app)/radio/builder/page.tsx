@@ -14,7 +14,9 @@ import {
 } from "@/components/achordion/station-builder";
 import { Skeleton } from "@/components/ui/skeleton";
 
-export const metadata = { title: "Station Builder" };
+import { sectionMetadata } from "@/lib/section-og";
+
+export const metadata = sectionMetadata("radio/builder");
 
 interface PageProps {
   searchParams: Promise<{ prompt?: string; mode?: string }>;

@@ -10,6 +10,9 @@ import { FreshReleasesGrid } from "@/components/achordion/fresh-releases-grid";
 import { FilterPills } from "@/components/achordion/filter-pills";
 import { Skeleton } from "@/components/ui/skeleton";
 import { friendlyListenBrainzError } from "@/lib/upstream-error";
+import { sectionMetadata } from "@/lib/section-og";
+
+export const metadata = sectionMetadata("explore/fresh-releases");
 
 interface PageProps {
   searchParams: Promise<{

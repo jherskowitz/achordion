@@ -28,6 +28,9 @@ import { resolveBskyAvatarsForUsers } from "@/lib/bsky-display";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getPlaylist } from "@/lib/clients/listenbrainz";
+import { sectionMetadata } from "@/lib/section-og";
+
+export const metadata = sectionMetadata("explore");
 
 const JSPF_PLAYLIST_KEY = "https://musicbrainz.org/doc/jspf#playlist";
 

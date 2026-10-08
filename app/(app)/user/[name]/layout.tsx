@@ -7,6 +7,32 @@ import {
 } from "@/components/achordion/user-page-header";
 import { recordProfileView } from "@/lib/profile-views";
 
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ name: string }>;
+}) {
+  // Applies to every /user/<name>/* sub-tab (playlists, pins, listens,
+  // stats, taste, community, …). The main profile page overrides this with
+  // its own richer generateMetadata; without it here the sub-tabs fell back
+  // to the root "Achordion" card title/description — only the OG *image*
+  // cascades from /user/[name]/opengraph-image.tsx, so the shared cards had
+  // the right picture but the generic landing-page text.
+  const { name } = await params;
+  const title = `${name}'s listening on Achordion`;
+  const description = `Pins, listens, and stats from ${name} on Achordion — the open ListenBrainz/MusicBrainz community.`;
+  return {
+    title: name,
+    description,
+    openGraph: { title, description, type: "profile" as const },
+    twitter: {
+      card: "summary_large_image" as const,
+      title,
+      description,
+    },
+  };
+}
+
 export default async function UserLayout({
   children,
   params,

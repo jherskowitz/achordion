@@ -21,7 +21,9 @@ import type { ParachordTrack } from "@/lib/parachord";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
-export const metadata = { title: "Apple Music charts" };
+import { sectionMetadata } from "@/lib/section-og";
+
+export const metadata = sectionMetadata("charts/apple-music");
 
 interface PageProps {
   searchParams: Promise<{ tab?: string; country?: string }>;
