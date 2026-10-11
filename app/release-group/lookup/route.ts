@@ -2,6 +2,7 @@ import {
   searchReleaseGroups,
   withLookupDeadline,
 } from "@/lib/clients/musicbrainz";
+import { cachedRedirect } from "@/lib/lookup-redirect";
 
 /**
  * Resolve `?artist=…&title=…` to a MusicBrainz release-group MBID and
@@ -22,12 +23,12 @@ export async function GET(request: Request) {
     // Redirect to /search with whatever we have so the user lands
     // somewhere useful and the logs stay quiet.
     const fallback = title || artist;
-    return Response.redirect(
+    return cachedRedirect(
       new URL(
         fallback ? `/search?q=${encodeURIComponent(fallback)}` : "/search",
         request.url,
       ),
-      302,
+      { matched: false },
     );
   }
   try {
@@ -37,16 +38,15 @@ export async function GET(request: Request) {
     const ep = results.find((r) => r["primary-type"] === "EP");
     const top = album ?? ep ?? results[0];
     if (top) {
-      return Response.redirect(
-        new URL(`/release-group/${top.id}`, request.url),
-        302,
-      );
+      return cachedRedirect(new URL(`/release-group/${top.id}`, request.url), {
+        matched: true,
+      });
     }
   } catch {
     /* fall through */
   }
-  return Response.redirect(
+  return cachedRedirect(
     new URL(`/search?q=${encodeURIComponent(`${artist} ${title}`)}`, request.url),
-    302,
+    { matched: false },
   );
 }

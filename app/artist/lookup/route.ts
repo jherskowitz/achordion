@@ -1,4 +1,5 @@
 import { searchArtists, withLookupDeadline } from "@/lib/clients/musicbrainz";
+import { cachedRedirect } from "@/lib/lookup-redirect";
 
 /**
  * Resolve `?name=…` to a MusicBrainz artist MBID and redirect to
@@ -18,7 +19,7 @@ export async function GET(request: Request) {
     // with a missing artist credit becomes a 400 in our logs that
     // nobody can act on. Send the user to /search instead, which is
     // what they'd want as a fallback anyway.
-    return Response.redirect(new URL("/search", request.url), 302);
+    return cachedRedirect(new URL("/search", request.url), { matched: false });
   }
   try {
     // Quote the artist name to bias MB's search toward exact-phrase
@@ -28,16 +29,15 @@ export async function GET(request: Request) {
     const results = await withLookupDeadline(searchArtists(q, 5));
     const top = results[0];
     if (top?.id) {
-      return Response.redirect(
-        new URL(`/artist/${top.id}`, request.url),
-        302,
-      );
+      return cachedRedirect(new URL(`/artist/${top.id}`, request.url), {
+        matched: true,
+      });
     }
   } catch {
     /* fall through */
   }
-  return Response.redirect(
+  return cachedRedirect(
     new URL(`/search?q=${encodeURIComponent(name)}`, request.url),
-    302,
+    { matched: false },
   );
 }
