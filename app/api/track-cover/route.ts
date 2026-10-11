@@ -4,6 +4,7 @@ import {
   withLookupDeadline,
 } from "@/lib/clients/musicbrainz";
 import { caaReleaseGroupUrl } from "@/lib/clients/coverart";
+import { getAlbumArtwork, getTrackArtwork } from "@/lib/clients/album-art";
 import { checkRateLimit } from "@/lib/rate-limit";
 
 /**
@@ -61,8 +62,26 @@ export async function GET(request: Request) {
     // memoize and we want bad callers to fix themselves.
     return Response.json({ url: null, mbid: null }, { status: 400 });
 
-  const nullResponse = () =>
-    Response.json({ url: null, mbid: null }, { headers: CACHE_HEADERS });
+  // When Cover Art Archive resolution comes up empty, fall through to the
+  // iTunes→Deezer catalog HERE, server-side, instead of making the client
+  // fire a SECOND request to /api/album-cover. That halves the cover
+  // lookups (one function + one edge request per cover instead of two) on
+  // text-only surfaces where CAA routinely misses — the lion's share of
+  // the cover-API traffic. No release-group MBID comes back from the
+  // catalog, so mbid stays null. Bounded by a deadline so a slow catalog
+  // can't stack on top of the MB deadline and blow the function limit.
+  const catalogResponse = async () => {
+    let url: string | null = null;
+    try {
+      url = await withLookupDeadline(
+        album ? getAlbumArtwork(artist, album) : getTrackArtwork(artist, title),
+        4000,
+      );
+    } catch {
+      url = null;
+    }
+    return Response.json({ url, mbid: null }, { headers: CACHE_HEADERS });
+  };
 
   // Recording-MBID path — mirrors the recording page: look the recording
   // up, take its release-group, build the CAA URL. This is how a caller
@@ -94,12 +113,10 @@ export async function GET(request: Request) {
   // across "the" / "national" and pulls in irrelevant groups.
   const quoted = (s: string) => `"${s.replace(/"/g, '\\"')}"`;
 
-  // No album → no way to resolve a cover. (A recording search can't
-  // help: MB's recording-search response doesn't carry release-group
-  // info in the schema we parse, so that path always returned null —
-  // it was a pure wasted MB call that only added load to the shared
-  // 1-req/sec queue. Dropped.)
-  if (!album) return nullResponse();
+  // No album → no CAA release-group to resolve. A recording search can't
+  // help (MB's recording-search response doesn't carry release-group info
+  // in the schema we parse), so go straight to the catalog by track title.
+  if (!album) return catalogResponse();
 
   try {
     // Bound the whole MB resolution on a wall clock. /api/track-cover
@@ -125,9 +142,9 @@ export async function GET(request: Request) {
     );
     return resolved
       ? Response.json(resolved, { headers: CACHE_HEADERS })
-      : nullResponse();
+      : await catalogResponse();
   } catch {
-    // MB error OR deadline exceeded → graceful null, fast.
-    return nullResponse();
+    // MB error OR deadline exceeded → try the catalog, then graceful null.
+    return await catalogResponse();
   }
 }

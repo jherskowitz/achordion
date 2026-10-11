@@ -164,13 +164,11 @@ export function LazyAlbumCover({
         // Don't overwrite a known-good initialSrc — Earshot's
         // cover-dialog URLs aren't on CAA; the API's URL would be
         // a worse match. Only fill in when we had no source yet.
+        // /api/track-cover now resolves the iTunes→Deezer catalog itself
+        // when CAA comes up empty, so `data.url` is already the best cover
+        // (CAA or catalog) — no separate /api/album-cover round-trip needed.
         if (data.url && !initialSrc) setSrc(data.url);
         callback?.({ url: data.url ?? null, mbid: data.mbid ?? null });
-        // Null-src gap: track-cover found no CAA cover and we have no
-        // initialSrc, so the <Image> will never render and onError will
-        // never fire. Proactively try the streaming catalog so these
-        // rows aren't stuck on a permanent Disc3 placeholder.
-        if (!data.url && !initialSrc) runCatalogFallback();
       })
       .catch(() => {
         // Silent — placeholder stays. onResolved isn't called on
@@ -179,9 +177,6 @@ export function LazyAlbumCover({
     return () => {
       cancelled = true;
     };
-    // runCatalogFallback is a stable in-component helper closed over props/
-    // state; adding it would re-run this lookup effect on every render.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [artist, album, initialSrc, inView]);
 
   // One layered tile for every state: the Disc3 placeholder sits behind
