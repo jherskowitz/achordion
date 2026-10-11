@@ -29,3 +29,16 @@ export function cachedRedirect(
     },
   });
 }
+
+/**
+ * A non-cacheable 302. For responses that depend on per-request state — the
+ * per-IP rate-limit fallback — which must NOT be stored in the shared,
+ * URL-keyed edge cache (or one throttled bot would poison a popular lookup
+ * URL into a `/search` redirect for every visitor).
+ */
+export function uncachedRedirect(to: URL | string): Response {
+  return new Response(null, {
+    status: 302,
+    headers: { Location: to.toString(), "Cache-Control": "private, no-store" },
+  });
+}

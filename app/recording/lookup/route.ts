@@ -2,7 +2,8 @@ import {
   searchRecordings,
   withLookupDeadline,
 } from "@/lib/clients/musicbrainz";
-import { cachedRedirect } from "@/lib/lookup-redirect";
+import { cachedRedirect, uncachedRedirect } from "@/lib/lookup-redirect";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 /**
  * Resolve `?artist=…&title=…` to a MusicBrainz recording MBID and
@@ -17,6 +18,15 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const artist = url.searchParams.get("artist")?.trim() ?? "";
   const title = url.searchParams.get("title")?.trim() ?? "";
+  // Over per-IP budget (a crawler following every lookup link) → skip the
+  // MB search and send them to /search. Fail-open on any Upstash error.
+  const limit = await checkRateLimit("lookup", request);
+  if (!limit.ok) {
+    const q = `${artist} ${title}`.trim();
+    return uncachedRedirect(
+      new URL(q ? `/search?q=${encodeURIComponent(q)}` : "/search", request.url),
+    );
+  }
   if (!artist || !title) {
     // RSC prefetch hits these eagerly — empty params shouldn't 400.
     // Redirect to /search with whatever we have so the user lands

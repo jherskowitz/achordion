@@ -56,6 +56,15 @@ const trackLinksLookupLimiter = makeLimiter("ip:track-links-lookup", 60, "60 s")
 // (a 1k-entity scrape still hits the wall in <2 minutes) while
 // leaving plenty of headroom for legitimate per-user activity.
 const pageLimiter = makeLimiter("ip:page", 600, "60 s");
+// Entity-link lookup routes (/artist/lookup, /release-group/lookup,
+// /recording/lookup). Each runs a MusicBrainz search on a cache MISS then
+// 302s — and the 302s are edge-cached, so the route only executes for a
+// never-seen lookup. A human clicks a handful a minute; a crawler following
+// the ~30-60 lookup links on a chart/explore page bursts far past that and
+// hammers the shared 1-req/sec MB queue. 30/min/IP caps that burst while
+// staying well clear of real browsing. (Partial against a distributed bot —
+// the edge-cached redirects + the spend cap are the real guarantees.)
+const lookupLimiter = makeLimiter("ip:lookup", 30, "60 s");
 
 /**
  * Client-IP extraction for rate-limit keying. Hardened against
@@ -94,7 +103,8 @@ export async function checkRateLimit(
     | "image"
     | "page"
     | "announcement-event"
-    | "track-links-lookup",
+    | "track-links-lookup"
+    | "lookup",
   request: Request,
 ): Promise<{ ok: boolean }> {
   const limiter =
@@ -106,7 +116,9 @@ export async function checkRateLimit(
           ? announcementEventLimiter
           : kind === "track-links-lookup"
             ? trackLinksLookupLimiter
-            : pageLimiter;
+            : kind === "lookup"
+              ? lookupLimiter
+              : pageLimiter;
   if (!limiter) return { ok: true };
   const ip = getClientIp(request);
   // FAIL OPEN. `limiter.limit()` is a network call to Upstash; it
