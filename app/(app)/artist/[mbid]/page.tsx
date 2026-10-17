@@ -63,7 +63,7 @@ type DiscographyType = (typeof DISCOGRAPHY_TYPE_OPTIONS)[number]["value"];
 function parseDiscographyType(v: string | undefined): DiscographyType {
   return DISCOGRAPHY_TYPE_OPTIONS.some((o) => o.value === v)
     ? (v as DiscographyType)
-    : "studio";
+    : "all";
 }
 
 interface PageParams {
@@ -307,7 +307,7 @@ async function ArtistBody({
                 param="type"
                 active={discographyType}
                 options={DISCOGRAPHY_TYPE_OPTIONS}
-                defaultValue="studio"
+                defaultValue="all"
                 ariaLabel="Discography type"
               />
             </div>
