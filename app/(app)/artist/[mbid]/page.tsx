@@ -312,7 +312,11 @@ async function ArtistBody({
               />
             </div>
             <Suspense key={discographyType} fallback={<DiscographySkeleton />}>
-              <DiscographySection mbid={mbid} type={discographyType} />
+              <DiscographySection
+                mbid={mbid}
+                type={discographyType}
+                artistName={artist.name}
+              />
             </Suspense>
           </section>
 
@@ -406,16 +410,18 @@ function SimilarArtistsSkeleton() {
 async function DiscographySection({
   mbid,
   type,
+  artistName,
 }: {
   mbid: string;
   type: DiscographyType;
+  artistName: string;
 }) {
   const groups = await withLookupDeadline(
     getArtistReleaseGroups(mbid),
   ).catch(() => []);
   const allBuckets = bucketDiscography(groups);
   const buckets = filterBucketsByType(allBuckets, type);
-  return <Discography buckets={buckets} />;
+  return <Discography buckets={buckets} artistName={artistName} />;
 }
 
 function filterBucketsByType(

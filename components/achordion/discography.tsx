@@ -23,7 +23,16 @@ const TYPE_LABELS: Record<string, string> = {
   Studio: "Albums + EPs",
 };
 
-export function Discography({ buckets }: { buckets: DiscographyBucket[] }) {
+export function Discography({
+  buckets,
+  artistName,
+}: {
+  buckets: DiscographyBucket[];
+  /** The artist whose discography this is — used for the iTunes→Deezer
+   *  catalog cover fallback when Cover Art Archive has no art for a
+   *  brand-new / niche release group. */
+  artistName?: string;
+}) {
   if (buckets.length === 0) {
     return (
       <p className="text-muted-foreground text-sm">
@@ -63,6 +72,8 @@ export function Discography({ buckets }: { buckets: DiscographyBucket[] }) {
                         size={240}
                         className="aspect-square h-auto w-full transition-opacity group-hover:opacity-90"
                         rounded="md"
+                        fallbackArtist={artistName}
+                        fallbackAlbum={rg.title}
                       />
                     </Link>
                     {showChip && (
