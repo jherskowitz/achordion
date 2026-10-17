@@ -273,20 +273,22 @@ async function ArtistBody({
             <LbRadioBlock mbid={mbid} artistName={artist.name} />
           </Suspense>
 
-          <section>
-            <Suspense
-              fallback={
-                <>
-                  <h2 className="mb-4 text-sm font-semibold tracking-wide uppercase">
-                    Popular tracks
-                  </h2>
-                  <ListSkeleton />
-                </>
-              }
-            >
-              <TopTracksSection mbid={mbid} />
-            </Suspense>
-          </section>
+          {/* No wrapping <section> here: TopTracksSection renders its own
+              when it has tracks and returns null when it doesn't, so an
+              artist with no popular tracks gets no empty header + no stray
+              column gap. The fallback carries the section during load. */}
+          <Suspense
+            fallback={
+              <section>
+                <h2 className="mb-4 text-sm font-semibold tracking-wide uppercase">
+                  Popular tracks
+                </h2>
+                <ListSkeleton />
+              </section>
+            }
+          >
+            <TopTracksSection mbid={mbid} />
+          </Suspense>
         </div>
 
         {/* Discography — full-width on lg via col-span-2 col-start-1
@@ -443,12 +445,14 @@ function filterBucketsByType(
 
 async function TopTracksSection({ mbid }: { mbid: string }) {
   // Deadline-bound + degrade to empty: an unguarded hang here would
-  // hold the function open to maxDuration (timeout). Empty → section
-  // renders its header with no rows, same as a real "no data" result.
+  // hold the function open to maxDuration (timeout). Empty (no data, or
+  // a degraded fetch) → render nothing so the whole section is hidden
+  // rather than showing an empty "Popular tracks" header.
   const items = await withLookupDeadline(
     getTopRecordingsForArtist(mbid),
   ).catch(() => [] as Awaited<ReturnType<typeof getTopRecordingsForArtist>>);
   const top = items.slice(0, 10);
+  if (top.length === 0) return null;
   // Build a ParachordTrack array straight from LB's top-recordings
   // payload — title, artist, optional album. Hands the whole popular
   // 10 off to Parachord on a single click.
@@ -463,7 +467,7 @@ async function TopTracksSection({ mbid }: { mbid: string }) {
     })
     .filter((t): t is ParachordTrack => t !== null);
   return (
-    <>
+    <section>
       <div className="mb-4 flex items-center justify-between gap-3">
         <h2 className="text-sm font-semibold tracking-wide uppercase">
           Popular tracks
@@ -489,7 +493,7 @@ async function TopTracksSection({ mbid }: { mbid: string }) {
           caa_release_mbid: r.caa_release_mbid,
         }))}
       />
-    </>
+    </section>
   );
 }
 
