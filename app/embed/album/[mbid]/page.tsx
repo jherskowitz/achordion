@@ -132,6 +132,10 @@ export default async function EmbedAlbumPage({
               size={250}
               className="aspect-square w-full"
               rounded="none"
+              // CAA has no art for brand-new / niche releases; fall back to
+              // the iTunes→Deezer catalog so the embed shows a cover.
+              fallbackArtist={credit.name}
+              fallbackAlbum={rg.title}
             />
             <PlayOnHoverFab
               href={parachordPlayAlbum({ mbid: rg.id })}

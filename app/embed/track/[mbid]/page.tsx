@@ -135,6 +135,12 @@ export default async function EmbedTrackPage({
             size={250}
             className="aspect-square w-full"
             rounded="none"
+            // CAA has no art for brand-new / niche releases; fall back to
+            // the iTunes→Deezer catalog (album when we know it, else track)
+            // so the embed shows a cover instead of the Disc3 placeholder.
+            fallbackArtist={credit.name}
+            fallbackAlbum={heroReleaseGroup?.title ?? undefined}
+            fallbackTrack={heroReleaseGroup?.title ? undefined : recording.title}
           />
           <PlayOnHoverFab
             href={parachordPlayTrack({
