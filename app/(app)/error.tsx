@@ -50,6 +50,34 @@ export default function AppError({
     setTimeout(() => setRefreshing(false), 1500);
   }
 
+  // Auto-retry ONCE on a cold render that threw transiently — the common
+  // case here is the MB lookup deadline firing under a saturated 1-req/sec
+  // queue (MB instability + crawler load) on an uncached niche page, which
+  // self-heals the moment the queue drains or another request caches it.
+  // Rather than make the user click "Try again," fire the same retry after
+  // a short beat. Guarded by a cooldown in sessionStorage so a genuinely
+  // persistent error retries at most once, then falls back to the manual
+  // UI instead of looping (and hammering the upstream we're trying to
+  // relieve). Fails safe to manual retry if sessionStorage is unavailable.
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      const KEY = "app-error-autoretry-ts";
+      const last = Number(window.sessionStorage.getItem(KEY) ?? "0");
+      if (Date.now() - last > 15000) {
+        window.sessionStorage.setItem(KEY, String(Date.now()));
+        timer = setTimeout(() => handleRetry(), 1000);
+      }
+    } catch {
+      /* no sessionStorage (private mode) → skip auto-retry, show manual UI */
+    }
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
+    // Intentionally run once per error-boundary mount; handleRetry is stable.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const isRetrying = pending || refreshing;
 
   return (
