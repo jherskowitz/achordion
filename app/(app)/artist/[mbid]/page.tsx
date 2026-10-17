@@ -253,8 +253,16 @@ async function ArtistBody({
           contextual facts (life-span / members / links / top
           listeners) reachable without forcing the user to scroll
           past them to get to the music. */}
-      <div className="mt-6 grid grid-cols-1 gap-10 lg:grid-cols-[minmax(0,1fr)_240px]">
-        <div className="min-w-0 space-y-12 lg:col-start-1 lg:row-start-1">
+      <div className="mt-6 grid grid-cols-1 items-start gap-10 lg:grid-cols-[minmax(0,1fr)_240px]">
+        {/* Left column holds ALL the music content — bio, radio, popular
+            tracks, discography, similar artists — flowing together in one
+            column. Keeping discography and similar here (rather than as
+            full-width rows below BOTH columns) lets them rise to fill the
+            space when the content above is short — e.g. an artist with no
+            popular tracks — instead of being pushed below the taller
+            sidebar. DOM order is also the mobile order: content, then the
+            sidebar last. */}
+        <div className="min-w-0 space-y-12 lg:col-start-1">
           {bioSource ? (
             <Suspense
               fallback={<Skeleton className="h-32 w-full rounded-xl" />}
@@ -289,43 +297,34 @@ async function ArtistBody({
           >
             <TopTracksSection mbid={mbid} />
           </Suspense>
-        </div>
 
-        {/* Discography — full-width on lg via col-span-2 col-start-1
-            so it sits below both columns of the hero row. mt-16
-            spacer is desktop-only; on mobile the gap-10 already
-            separates it from the popular-tracks list above. */}
-        <section className="lg:col-span-2 lg:col-start-1 lg:row-start-2 lg:mt-6">
-          <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-            <h2 className="text-sm font-semibold tracking-wide uppercase">
-              Discography
-            </h2>
-            <FilterPills
-              param="type"
-              active={discographyType}
-              options={DISCOGRAPHY_TYPE_OPTIONS}
-              defaultValue="studio"
-              ariaLabel="Discography type"
-            />
-          </div>
-          <Suspense key={discographyType} fallback={<DiscographySkeleton />}>
-            <DiscographySection mbid={mbid} type={discographyType} />
-          </Suspense>
-        </section>
+          <section>
+            <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+              <h2 className="text-sm font-semibold tracking-wide uppercase">
+                Discography
+              </h2>
+              <FilterPills
+                param="type"
+                active={discographyType}
+                options={DISCOGRAPHY_TYPE_OPTIONS}
+                defaultValue="studio"
+                ariaLabel="Discography type"
+              />
+            </div>
+            <Suspense key={discographyType} fallback={<DiscographySkeleton />}>
+              <DiscographySection mbid={mbid} type={discographyType} />
+            </Suspense>
+          </section>
 
-        {/* Similar artists — full-width on lg. Wrapper div carries
-            the grid placement so the inner <section> doesn't have to
-            know about its layout context. */}
-        <div className="lg:col-span-2 lg:col-start-1 lg:row-start-3">
           <Suspense fallback={<SimilarArtistsSkeleton />}>
             <SimilarArtistsSection mbid={mbid} />
           </Suspense>
         </div>
 
-        {/* Sidebar — DOM-last so it's at the bottom on mobile.
-            On lg, col-start-2 row-start-1 puts it back in the
-            right column of the hero row. */}
-        <div className="lg:col-start-2 lg:row-start-1 space-y-8">
+        {/* Sidebar — DOM-last so it's at the bottom on mobile; the second
+            grid column on lg (its own column, independent of the left
+            column's height). */}
+        <div className="space-y-8 lg:col-start-2">
           <ArtistInfoSidebar
             artist={artist}
             linksOverride={otherWithCredits}
