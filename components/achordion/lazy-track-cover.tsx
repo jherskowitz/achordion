@@ -123,11 +123,10 @@ export function LazyTrackCover({
         size={size}
         className={className}
         rounded={rounded}
-        // Catalog fallback when CAA fails — album search if we have the
-        // album name (more precise), else search by the track title.
-        fallbackArtist={artist}
-        fallbackAlbum={album ?? undefined}
-        fallbackTrack={album ? undefined : title}
+        // No fallback props here: this component resolves the iTunes→Deezer
+        // catalog itself (via /api/track-cover, which now folds it in) and
+        // feeds the result to CoverArt as `src`. Passing fallback props too
+        // would make CoverArt's own null-src catalog path double-fetch.
       />
     </div>
   );

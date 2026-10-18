@@ -187,7 +187,14 @@ export function LbSongsChartList({
           >
             <PlayOverNumberCell number={rank} href={playHref} className="w-7" />
             {inlineCover ? (
-              <CoverArt src={inlineCover} alt={item.track_name} size={48} />
+              <CoverArt
+                src={inlineCover}
+                alt={item.track_name}
+                size={48}
+                fallbackArtist={item.artist_name}
+                fallbackAlbum={item.release_name ?? undefined}
+                fallbackTrack={item.release_name ? undefined : item.track_name}
+              />
             ) : (
               <LazyTrackCover
                 artist={item.artist_name}

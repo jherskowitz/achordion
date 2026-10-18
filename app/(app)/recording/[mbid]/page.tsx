@@ -313,6 +313,8 @@ async function RecordingBody({ mbid }: { mbid: string }) {
                             size={250}
                             className="aspect-square w-full transition-opacity group-hover:opacity-90"
                             rounded="md"
+                            fallbackArtist={credit.name}
+                            fallbackAlbum={rg.title}
                           />
                         </Link>
                         {/* "Also appears on" intermingles compilations,

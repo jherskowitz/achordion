@@ -113,21 +113,18 @@ export function CoverArt({
     /* eslint-enable react-hooks/set-state-in-effect */
   }, [src]);
 
-  function handleError() {
-    // The catalog fallback image also failed — nothing left to try.
-    if (fallbackSrc) {
-      setErrored(true);
-      return;
-    }
-    // Transient CAA/archive.org failure: retry once (cache-busted).
-    if (retry < MAX_COVER_RETRIES) {
-      setRetry((r) => r + 1);
-      return;
-    }
-    // CAA retries exhausted — try the streaming-catalog fallback once.
-    const canFallback =
-      !!fallbackArtist && !!(fallbackAlbum || fallbackTrack) && !triedFallback;
-    if (!canFallback) {
+  const canFallback = !!fallbackArtist && !!(fallbackAlbum || fallbackTrack);
+
+  // Query the streaming catalog (iTunes→Deezer via /api/album-cover) once
+  // and swap to the result. Fired in TWO cases: the CAA `src` image 404s
+  // after its retry (handleError), AND when there's NO `src` at all (the
+  // effect below) — the latter is the common "missing cover" case for
+  // direct callers whose cover resolved to nothing (e.g. a scrobble LB
+  // never mapped to a release with art). A null `src` never mounts an
+  // <Image>, so onError can't fire; without the proactive path the
+  // fallback would be dead for every null-cover row.
+  function runCatalogFallback() {
+    if (!canFallback || triedFallback) {
       setErrored(true);
       return;
     }
@@ -148,7 +145,39 @@ export function CoverArt({
       .catch(() => setErrored(true));
   }
 
-  if (!src || errored) {
+  function handleError() {
+    // The catalog fallback image also failed — nothing left to try.
+    if (fallbackSrc) {
+      setErrored(true);
+      return;
+    }
+    // Transient CAA/archive.org failure: retry once (cache-busted).
+    if (retry < MAX_COVER_RETRIES) {
+      setRetry((r) => r + 1);
+      return;
+    }
+    // CAA retries exhausted — try the streaming-catalog fallback once.
+    runCatalogFallback();
+  }
+
+  // No `src` to render, but we have catalog search terms → resolve the
+  // catalog proactively (the <Image> never mounts with a null src, so
+  // handleError can never fire). Lazy covers resolve their own catalog and
+  // DON'T pass fallback props, so this never double-fetches for them.
+  // runCatalogFallback is a stable in-render closure over these inputs; the
+  // setState it does is the intended effect (resolve-then-swap), once per src.
+  /* eslint-disable react-hooks/set-state-in-effect, react-hooks/exhaustive-deps */
+  useEffect(() => {
+    if (!src && !fallbackSrc && !errored && !triedFallback && canFallback) {
+      runCatalogFallback();
+    }
+  }, [src, fallbackSrc, errored, triedFallback, canFallback]);
+  /* eslint-enable react-hooks/set-state-in-effect, react-hooks/exhaustive-deps */
+
+  // Placeholder only when there's genuinely nothing to show: errored, or no
+  // src AND no catalog result (either still resolving, or the catalog also
+  // missed). A null src with a resolved fallbackSrc falls through to render.
+  if (errored || (!src && !fallbackSrc)) {
     return (
       <Placeholder
         alt={alt}
@@ -165,9 +194,14 @@ export function CoverArt({
   // The catalog fallback URL, once resolved, takes over as the source
   // (rendered as-is — no cache-buster). Otherwise the CAA src, cache-
   // busted on retry.
-  const effectiveSrc =
+  // Past the early return at least one of `fallbackSrc` / `src` is set.
+  // Prefer the resolved catalog fallback; otherwise the CAA src, cache-
+  // busted on retry so the browser re-resolves the redirect to a fresh node.
+  const effectiveSrc: string =
     fallbackSrc ??
-    (retry > 0 ? `${src}${src.includes("?") ? "&" : "?"}cb=${retry}` : src);
+    (retry > 0 && src
+      ? `${src}${src.includes("?") ? "&" : "?"}cb=${retry}`
+      : (src ?? ""));
 
   // Layer the placeholder BEHIND the image. While the image's bytes are
   // still loading it sits at `opacity-0`, so the Disc3 placeholder shows
