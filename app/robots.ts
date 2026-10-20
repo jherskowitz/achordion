@@ -50,6 +50,25 @@ export default function robots(): MetadataRoute.Robots {
         ],
         disallow: "/",
       },
+      // Chinese search-engine crawlers — out entirely. Achordion is an
+      // English, US/Western, account-gated site built on ListenBrainz /
+      // MusicBrainz; there's no Chinese-market audience or SEO value to
+      // justify the crawl load (China was ~43% of traffic with zero real
+      // users). These all honor robots.txt. Non-compliant Chinese scrapers
+      // are handled separately by a Vercel Firewall geo-challenge on CN.
+      {
+        userAgent: [
+          "Baiduspider", // Baidu (matches Baiduspider-image/-news/-render too)
+          "Sogou web spider",
+          "Sogou inst spider",
+          "Sogou Pic Spider",
+          "360Spider",
+          "HaosouSpider", // 360 Search
+          "YisouSpider", // Shenma / UC / Alibaba mobile search
+          "PetalBot", // Huawei Petal Search
+        ],
+        disallow: "/",
+      },
       // Link-preview scrapers — allow them ON every entity route so
       // sharing an album / artist / track / playlist / user URL into
       // Threads / Discord / Slack / Bluesky / Twitter unfurls a rich
