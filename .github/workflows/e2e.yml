@@ -24,12 +24,15 @@ concurrency:
 jobs:
   e2e:
     name: smoke
-    # Pinned, not `ubuntu-latest`: the latest runner rolled to Ubuntu 26.04,
-    # which our pinned Playwright (1.59.x) can't install browser deps for
-    # (`playwright install --with-deps` → "does not support chromium on
-    # ubuntu26.04-x64"), breaking the smoke job on every run. 24.04 is an
-    # LTS Playwright supports; bump this (and Playwright) together in future.
-    runs-on: ubuntu-24.04
+    # Back on `ubuntu-latest` now that Playwright is current (1.64.x).
+    # The earlier breakage was stale Playwright (1.59.x), which couldn't
+    # install browser deps once the latest runner rolled to Ubuntu 26.04
+    # ("does not support chromium on ubuntu26.04-x64") — not `ubuntu-latest`
+    # itself. Keeping Playwright current is what keeps this green; if a
+    # future runner rollover outruns Playwright's OS support again, bump
+    # Playwright first, and only pin the runner (e.g. ubuntu-24.04) if that
+    # can't land immediately.
+    runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
