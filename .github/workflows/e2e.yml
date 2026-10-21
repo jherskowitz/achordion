@@ -24,7 +24,12 @@ concurrency:
 jobs:
   e2e:
     name: smoke
-    runs-on: ubuntu-latest
+    # Pinned, not `ubuntu-latest`: the latest runner rolled to Ubuntu 26.04,
+    # which our pinned Playwright (1.59.x) can't install browser deps for
+    # (`playwright install --with-deps` → "does not support chromium on
+    # ubuntu26.04-x64"), breaking the smoke job on every run. 24.04 is an
+    # LTS Playwright supports; bump this (and Playwright) together in future.
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
