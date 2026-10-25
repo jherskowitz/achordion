@@ -37,6 +37,7 @@ import {
 import { ArtistInfoSidebar } from "@/components/achordion/artist-info-sidebar";
 import { Biography } from "@/components/achordion/biography";
 import { Discography } from "@/components/achordion/discography";
+import { DiscographyLoadError } from "@/components/achordion/discography-load-error";
 import {
   ExternalLinks,
   categoriseLinks,
@@ -416,9 +417,21 @@ async function DiscographySection({
   type: DiscographyType;
   artistName: string;
 }) {
-  const groups = await withLookupDeadline(
-    getArtistReleaseGroups(mbid),
-  ).catch(() => []);
+  // Distinguish a FAILED/slow fetch from a genuinely-empty discography.
+  // The old `.catch(() => [])` collapsed both into an empty list, so a
+  // transient MusicBrainz timeout rendered as "No releases on file" —
+  // wrong (and sticky under the edge cache) for artists who do have a
+  // catalog. The deadline is raised above mbFetch's own 8s per-call
+  // timeout so a healthy-but-slow single call isn't killed 1s early; a
+  // real failure returns null and surfaces a retryable error instead of
+  // a false empty state.
+  let groups: Awaited<ReturnType<typeof getArtistReleaseGroups>> | null;
+  try {
+    groups = await withLookupDeadline(getArtistReleaseGroups(mbid), 10_000);
+  } catch {
+    groups = null;
+  }
+  if (groups === null) return <DiscographyLoadError />;
   const allBuckets = bucketDiscography(groups);
   const buckets = filterBucketsByType(allBuckets, type);
   return <Discography buckets={buckets} artistName={artistName} />;
