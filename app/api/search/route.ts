@@ -10,6 +10,17 @@ import {
   getReleaseGroupPopularityBatch,
   searchUsers,
 } from "@/lib/clients/listenbrainz";
+import { checkRateLimit } from "@/lib/rate-limit";
+
+// Edge-cache successful search responses. The `q` query string is part of
+// Vercel's CDN cache key, so repeated identical queries (a scraper cycling a
+// finite set, a user retyping) are served from the edge WITHOUT re-invoking
+// the function — the actual cost lever, since each miss fans out to ~8 MB/LB
+// calls behind the 1-req/sec MB queue. 10min fresh + 1h stale-while-
+// revalidate keeps typeahead results current enough; max-age=30 lets a user
+// retyping within 30s skip even the edge round-trip.
+const SEARCH_CACHE =
+  "public, max-age=30, s-maxage=600, stale-while-revalidate=3600";
 
 /**
  * Power-search prefixes accepted by the search box. `track:` and
@@ -57,12 +68,27 @@ function parseSearchQuery(raw: string): ParsedQuery {
 const LIMIT = 8;
 
 export async function GET(request: Request) {
+  // Per-IP rate limit (defense-in-depth alongside the edge cache). Only runs
+  // on a cache MISS — a cached hit is served by the edge and never reaches
+  // the function. The 429 is no-store so a rate-limited response can't poison
+  // the shared cache key.
+  const { ok } = await checkRateLimit("search", request);
+  if (!ok) {
+    return Response.json(
+      { artists: [], albums: [], songs: [], users: [] },
+      { status: 429, headers: { "Cache-Control": "no-store" } },
+    );
+  }
+
   const url = new URL(request.url);
   const raw = url.searchParams.get("q") ?? "";
   const { kind, q } = parseSearchQuery(raw);
 
   if (!q) {
-    return Response.json({ artists: [], albums: [], songs: [], users: [] });
+    return Response.json(
+      { artists: [], albums: [], songs: [], users: [] },
+      { headers: { "Cache-Control": SEARCH_CACHE } },
+    );
   }
 
   // Run all four lookups in parallel, but only the ones the kind
@@ -152,5 +178,5 @@ export async function GET(request: Request) {
       };
     }),
     users: users.map((name) => ({ name })),
-  });
+  }, { headers: { "Cache-Control": SEARCH_CACHE } });
 }

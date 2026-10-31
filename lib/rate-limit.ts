@@ -65,6 +65,16 @@ const pageLimiter = makeLimiter("ip:page", 600, "60 s");
 // staying well clear of real browsing. (Partial against a distributed bot —
 // the edge-cached redirects + the spend cap are the real guarantees.)
 const lookupLimiter = makeLimiter("ip:lookup", 30, "60 s");
+// Search endpoint (/api/search typeahead). The heaviest public API route:
+// each cache MISS fans out to MB search (artist + album + song) PLUS LB
+// popularity + recording-metadata — ~8 upstream calls, all serialized
+// behind the 1-req/sec MB queue. The typeahead debounces 250ms and cancels
+// in-flight, so a real user commits at most a handful of distinct queries a
+// minute; 60/min/IP is far above that but cuts a single bursting scraper IP
+// off fast. (Only partial against a distributed scraper — the short edge
+// cache on the route response is the real cost lever; see
+// app/api/search/route.ts.)
+const searchLimiter = makeLimiter("ip:search", 60, "60 s");
 
 /**
  * Client-IP extraction for rate-limit keying. Hardened against
@@ -104,7 +114,8 @@ export async function checkRateLimit(
     | "page"
     | "announcement-event"
     | "track-links-lookup"
-    | "lookup",
+    | "lookup"
+    | "search",
   request: Request,
 ): Promise<{ ok: boolean }> {
   const limiter =
@@ -118,7 +129,9 @@ export async function checkRateLimit(
             ? trackLinksLookupLimiter
             : kind === "lookup"
               ? lookupLimiter
-              : pageLimiter;
+              : kind === "search"
+                ? searchLimiter
+                : pageLimiter;
   if (!limiter) return { ok: true };
   const ip = getClientIp(request);
   // FAIL OPEN. `limiter.limit()` is a network call to Upstash; it
