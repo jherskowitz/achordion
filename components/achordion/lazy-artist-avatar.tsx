@@ -21,7 +21,10 @@ export function LazyArtistAvatar({
   fallbackClassName,
   width = 128,
 }: {
-  mbid: string;
+  /** Artist MBID when known. When null/absent (e.g. a ListenBrainz
+   *  stats row that never mapped to an MBID), we skip the image lookup
+   *  and paint a name-seeded DiceBear instead of a blank circle. */
+  mbid?: string | null;
   name: string;
   className?: string;
   fallbackClassName?: string;
@@ -29,6 +32,9 @@ export function LazyArtistAvatar({
 }) {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   useEffect(() => {
+    // No MBID → nothing to look up (the Wikidata/fanart chain is MBID-
+    // keyed); the name-seeded DiceBear below is the final fallback.
+    if (!mbid) return;
     let cancelled = false;
     fetch(`/api/artist-image?mbid=${mbid}&width=${width}`)
       .then((r) => (r.ok ? r.json() : { url: null }))
@@ -44,9 +50,12 @@ export function LazyArtistAvatar({
   }, [mbid, width]);
   const initial = name.slice(0, 1).toUpperCase();
   // AvatarImage's `src` falls through to AvatarFallback when the URL
-  // 404s. We paint Wikidata when we have it, DiceBear otherwise; the
-  // initial letter stays as the absolute last-resort.
-  const src = imageUrl ?? dicebearShapesUrl(mbid);
+  // 404s. We paint the resolved image (Wikidata/fanart) when we have it,
+  // else a DiceBear shape — seeded by MBID when known (stable, matches
+  // the server <ArtistAvatar> + OG image) and by name otherwise so a
+  // mbid-less artist still gets a deterministic avatar, not a blank.
+  // The initial letter stays as the absolute last-resort.
+  const src = imageUrl ?? dicebearShapesUrl(mbid || name);
   return (
     <Avatar className={cn("size-10 shrink-0", className)}>
       <AvatarImage src={src} alt={name} />

@@ -9,9 +9,11 @@ import { getArtistImageFromFanart } from "@/lib/clients/fanart";
 import { dicebearShapesUrl } from "@/lib/dicebear-shapes";
 
 interface ArtistAvatarProps {
-  /** Artist MBID — used as the DiceBear fallback seed and to look up
-   *  Wikidata when no `artist` is passed in. */
-  mbid: string;
+  /** Artist MBID — drives the Wikidata/fanart lookup and the DiceBear
+   *  fallback seed. When null/absent (e.g. a ListenBrainz stats row with
+   *  no mapped MBID) we skip the lookup and seed DiceBear by name, so the
+   *  avatar is a geometric shape rather than a blank circle. */
+  mbid?: string | null;
   /** Display name used for alt text and the initial fallback. */
   name: string;
   /**
@@ -106,8 +108,12 @@ export async function ArtistAvatar({
   // a bigger size (none today) can override via the `width` prop.
   width = 256,
 }: ArtistAvatarProps) {
-  const { url } = await resolveArtistImage(mbid, artist, width);
-  const src = url ?? dicebearShapesUrl(mbid);
+  // The Wikidata/fanart chain is MBID-keyed; with no MBID there's nothing
+  // to resolve, so skip straight to the name-seeded DiceBear fallback.
+  const { url } = mbid
+    ? await resolveArtistImage(mbid, artist, width)
+    : { url: null };
+  const src = url ?? dicebearShapesUrl(mbid || name);
   const initial = name.slice(0, 1).toUpperCase();
   return (
     <Avatar className={className}>

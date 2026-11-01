@@ -64,18 +64,14 @@ function ArtistRow({ entry, max }: { entry: ArtistEntry; max: number }) {
   });
   return (
     <li className="flex items-center gap-2.5 text-sm">
-      {entry.artist_mbid ? (
-        <Link href={link} className="shrink-0">
-          <LazyArtistAvatar
-            mbid={entry.artist_mbid}
-            name={entry.artist_name}
-            className="size-9"
-            fallbackClassName="text-xs"
-          />
-        </Link>
-      ) : (
-        <div className="bg-muted size-9 shrink-0 rounded-full" />
-      )}
+      <Link href={link} className="shrink-0">
+        <LazyArtistAvatar
+          mbid={entry.artist_mbid ?? null}
+          name={entry.artist_name}
+          className="size-9"
+          fallbackClassName="text-xs"
+        />
+      </Link>
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline justify-between gap-2">
           <span className="min-w-0 truncate">
