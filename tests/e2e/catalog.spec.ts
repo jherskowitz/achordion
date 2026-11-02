@@ -1,4 +1,4 @@
-import { test } from "@playwright/test";
+import { test, expect } from "@playwright/test";
 import { STABLE_MBIDS, assertCleanRoute } from "./_helpers";
 
 /**
@@ -38,3 +38,22 @@ for (const spec of CATALOG_ROUTES) {
     });
   });
 }
+
+/**
+ * #107: a RELEASE id handed to /release-group/<id> (Parachord album pages,
+ * older shared links) must land on its parent release-group page, not a
+ * dead end. The redirect is client-side (the route streams via loading.tsx,
+ * so it can't be a hard 308), which a real browser follows — `toHaveURL`
+ * retries until the navigation settles on the release-group route.
+ */
+test(`catalog: /release-group/<release id> redirects to its release group`, async ({
+  page,
+}) => {
+  await page.goto(`/release-group/${STABLE_MBIDS.release}`, {
+    waitUntil: "domcontentloaded",
+  });
+  await expect(page).toHaveURL(
+    new RegExp(`/release-group/${STABLE_MBIDS.releaseGroup}(?:$|[?#])`),
+  );
+  await expect(page.locator("body")).toContainText(/Please Please Me/i);
+});

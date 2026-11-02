@@ -5,6 +5,9 @@ import {
   getArtist,
   getRecording,
   getReleaseGroup,
+  MusicBrainzError,
+  resolveReleaseGroupIdFromRelease,
+  type ReleaseGroupDetail,
 } from "@/lib/clients/musicbrainz";
 
 /**
@@ -160,25 +163,51 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     .map((s) => s.trim().toLowerCase())
     .includes("names");
 
+  // For albums, resolve the CANONICAL release-group id up front
+  // (verify-then-fallback, #107). A caller — notably Parachord — may hand us
+  // a RELEASE id; returning /release-group/<release-id> would 404. Verify the
+  // id is a real release group; if MB 404s it, map the release to its parent
+  // group. On any other (transient) failure, keep the original id — the
+  // /release-group/[mbid] page's own 404→release redirect is the safety net.
+  // When the verify fetch succeeds we reuse its result for name enrichment
+  // below, so names=true albums cost no extra MB call vs before.
+  let canonicalMbid = mbid;
+  let resolvedRg: ReleaseGroupDetail | null = null;
+  if (type === "release-group") {
+    try {
+      resolvedRg = await getReleaseGroup(mbid);
+    } catch (e) {
+      if (e instanceof MusicBrainzError && e.status === 404) {
+        const rgId = await resolveReleaseGroupIdFromRelease(mbid);
+        if (rgId) canonicalMbid = rgId;
+      }
+      // Non-404 (transient MB) → fall through with the original id.
+    }
+  }
+
   const response: EntityLinkResponse = {
     type,
-    mbid,
-    url: canonicalUrl(type, mbid),
-    ...(embedUrl(type, mbid) ? { embed_url: embedUrl(type, mbid) } : {}),
+    mbid: canonicalMbid,
+    url: canonicalUrl(type, canonicalMbid),
+    ...(embedUrl(type, canonicalMbid)
+      ? { embed_url: embedUrl(type, canonicalMbid) }
+      : {}),
   };
 
   if (includeNames && type !== "playlist") {
     try {
       if (type === "artist") {
-        const artist = await getArtist(mbid);
+        const artist = await getArtist(canonicalMbid);
         response.name = artist.name;
       } else if (type === "release-group") {
-        const rg = await getReleaseGroup(mbid);
+        // Reuse the verify fetch when the id was already a valid RG;
+        // otherwise fetch the resolved group (cache-wrapped, so cheap).
+        const rg = resolvedRg ?? (await getReleaseGroup(canonicalMbid));
         response.name = rg.title;
         const credit = formatArtistCredit(rg["artist-credit"]);
         if (credit.name) response.artist_name = credit.name;
       } else {
-        const recording = await getRecording(mbid);
+        const recording = await getRecording(canonicalMbid);
         response.name = recording.title;
         const credit = formatArtistCredit(recording["artist-credit"]);
         if (credit.name) response.artist_name = credit.name;

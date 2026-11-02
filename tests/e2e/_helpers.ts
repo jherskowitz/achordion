@@ -20,6 +20,10 @@ export const STABLE_MBIDS = {
   artist: "b10bbbfc-cf9e-42e0-be17-e2c3e1d2600d",
   /** "Please Please Me" by The Beatles (release group). */
   releaseGroup: "de208292-8db5-3aed-a14a-b37a84d8c521",
+  /** A specific RELEASE (1987 US CD) of "Please Please Me" — its parent
+   *  release group is `releaseGroup` above. Used to exercise the
+   *  /release-group/<release-id> → 308 → release-group redirect (#107). */
+  release: "10ba4ca0-79aa-4e44-a315-2f663c8084bd",
   /** "Hey Jude" by The Beatles (recording). */
   recording: "da972cd2-7eb1-4b3c-8474-4562f7ba0c07",
 } as const;

@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import {
   formatArtistCredit,
   getRelease,
@@ -8,6 +8,7 @@ import {
   MusicBrainzError,
   partitionArtistRelations,
   pickCanonicalRelease,
+  resolveReleaseGroupIdFromRelease,
   withLookupDeadline,
   type ReleaseDetail,
 } from "@/lib/clients/musicbrainz";
@@ -72,13 +73,26 @@ async function AlbumBody({ mbid }: { mbid: string }) {
   try {
     rg = await withLookupDeadline(getReleaseGroup(mbid));
   } catch (e) {
-    // Only a genuine MB "not found" (404) is a real miss → notFound().
-    // A deadline (queue saturation) or any transient MB failure
-    // (429/5xx/timeout, parse error) goes to the refreshable error
-    // boundary instead — otherwise a throttled COLD render turns a real
-    // album into a 404 on first click that "fixes itself" on retry.
-    if (e instanceof MusicBrainzError && e.status === 404) notFound();
-    throw e;
+    // Transient MB failure (deadline/429/5xx/parse) → refreshable error
+    // boundary, not a bogus 404: a throttled COLD render would otherwise
+    // 404 a real album on first click and "fix itself" on retry.
+    if (!(e instanceof MusicBrainzError && e.status === 404)) throw e;
+    // Genuine 404 on the release-GROUP endpoint. The id may actually be a
+    // RELEASE id — Parachord album pages that loaded a specific release,
+    // or older shared /release-group/<id> links (#107). Resolve it to its
+    // parent release group and redirect there (immutable mapping → a
+    // permanent redirect).
+    //
+    // This streams inside <Suspense>, so it's a CLIENT-side redirect: a
+    // real browser follows it (the common case for a shared link opened by
+    // a person), but curl / link-preview crawlers see the 200 shell. A true
+    // HTTP 308 isn't achievable here without de-streaming the whole route
+    // (it has a loading.tsx). Parachord doesn't rely on this — it resolves
+    // the canonical URL up front via /api/entity-link (verify-then-fallback),
+    // which IS a hard, correct response.
+    const rgId = await resolveReleaseGroupIdFromRelease(mbid);
+    if (rgId && rgId !== mbid) permanentRedirect(`/release-group/${rgId}`);
+    notFound();
   }
 
   const credit = formatArtistCredit(rg["artist-credit"]);

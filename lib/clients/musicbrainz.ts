@@ -522,6 +522,32 @@ export async function getRelease(mbid: string): Promise<ReleaseDetail> {
   );
 }
 
+/**
+ * Resolve a MusicBrainz RELEASE id to its parent RELEASE-GROUP id.
+ *
+ * Albums must always link to the release-group, never a release (AGENTS.md
+ * §1), but some sources hand us a release id instead: Parachord album pages
+ * that have loaded a specific release, older shared `/release-group/<id>`
+ * links, ListenBrainz release feeds. A release belongs to exactly one
+ * release group; this returns that group's id, or `null` if `mbid` isn't a
+ * resolvable release (unknown id, or a transient/timed-out MB call).
+ *
+ * Deadline-bounded and fail-soft (returns null rather than throwing) so
+ * callers can treat null as "couldn't map — fall back." `getRelease` is
+ * cache-tagged, so the mapping is cheap on repeat and edge-cacheable at the
+ * call site. See #107.
+ */
+export async function resolveReleaseGroupIdFromRelease(
+  mbid: string,
+): Promise<string | null> {
+  try {
+    const release = await withLookupDeadline(getRelease(mbid));
+    return release["release-group"]?.id ?? null;
+  } catch {
+    return null;
+  }
+}
+
 // MB recording: a single performance — distinct from a Track (which is a
 // recording placed on a specific medium of a specific release). A
 // recording can appear on many releases / release-groups.
