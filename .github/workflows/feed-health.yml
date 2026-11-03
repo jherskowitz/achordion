@@ -1,0 +1,55 @@
+name: feed-health
+
+# Weekly health check for the Critical Darlings source feed.
+#
+# Why: the pipeline broke SILENTLY for ~2 weeks (Oct 2026) when Metacritic
+# redesigned their site and retired the browse URL the scraper targeted —
+# the scrape started returning 0 albums, the source feed went empty, IFTTT
+# had nothing to ingest, and the tab quietly stopped updating. Nobody
+# noticed until the stale tab was spotted by eye.
+#
+# This catches that class of breakage early. It hits the source feed we
+# generate (/api/critical-darlings/metacritic.xml) and fails if the scrape
+# stops producing items — a failed run turns the workflow red, which GitHub
+# emails to the repo owner. Run it by hand anytime from the Actions tab.
+#
+# Note: it checks the SOURCE scrape (the thing that broke), not the output
+# `feed.xml` freshness — output can legitimately be quiet in a week with no
+# new high-scoring releases, which would false-alarm. A working scrape
+# always yields plenty of items (the un-filtered feed includes every recent
+# release, not just the >80 cut), so a near-empty feed means the scrape is
+# broken (e.g. Metacritic moved the URL again).
+
+on:
+  schedule:
+    - cron: "0 13 * * 1" # Mondays 13:00 UTC
+  workflow_dispatch: {}
+
+concurrency:
+  group: feed-health
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: critical-darlings source feed
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Source feed produces items
+        run: |
+          set -euo pipefail
+          # Cache-bust so we don't read a stale edge-cached response.
+          url="https://achordion.xyz/api/critical-darlings/metacritic.xml?_=$(date +%s)"
+          echo "GET $url"
+          code=$(curl -sS -o body.xml -w "%{http_code}" --max-time 60 \
+            -A "achordion-feed-health/1.0" "$url")
+          echo "HTTP $code"
+          items=$(grep -c '<item>' body.xml || true)
+          echo "item count: $items"
+          if [ "$code" != "200" ] || [ "$items" -lt 10 ]; then
+            echo "::error title=Critical Darlings feed broken::Source feed returned HTTP $code with $items items (expected 200 and >=10). The Metacritic scrape is likely broken — e.g. Metacritic moved the browse URL again. Check lib/clients/metacritic.ts (NEW_RELEASES_URL) and lib/metacritic-parse.ts (card selectors)."
+            echo "--- first lines of response ---"
+            head -20 body.xml || true
+            exit 1
+          fi
+          echo "Feed healthy: HTTP $code, $items items."
