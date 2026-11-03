@@ -1,5 +1,7 @@
 import { fetchMetacriticNewReleases } from "@/lib/clients/metacritic";
 import { highScoringAlbums } from "@/lib/metacritic-parse";
+import { criticsPickId } from "@/lib/clients/critical-darlings";
+import { getStoredCriticalDarlings } from "@/lib/critical-darlings-store";
 
 /**
  * Metacritic new-album-releases RSS feed — the drop-in replacement for
@@ -32,7 +34,7 @@ import { highScoringAlbums } from "@/lib/metacritic-parse";
  */
 
 const CHANNEL_LINK =
-  "https://www.metacritic.com/browse/albums/release-date/new-releases/date";
+  "https://www.metacritic.com/browse/music/all/all/all-time/new/";
 
 /** Wrap arbitrary text in a CDATA section, neutralizing any embedded `]]>`. */
 function cdata(value: string): string {
@@ -57,7 +59,24 @@ export async function GET(request: Request): Promise<Response> {
       : null;
 
   const all = await fetchMetacriticNewReleases();
-  const albums = min !== null ? highScoringAlbums(all, min) : all;
+  const scored = min !== null ? highScoringAlbums(all, min) : all;
+
+  // Only publish the MISSING high-scorers — albums that meet the cut but
+  // aren't already in our Critical Darlings store. Metacritic's new-releases
+  // page always lists the current ~50, so without this the feed resuming
+  // after a gap (or any re-scrape) would re-present every current high-scorer
+  // to IFTTT, which would re-run its AI-summary + Spotify steps and re-ingest
+  // picks we already have (bumping their order to "newest"). The store id is
+  // deterministic on (title, artist) via the same `criticsPickId` the ingest
+  // route uses, so we can predict it and filter here. Fail-open on a store
+  // read error — IFTTT's per-GUID dedup + the ingest upsert still prevent
+  // duplicate rows; this just spares the wasteful re-processing upstream.
+  const publishedIds = new Set(
+    (await getStoredCriticalDarlings().catch(() => [])).map((p) => p.id),
+  );
+  const albums = scored.filter(
+    (a) => !a.artist || !publishedIds.has(criticsPickId(a.title, a.artist)),
+  );
 
   const items = albums
     .map((a) => {

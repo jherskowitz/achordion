@@ -1,25 +1,31 @@
 /**
- * Parser for Metacritic's album new-releases page
- * (https://www.metacritic.com/browse/albums/release-date/new-releases/date).
+ * Parser for Metacritic's music new-releases browse page
+ * (https://www.metacritic.com/browse/music/all/all/all-time/new/).
  *
  * Pure + dependency-free so it's unit-testable and client-safe; the
  * network fetch lives in the server-only sibling `lib/clients/metacritic.ts`.
  *
- * Background: the Critical Darlings pipeline used to be FetchRSS
- * (scrape Metacritic → RSS) → IFTTT (filter score>80 + AI summary +
- * Spotify lookup → POST to our ingest). FetchRSS's feed disappeared,
- * breaking the chain. Metacritic has no RSS/API, but the browse page is
- * classic server-rendered HTML — every field we need sits in stable
- * markup, so we can scrape it ourselves and drop both third parties.
+ * Background: the Critical Darlings pipeline scrapes Metacritic → our
+ * `/api/critical-darlings/metacritic.xml` RSS → IFTTT (score filter + AI
+ * summary + Spotify lookup → POST to our ingest). This used to target the
+ * `/browse/albums/release-date/new-releases/date` page, but Metacritic
+ * redesigned the site (~Oct 2026) and retired that whole URL tree (it now
+ * 301s to `/browse/game/`), which silently starved the feed. The albums
+ * browse now lives under `/browse/music/…` as a Nuxt app whose product
+ * cards are still server-rendered — this parses those.
  *
- * Row markup (as of 2026-07):
- *   <div class="clamp-score-wrap">
- *     <a class="metascore_anchor" href="/music/<slug>/<artist>/critic-reviews">
- *       <div class="metascore_w large release positive">81</div></a></div>
- *   <a href="/music/<slug>/<artist>" class="title"><h3>A*POP</h3></a>
- *   <div class="clamp-details">
- *     <div class="artist"> by Tyla </div><span>July 24, 2026</span></div>
- *   <div class="summary"> Tyla returns with ... </div>
+ * Card markup (as of 2026-11): each release is a single anchor
+ *   <a … href="/music/<album>/<artist>/" … target="_self">
+ *     …<div … aria-label="Metascore 81 out of 100">…</div>…
+ *     <h3>…<span>Surface, Echo &amp; Sound</span></h3>
+ *     <div data-testid="product-artists" title="Editors">Editors</div>
+ *     <div><span>Oct NaN, 2026</span></div>…
+ *   </a>
+ * We key on the stable bits — the `/music/<album>/<artist>/` href, the
+ * `aria-label="Metascore N out of 100"`, the `<h3>` title, and the
+ * `data-testid="product-artists"` — rather than the volatile Tailwind
+ * class soup. Metacritic's SSR renders the day as literal "NaN" (it's
+ * hydrated client-side), so only month + year are reliably recoverable.
  */
 
 const BASE_URL = "https://www.metacritic.com";
@@ -76,30 +82,51 @@ function clean(s: string): string {
  */
 export function parseMetacriticNewReleases(html: string): MetacriticAlbum[] {
   const out: MetacriticAlbum[] = [];
-  // Each row begins at a score wrapper; split on it so per-row regexes
-  // can't leak across album boundaries.
-  const rows = html.split(/(?=<div class="clamp-score-wrap">)/);
-  for (const row of rows) {
-    const score = /metascore_w[^"]*release[^"]*">\s*(\d{1,3}|tbd)\s*</.exec(row);
-    const title = /<a href="(\/music\/[^"]+)" class="title"><h3>([\s\S]*?)<\/h3><\/a>/.exec(
-      row,
+  // Each product card is one anchor to /music/<album>/<artist>/. Split on
+  // every /music anchor and keep the blocks that actually hold a card —
+  // identified by the stable `data-testid="product-artists"` + Metascore
+  // aria-label — which drops nav / cross-link /music anchors elsewhere on
+  // the page. (Card titles/artists are <div>s, not links, so a card block
+  // never contains an inner /music anchor that could truncate it.)
+  const anchor = /<a\b[^>]*\bhref="\/music\/[^"]+"/g;
+  const starts: number[] = [];
+  for (let m = anchor.exec(html); m; m = anchor.exec(html)) starts.push(m.index);
+  for (let i = 0; i < starts.length; i++) {
+    const block = html.slice(
+      starts[i],
+      i + 1 < starts.length ? starts[i + 1] : html.length,
     );
-    if (!score || !title) continue;
-    const artist = /class="artist">\s*by\s*([\s\S]*?)\s*<\/div>/.exec(row);
-    const date = /<span>([A-Z][a-z]+ \d{1,2}, \d{4})<\/span>/.exec(row);
-    const review = /metascore_anchor"\s+href="(\/music\/[^"]+\/critic-reviews)"/.exec(
-      row,
-    );
-    const summary = /class="summary">\s*([\s\S]*?)\s*<\/div>/.exec(row);
-    const raw = score[1];
+    if (
+      !block.includes('data-testid="product-artists"') ||
+      !block.includes('aria-label="Metascore')
+    )
+      continue;
+    const href = /href="(\/music\/[^"]+)"/.exec(block);
+    const title = /<h3[^>]*>(?:\s*<!---->)?\s*<span>([\s\S]*?)<\/span>/.exec(block);
+    if (!href || !title) continue;
+    const score = /aria-label="Metascore (\d{1,3}|tbd) out of 100"/.exec(block);
+    const artist = /data-testid="product-artists"[^>]*\stitle="([^"]*)"/.exec(block);
+    const date = /<span>([A-Z][a-z]{2,8}) (\d{1,2}|NaN), (\d{4})<\/span>/.exec(block);
+    const raw = score?.[1];
+    // Metacritic's SSR renders the day as "NaN" (hydrated client-side), so
+    // keep the real day when present but fall back to month + year.
+    let releaseDate: string | null = null;
+    if (date) {
+      const [, mon, day, year] = date;
+      releaseDate = day === "NaN" ? `${mon} ${year}` : `${mon} ${day}, ${year}`;
+    }
     out.push({
-      title: clean(title[2]),
+      title: clean(title[1]),
       artist: artist ? clean(artist[1]) : null,
-      score: raw === "tbd" ? null : Number.parseInt(raw, 10),
-      releaseDate: date ? date[1] : null,
-      reviewUrl: review ? BASE_URL + review[1] : null,
-      albumUrl: BASE_URL + title[1],
-      summary: summary ? clean(summary[1]) : null,
+      score: !raw || raw === "tbd" ? null : Number.parseInt(raw, 10),
+      releaseDate,
+      // Link to the album page (it shows the Metascore + critic reviews);
+      // the new site has no reliably-constructible review-tab URL.
+      reviewUrl: null,
+      albumUrl: BASE_URL + href[1],
+      // The source feed carries only the score — IFTTT generates the
+      // summaries downstream, so Metacritic's own blurb is never used.
+      summary: null,
     });
   }
   return out;

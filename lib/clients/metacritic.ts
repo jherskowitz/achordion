@@ -7,16 +7,22 @@ import {
 } from "@/lib/metacritic-parse";
 
 /**
- * Metacritic album new-releases scraper — the first-party replacement
- * for the vanished FetchRSS feed. No RSS/API exists, but the browse
- * page is server-rendered HTML; `lib/metacritic-parse.ts` extracts the
- * rows. Meant to be driven by a scheduled job (Vercel Cron), which
- * filters to score>80, resolves a Spotify URL, and posts to
- * /api/critical-darlings/ingest.
+ * Metacritic music new-releases scraper — the source of the Critical
+ * Darlings pipeline. No RSS/API exists, but the browse page is server-
+ * rendered HTML; `lib/metacritic-parse.ts` extracts the product cards.
+ * Polled by IFTTT via /api/critical-darlings/metacritic.xml, which
+ * filters to score>80, generates a summary, resolves a Spotify URL, and
+ * posts to /api/critical-darlings/ingest.
+ *
+ * URL note: Metacritic redesigned the site (~Oct 2026) and retired the
+ * old `/browse/albums/release-date/new-releases/date` tree (it now 301s
+ * to `/browse/game/`). The albums browse now lives under `/browse/music`;
+ * `…/all/all/all-time/new/` sorts by release date (newest first), so the
+ * first page IS the new releases. `pageSize=50` caps the scrape.
  */
 
 const NEW_RELEASES_URL =
-  "https://www.metacritic.com/browse/albums/release-date/new-releases/date";
+  "https://www.metacritic.com/browse/music/all/all/all-time/new/?pageSize=50";
 
 // A real browser UA — Metacritic sits behind Cloudflare and a bare
 // programmatic UA is more likely to draw a challenge.
