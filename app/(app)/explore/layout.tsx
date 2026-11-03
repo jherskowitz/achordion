@@ -2,9 +2,9 @@ import type { ReactNode } from "react";
 import { SectionTabs, type SectionTab } from "@/components/achordion/section-tabs";
 
 const EXPLORE_TABS: SectionTab[] = [
-  { href: "/explore/critical-darlings", label: "Critical Darlings" },
   { href: "/explore", label: "Just for You" },
   { href: "/explore/fresh-releases", label: "Fresh Releases" },
+  { href: "/explore/critical-darlings", label: "Critical Darlings" },
   { href: "/explore/similar-users", label: "Similar Users" },
   { href: "/explore/year-in-music", label: "Year In Music" },
 ];
