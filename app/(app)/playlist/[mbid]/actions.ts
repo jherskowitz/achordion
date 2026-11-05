@@ -46,10 +46,34 @@ async function loadOwnedPlaylist(
   // Try authed first — the playlist might be private, in which case
   // the unauthed endpoint 404s. Authed lookup also bypasses the data
   // cache, so we get the freshest collaborators list to forward.
-  const current =
-    (await getPlaylist(mbid, token).catch(() => null)) ??
-    (await getPlaylist(mbid).catch(() => null));
-  if (!current) return { ok: false, reason: "Playlist not found." };
+  // Try authed first (private + freshest), fall back to anon. Don't collapse
+  // a transient failure into "not found" (see #108): getPlaylist returns null
+  // only for a real 404/204 and throws otherwise (401/429/5xx/Zod). A throw
+  // yields a retryable error; only a clean null means the playlist is gone.
+  let current: Awaited<ReturnType<typeof getPlaylist>> = null;
+  let lookupFailed = false;
+  try {
+    current = await getPlaylist(mbid, token);
+  } catch (err) {
+    console.error(`[playlist-action] authed lookup failed for ${mbid}:`, err);
+    lookupFailed = true;
+  }
+  if (!current) {
+    try {
+      current = await getPlaylist(mbid);
+    } catch (err) {
+      console.error(`[playlist-action] anon lookup failed for ${mbid}:`, err);
+      lookupFailed = true;
+    }
+  }
+  if (!current) {
+    return {
+      ok: false,
+      reason: lookupFailed
+        ? "Couldn't reach ListenBrainz — please try again."
+        : "Playlist not found.",
+    };
+  }
   if (
     !current.creator ||
     current.creator.toLowerCase() !== viewer.toLowerCase()

@@ -100,7 +100,19 @@ async function PlaylistBody({ mbid }: { mbid: string }) {
   ]);
   let data = await getPlaylist(mbid);
   if (!data && token) {
-    data = await getPlaylist(mbid, token).catch(() => null);
+    // Don't swallow: getPlaylist returns null ONLY for a real 404/204 and
+    // throws for everything else (401/429/5xx/timeout/Zod). Catching those
+    // into null showed the owner a 404 page for a transient failure and
+    // logged nothing — and the anonymous call above doesn't catch, so the
+    // very same failure rendered error.tsx there but a 404 here. Log the
+    // cause and let it reach the refreshable error boundary; notFound() only
+    // for a genuine null. See #108.
+    try {
+      data = await getPlaylist(mbid, token);
+    } catch (err) {
+      console.error(`[playlist] authed lookup failed for ${mbid}:`, err);
+      throw err;
+    }
   }
   if (!data) notFound();
   const xspfUrl = await publicUrl(`/api/playlist/${mbid}/xspf`);

@@ -103,8 +103,13 @@ function fetchAuthedPlaylistCached(
     async () => {
       try {
         return await getPlaylist(mbid, token);
-      } catch {
-        return null;
+      } catch (err) {
+        // Don't cache a transient failure as "not found": getPlaylist returns
+        // null (which unstable_cache WILL memoize) only for a real 404/204.
+        // Log + rethrow so the miss isn't cached; the GET's catch turns the
+        // throw into a 502 the caller can retry. See #108.
+        console.error(`[playlist-preview] authed lookup failed for ${mbid}:`, err);
+        throw err;
       }
     },
     [

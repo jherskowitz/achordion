@@ -20,8 +20,18 @@ export async function GET(
   if (!playlist) {
     const token = await getLbTokenForRequest();
     if (token) {
-      playlist = await getPlaylist(mbid, token).catch(() => null);
-      if (playlist) viaAuth = true;
+      // Don't swallow a transient failure into a 404 (see #108): getPlaylist
+      // returns null only for a real 404/204 and throws otherwise. Surface a
+      // 502 so the owner's download retries instead of looking deleted.
+      try {
+        playlist = await getPlaylist(mbid, token);
+        if (playlist) viaAuth = true;
+      } catch (err) {
+        console.error(`[playlist-xspf] authed lookup failed for ${mbid}:`, err);
+        return new Response("Playlist temporarily unavailable", {
+          status: 502,
+        });
+      }
     }
   }
   if (!playlist) {
