@@ -21,7 +21,9 @@ import { getStoredCriticalDarlings } from "@/lib/critical-darlings-store";
  *                   grounds the AI-summary step)
  *   - <dc:creator>  artist                   → EntryAuthor
  *   - <category>    "metascore:N"            (extra, for score-based filters)
- *   - <pubDate>     RFC-822 release date
+ *   - <pubDate>     RFC-822 feed-availability time (see the note by the item
+ *                   build — NOT Metacritic's release date, which the
+ *                   redesign no longer exposes a usable day for)
  *   - <guid>        Metacritic album URL (stable)
  *
  * By default every parsed release is included (~100 items) and IFTTT does
@@ -78,16 +80,25 @@ export async function GET(request: Request): Promise<Response> {
     (a) => !a.artist || !publishedIds.has(criticsPickId(a.title, a.artist)),
   );
 
+  // pubDate carries RECENCY for IFTTT's RSS trigger, which fires only for
+  // items that look new *and recent* (it compares pubDate against its last
+  // check). Metacritic's redesign renders the release day as "NaN", so we
+  // only recover month+year — and a month-only date reads as weeks old, so
+  // the trigger skipped our catch-up items as "not recent". But every item
+  // here IS newly available in our feed (the only-missing filter guarantees
+  // it isn't in our store yet), so we stamp it with the feed-generation time,
+  // newest first. Stable within the 30-min edge-cache window, and the GUID
+  // (album URL) keeps IFTTT from re-firing once an item is ingested — the
+  // only-missing filter then drops it from the feed entirely.
+  const now = Date.now();
   const items = albums
-    .map((a) => {
+    .map((a, i) => {
       const title = a.artist ? `${a.title} by ${a.artist}` : a.title;
       const scorePrefix = a.score !== null ? `Metascore: ${a.score}. ` : "";
       const description = `${scorePrefix}${a.summary ?? ""}`.trim();
       const link = a.reviewUrl ?? a.albumUrl ?? CHANNEL_LINK;
       const guid = a.albumUrl ?? link;
-      const parsed = a.releaseDate ? new Date(a.releaseDate) : null;
-      const pubDate =
-        parsed && !Number.isNaN(parsed.getTime()) ? parsed.toUTCString() : null;
+      const pubDate = new Date(now - i * 1000).toUTCString();
       return [
         "    <item>",
         `      <title>${cdata(title)}</title>`,
@@ -98,7 +109,7 @@ export async function GET(request: Request): Promise<Response> {
           ? [`      <category>metascore:${a.score}</category>`]
           : []),
         `      <description>${cdata(description)}</description>`,
-        ...(pubDate ? [`      <pubDate>${pubDate}</pubDate>`] : []),
+        `      <pubDate>${pubDate}</pubDate>`,
         "    </item>",
       ].join("\n");
     })
