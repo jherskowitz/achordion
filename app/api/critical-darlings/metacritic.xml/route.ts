@@ -1,7 +1,10 @@
 import { fetchMetacriticNewReleases } from "@/lib/clients/metacritic";
 import { highScoringAlbums } from "@/lib/metacritic-parse";
 import { criticsPickId } from "@/lib/clients/critical-darlings";
-import { getStoredCriticalDarlings } from "@/lib/critical-darlings-store";
+import {
+  getStoredCriticalDarlings,
+  getFeedFirstSeen,
+} from "@/lib/critical-darlings-store";
 
 /**
  * Metacritic new-album-releases RSS feed — the drop-in replacement for
@@ -80,25 +83,27 @@ export async function GET(request: Request): Promise<Response> {
     (a) => !a.artist || !publishedIds.has(criticsPickId(a.title, a.artist)),
   );
 
-  // pubDate carries RECENCY for IFTTT's RSS trigger, which fires only for
-  // items that look new *and recent* (it compares pubDate against its last
-  // check). Metacritic's redesign renders the release day as "NaN", so we
-  // only recover month+year — and a month-only date reads as weeks old, so
-  // the trigger skipped our catch-up items as "not recent". But every item
-  // here IS newly available in our feed (the only-missing filter guarantees
-  // it isn't in our store yet), so we stamp it with the feed-generation time,
-  // newest first. Stable within the 30-min edge-cache window, and the GUID
-  // (album URL) keeps IFTTT from re-firing once an item is ingested — the
-  // only-missing filter then drops it from the feed entirely.
-  const now = Date.now();
+  // pubDate carries RECENCY for IFTTT's RSS trigger: it fires for items that
+  // look new *and recent* (comparing pubDate against its last check), and a
+  // stale date gets an item skipped. Metacritic's redesign renders the day as
+  // "NaN" so we can't use the real release date — but every item here is newly
+  // available in our feed (the only-missing filter guarantees it isn't in the
+  // store yet). So each gets a STABLE first-seen timestamp: recent when it
+  // first appears (IFTTT fires), then unchanged as it persists — not re-
+  // stamped "now" on every render. The GUID (album URL) keeps IFTTT from
+  // re-firing once an item is ingested; the only-missing filter then drops it
+  // from the feed entirely.
+  const guidOf = (a: (typeof albums)[number]): string =>
+    a.albumUrl ?? a.reviewUrl ?? CHANNEL_LINK;
+  const firstSeen = await getFeedFirstSeen(albums.map(guidOf));
   const items = albums
-    .map((a, i) => {
+    .map((a) => {
       const title = a.artist ? `${a.title} by ${a.artist}` : a.title;
       const scorePrefix = a.score !== null ? `Metascore: ${a.score}. ` : "";
       const description = `${scorePrefix}${a.summary ?? ""}`.trim();
       const link = a.reviewUrl ?? a.albumUrl ?? CHANNEL_LINK;
-      const guid = a.albumUrl ?? link;
-      const pubDate = new Date(now - i * 1000).toUTCString();
+      const guid = guidOf(a);
+      const pubDate = new Date(firstSeen.get(guid) ?? Date.now()).toUTCString();
       return [
         "    <item>",
         `      <title>${cdata(title)}</title>`,

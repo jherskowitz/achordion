@@ -26,6 +26,9 @@ import type { CriticsPickAlbum } from "@/lib/clients/critical-darlings";
 
 export const CRITICAL_DARLINGS_KEY = "critical-darlings:json";
 
+/** First-seen timestamps for Metacritic source-feed items (guid → ms). */
+const FEED_FIRSTSEEN_KEY = "critical-darlings:feed-firstseen";
+
 /** Keep the surface to a sane rolling window. */
 const MAX_ITEMS = 60;
 /** Drop anything older than this on read + write, even without churn. */
@@ -135,4 +138,63 @@ export async function ingestCriticalDarlings(
 
   await redis.set(CRITICAL_DARLINGS_KEY, JSON.stringify(merged));
   return incoming.length;
+}
+
+/**
+ * Resolve a stable first-seen timestamp (ms) for each source-feed item,
+ * keyed by its guid (the album URL). Used as the `<pubDate>` in the
+ * Metacritic source feed: a newly-appearing album is stamped `now` (so it
+ * reads as recent and IFTTT's RSS trigger fires on it), and that timestamp
+ * then STAYS PUT as the item persists across regenerations — instead of
+ * re-stamping "now" every render, which made the dates meaningless.
+ *
+ * Call with the guids currently in the feed. Unseen guids are stamped now,
+ * known guids keep their stored timestamp, and guids no longer present are
+ * pruned so the map stays bounded to the current feed. The write only fires
+ * when the set actually changed. Fail-open: returns `now` for every guid
+ * when Upstash isn't configured or errors, so the feed still emits a recent
+ * (if non-persistent) date.
+ */
+export async function getFeedFirstSeen(
+  guids: string[],
+): Promise<Map<string, number>> {
+  const now = Date.now();
+  const allNow = (): Map<string, number> =>
+    new Map(guids.map((g): [string, number] => [g, now]));
+  if (!redis || guids.length === 0) return allNow();
+
+  let stored: Record<string, number> = {};
+  try {
+    const raw = await redis.get<Record<string, number> | string>(
+      FEED_FIRSTSEEN_KEY,
+    );
+    if (typeof raw === "string") {
+      try {
+        stored = JSON.parse(raw) as Record<string, number>;
+      } catch {
+        stored = {};
+      }
+    } else if (raw && typeof raw === "object") {
+      stored = raw;
+    }
+  } catch {
+    return allNow(); // fail-open
+  }
+
+  const current = new Set(guids);
+  const next: Record<string, number> = {};
+  for (const g of guids) {
+    next[g] = typeof stored[g] === "number" ? stored[g] : now;
+  }
+  const changed =
+    guids.some((g) => typeof stored[g] !== "number") || // a new guid
+    Object.keys(stored).some((k) => !current.has(k)); // a pruned guid
+  if (changed) {
+    try {
+      await redis.set(FEED_FIRSTSEEN_KEY, JSON.stringify(next));
+    } catch {
+      // Best-effort — the map returned is still correct for this render.
+    }
+  }
+  return new Map<string, number>(Object.entries(next));
 }
