@@ -1,4 +1,4 @@
-import { searchArtists, withLookupDeadline } from "@/lib/clients/musicbrainz";
+import { resolveArtistMbidByName } from "@/lib/clients/musicbrainz";
 import { cachedRedirect, uncachedRedirect } from "@/lib/lookup-redirect";
 import { checkRateLimit } from "@/lib/rate-limit";
 
@@ -30,20 +30,11 @@ export async function GET(request: Request) {
     // what they'd want as a fallback anyway.
     return cachedRedirect(new URL("/search", request.url), { matched: false });
   }
-  try {
-    // Quote the artist name to bias MB's search toward exact-phrase
-    // matches (otherwise common-word names fan out to a long list of
-    // unrelated artists ranked higher by token overlap).
-    const q = `artist:"${name.replace(/"/g, '\\"')}"`;
-    const results = await withLookupDeadline(searchArtists(q, 5));
-    const top = results[0];
-    if (top?.id) {
-      return cachedRedirect(new URL(`/artist/${top.id}`, request.url), {
-        matched: true,
-      });
-    }
-  } catch {
-    /* fall through */
+  const id = await resolveArtistMbidByName(name);
+  if (id) {
+    return cachedRedirect(new URL(`/artist/${id}`, request.url), {
+      matched: true,
+    });
   }
   return cachedRedirect(
     new URL(`/search?q=${encodeURIComponent(name)}`, request.url),

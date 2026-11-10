@@ -1,4 +1,5 @@
 import { resolveArtistImage } from "@/components/achordion/artist-avatar";
+import { resolveArtistMbidByName } from "@/lib/clients/musicbrainz";
 import { checkRateLimit } from "@/lib/rate-limit";
 
 // Browser cache: 1h fresh, 24h stale-while-revalidate. Artist images
@@ -30,13 +31,23 @@ export async function GET(request: Request) {
 
   const url = new URL(request.url);
   const mbid = url.searchParams.get("mbid")?.trim() ?? "";
+  const name = url.searchParams.get("name")?.trim() ?? "";
   const widthRaw = url.searchParams.get("width");
   const width = widthRaw ? parseInt(widthRaw, 10) : 128;
-  if (!mbid) return Response.json({ url: null }, { status: 400 });
+  if (!mbid && !name) return Response.json({ url: null }, { status: 400 });
 
   try {
+    // Resolve a name → MBID when the caller only has a name — a ListenBrainz
+    // stats row often never mapped to one, and both Wikidata and fanart.tv are
+    // MBID-keyed, so without this those rows can never show a real photo. Same
+    // quoted search the /artist/lookup click uses, so the avatar matches where
+    // the name-link goes. Rate-limited above + MB-cached. See #106.
+    const resolvedMbid = mbid || (name ? await resolveArtistMbidByName(name) : null);
+    if (!resolvedMbid) {
+      return Response.json({ url: null }, { headers: CACHE_HEADERS });
+    }
     const { url: imageUrl } = await resolveArtistImage(
-      mbid,
+      resolvedMbid,
       undefined,
       Number.isFinite(width) ? width : 128,
     );

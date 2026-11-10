@@ -876,6 +876,28 @@ export async function searchArtists(query: string, limit = 8) {
   return result.artists;
 }
 
+/**
+ * Resolve an artist NAME to its most-likely MBID via a quoted exact-phrase
+ * search, or null. Deadline-bounded and fail-soft. Shared by the
+ * `/artist/lookup` click redirect and the name→image path (#106) so both
+ * resolve a name the same way — the avatar a MBID-less row shows matches the
+ * artist its name-link navigates to. Quoting biases MB toward an exact phrase
+ * so common-word names don't fan out to unrelated artists.
+ */
+export async function resolveArtistMbidByName(
+  name: string,
+): Promise<string | null> {
+  const n = name.trim();
+  if (!n) return null;
+  try {
+    const q = `artist:"${n.replace(/"/g, '\\"')}"`;
+    const results = await withLookupDeadline(searchArtists(q, 5));
+    return results[0]?.id ?? null;
+  } catch {
+    return null;
+  }
+}
+
 const ReleaseGroupSearchSchema = z.object({
   "release-groups": z.array(
     z.object({
