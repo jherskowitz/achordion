@@ -141,6 +141,22 @@ export async function visit(
     // application/javascript) at error level. Same root cause —
     // Vercel script rewrite only exists on Vercel deploys.
     /Refused to execute script from .*\/_vercel\/(?:insights|speed-insights)\/script\.js/,
+    // React #441 = "An error occurred in the Server Components render".
+    // On the live-data catalog pages (artist / release-group / recording)
+    // a Suspense'd child section (discography, similar artists, listener
+    // stats, reviews) fetches MusicBrainz/ListenBrainz, and when an
+    // upstream is briefly slow or rate-limiting, that child throws, the
+    // error boundary catches it, and React logs #441 on the client — even
+    // though the hero/main content rendered fine. This flaked the smoke
+    // suite red on ~monthly intervals (always on a slow-upstream window,
+    // same bucket as the cover-art 5xx / LB-hiccup noise above). The
+    // `expectedText` assertion still guards that the page actually
+    // rendered its entity, so a *fully* broken page (hero throws → no
+    // expected text) still fails. The residual gap — a code bug that
+    // throws only inside a streamed child while the hero renders — is
+    // caught by the broader test run; here we trade it for not reding the
+    // suite on a transient upstream blip.
+    /Minified React error #441/,
   ];
   const onConsole = (msg: ConsoleMessage) => {
     if (msg.type() !== "error") return;
