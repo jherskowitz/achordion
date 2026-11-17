@@ -15,6 +15,7 @@ import {
   PARACHORD_CLIENT_HEADER,
   normalizeParachordClient,
 } from "@/lib/parachord-client";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 /**
  * Parachord-only endpoint for submitting MBID → external-links
@@ -187,6 +188,21 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json(
       { error: "unauthorized" },
       { status: 401, headers: NO_STORE },
+    );
+  }
+
+  // Own per-IP backstop (`ip:track-links-submit`, 300/min) — matches
+  // playlist-links/submit so the two Parachord write routes behave
+  // identically. The bearer above is the real abuse gate; this only
+  // bounds a leaked token from one address. Keyed per-IP, not on the
+  // (fleet-wide shared) bearer, so one busy client can't 429 the rest.
+  // Placed before the MB lookups / ISRC resolution / Redis write below
+  // so an over-budget caller is cut off cheaply. See issue #112.
+  const limit = await checkRateLimit("track-links-submit", request);
+  if (!limit.ok) {
+    return NextResponse.json(
+      { error: "rate limited" },
+      { status: 429, headers: NO_STORE },
     );
   }
 

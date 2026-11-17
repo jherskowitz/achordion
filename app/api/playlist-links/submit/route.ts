@@ -13,8 +13,10 @@ import { setPlaylistLinks, type PlaylistLink } from "@/lib/playlist-links-store"
  * Symmetric to /api/track-links/submit:
  *   - Bearer token auth (PARACHORD_TRACK_LINKS_TOKEN — reuses the same
  *     env var; this is one logical write contract from one writer).
- *   - Per-IP rate limit shares the announcement-event limiter as a
- *     reasonable approximation; bump to its own kind if volume warrants.
+ *   - Own per-IP rate limit (`ip:playlist-links-submit`, 300/min) sized
+ *     for a sync-cycle burst. It previously borrowed the 60/min
+ *     announcement-event bucket and collided with banner events from the
+ *     same IP, 429'ing submits that nothing retries — see issue #112.
  *   - Best-effort: 200 even when Upstash isn't configured (local dev).
  */
 
@@ -73,7 +75,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "unauthorized" }, { status: 401, headers: NO_STORE });
   }
 
-  const limit = await checkRateLimit("announcement-event", request);
+  const limit = await checkRateLimit("playlist-links-submit", request);
   if (!limit.ok) {
     console.warn("[pl-links] submit: rate-limited");
     return NextResponse.json({ error: "rate limited" }, { status: 429, headers: NO_STORE });
