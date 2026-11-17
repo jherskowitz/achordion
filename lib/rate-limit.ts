@@ -75,6 +75,23 @@ const lookupLimiter = makeLimiter("ip:lookup", 30, "60 s");
 // cache on the route response is the real cost lever; see
 // app/api/search/route.ts.)
 const searchLimiter = makeLimiter("ip:search", 60, "60 s");
+// Parachord submit endpoints (playlist-links + track-links). These are
+// bearer-authenticated writes — the shared PARACHORD_TRACK_LINKS_TOKEN is
+// the real abuse gate; this per-IP limiter is only a backstop for a leaked
+// token. Keyed per-IP (not on the bearer): the token is ONE shared secret
+// across every Parachord client (desktop/android/ios), so a bearer-keyed
+// bucket would collapse the whole fleet into one budget and 429 legitimate
+// clients during busy sync windows. 300/min comfortably covers one user
+// pushing their whole changed playlist set in a single sync cycle (submits
+// are fire-and-forget with no retry, so a 429 silently drops links — the
+// ceiling has to clear a real burst), while still cutting off a leaked-token
+// abuser from one address. The two submit routes share this ceiling so they
+// behave identically; each gets its own prefix so their buckets don't
+// contend. Previously playlist-links/submit borrowed the 60/min
+// announcement-event bucket and collided with banner events from the same
+// IP — see issue #112.
+const playlistLinksSubmitLimiter = makeLimiter("ip:playlist-links-submit", 300, "60 s");
+const trackLinksSubmitLimiter = makeLimiter("ip:track-links-submit", 300, "60 s");
 
 /**
  * Client-IP extraction for rate-limit keying. Hardened against
@@ -114,6 +131,8 @@ export async function checkRateLimit(
     | "page"
     | "announcement-event"
     | "track-links-lookup"
+    | "playlist-links-submit"
+    | "track-links-submit"
     | "lookup"
     | "search",
   request: Request,
@@ -127,11 +146,15 @@ export async function checkRateLimit(
           ? announcementEventLimiter
           : kind === "track-links-lookup"
             ? trackLinksLookupLimiter
-            : kind === "lookup"
-              ? lookupLimiter
-              : kind === "search"
-                ? searchLimiter
-                : pageLimiter;
+            : kind === "playlist-links-submit"
+              ? playlistLinksSubmitLimiter
+              : kind === "track-links-submit"
+                ? trackLinksSubmitLimiter
+                : kind === "lookup"
+                  ? lookupLimiter
+                  : kind === "search"
+                    ? searchLimiter
+                    : pageLimiter;
   if (!limiter) return { ok: true };
   const ip = getClientIp(request);
   // FAIL OPEN. `limiter.limit()` is a network call to Upstash; it
