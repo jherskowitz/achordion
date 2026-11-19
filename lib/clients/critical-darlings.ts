@@ -1,30 +1,20 @@
 import "server-only";
-import { fetchWithTimeout } from "@/lib/fetch-timeout";
 import { getStoredCriticalDarlings } from "@/lib/critical-darlings-store";
 
 /**
  * Critical Darlings — top-rated albums from leading music publications.
  *
- * Primary source is now the webhook-fed store: IFTTT (Metacritic
- * scrape + score>80 filter + AI summary + Spotify lookup) POSTs each
- * new pick to `/api/critical-darlings/ingest`. During the cutover
- * `getCriticalDarlings` UNIONs that store with the legacy rssground.com
- * feed (store wins on id conflict) so freshly-ingested picks layer on
- * top of the existing backlog instead of replacing it. Drop the
- * rssground half once the store stands on its own — see #81. The
- * Parachord-facing feed.xml stays store-only regardless.
+ * Source is the webhook-fed store: IFTTT (Metacritic scrape + score>80
+ * filter + AI summary + Spotify lookup) POSTs each new pick to
+ * `/api/critical-darlings/ingest`, which upserts into Upstash. This is
+ * the same store the Parachord-facing `feed.xml` serves — the legacy
+ * rssground.com fallback was removed once every client had migrated off
+ * it (see #81 / #83).
  *
- * Parsing of the legacy feed mirrors Parachord's `loadCriticsPicks()`:
- *  1. Fetch the rssground.com/p/uncoveries feed
- *  2. Parse each item title as "Album Title by Artist Name"
- *  3. Pull a Spotify album URL out of the description if present
- *
- * The desktop and Android clients also lazily resolve cover art via
+ * The desktop and Android clients lazily resolve cover art via
  * MusicBrainz + CAA after parsing — we do that on the page itself with
  * a per-card Suspense fence so the rate-limited MB calls stream in.
  */
-
-const RSS_URL = "https://www.rssground.com/p/uncoveries";
 
 export interface CriticsPickAlbum {
   /** Stable slug — `${title}|${artist}` lowercased, non-alnum → `-`. */
@@ -40,10 +30,6 @@ export interface CriticsPickAlbum {
   /** Metacritic metascore (0–100), when the source provides it. The
    *  legacy RSS feed doesn't carry it; the webhook ingest does. */
   score?: number;
-}
-
-function stripCdata(s: string): string {
-  return s.replace(/<!\[CDATA\[/g, "").replace(/\]\]>/g, "");
 }
 
 function decodeHtmlEntitiesOnce(s: string): string {
@@ -117,19 +103,13 @@ export function parseCriticsPickTitle(
   return { title, artist };
 }
 
-function extractSpotifyUrl(html: string): string | null {
-  const m = html.match(/https?:\/\/open\.spotify\.com\/album\/[a-zA-Z0-9]+/);
-  return m ? m[0] : null;
-}
-
 function slug(title: string, artist: string): string {
   return `${title}|${artist}`.toLowerCase().replace(/[^a-z0-9|]+/g, "-");
 }
 
 /**
- * Stable render id for a pick. Matches the legacy feed's `id` format
- * (`critics-<slug>`) so items ingested via the webhook and items from
- * the fallback feed dedupe against each other by the same key.
+ * Stable render id for a pick: `critics-<slug>`. The ingest webhook and
+ * the store key on this same format, so picks dedupe by it.
  */
 export function criticsPickId(title: string, artist: string): string {
   return `critics-${slug(title, artist)}`;
@@ -145,100 +125,38 @@ export function sanitizeCriticalDarlingText(html: string): string {
   return cleanHtml(html);
 }
 
-function parseRss(xml: string): CriticsPickAlbum[] {
-  const out: CriticsPickAlbum[] = [];
-  const seen = new Set<string>();
-  const itemRe = /<item>([\s\S]*?)<\/item>/g;
-  const titleRe = /<title>([\s\S]*?)<\/title>/;
-  const linkRe = /<link>([\s\S]*?)<\/link>/;
-  const descRe = /<description>([\s\S]*?)<\/description>/;
-  const pubRe = /<pubDate>([\s\S]*?)<\/pubDate>/;
-  let m: RegExpExecArray | null;
-  while ((m = itemRe.exec(xml))) {
-    const item = m[1];
-    const titleRaw = decodeHtmlEntities(
-      stripCdata(titleRe.exec(item)?.[1] ?? "").trim(),
-    );
-    if (!titleRaw) continue;
-    const parsed = parseCriticsPickTitle(titleRaw);
-    if (!parsed) continue;
-    const id = slug(parsed.title, parsed.artist);
-    if (seen.has(id)) continue;
-    seen.add(id);
-    const linkRaw = stripCdata(linkRe.exec(item)?.[1] ?? "").trim();
-    const descRaw = stripCdata(descRe.exec(item)?.[1] ?? "").trim();
-    const pubDate = stripCdata(pubRe.exec(item)?.[1] ?? "").trim() || null;
-    out.push({
-      id: `critics-${id}`,
-      title: parsed.title,
-      artist: parsed.artist,
-      link: linkRaw || null,
-      description: cleanHtml(descRaw),
-      spotifyUrl: extractSpotifyUrl(descRaw),
-      pubDate,
-    });
-  }
-  return out;
-}
-
 /**
- * Fetch the Critical Darlings RSS feed. Cached for 12 hours — the
- * upstream RSS is published throughout the week but practically the
- * list of "what critics are loving right now" doesn't move fast
- * enough that mid-day refreshes earn their keep, and the per-card
- * MB cover lookups (searchReleaseGroups, then `mbFetch`'s 1-req/sec
- * gate) are expensive on cold revalidation. Two refreshes a day is
- * enough to keep the surface fresh and friendly to the source feed.
+ * Read the Critical Darlings picks from the webhook-fed store, newest
+ * first. Returns [] on any store failure — the caller decides how to
+ * render the empty state.
  *
- * Returns [] on any network/parse failure — the caller decides how
- * to render the empty state.
+ * Caching + the `critical-darlings` tag live on the store read
+ * (`getStoredCriticalDarlings`, `unstable_cache`), which the ingest
+ * route busts on each new pick — so this function needs no cache of its
+ * own. The per-card MB/CAA cover lookups happen on the page behind a
+ * Suspense fence, not here.
  */
 export async function getCriticalDarlings(): Promise<CriticsPickAlbum[]> {
-  // Primary: the webhook-fed store (IFTTT → /api/critical-darlings/
-  // ingest).
   const stored = await getStoredCriticalDarlings().catch(() => []);
 
-  // Transitional: UNION the store with the legacy RSSground feed rather
-  // than either/or. A store entry always wins on id conflict, so newly-
-  // ingested picks layer on top of the existing RSSground backlog
-  // instead of replacing it — no "content cliff" where the page
-  // collapses to a handful of items the moment the first pick ingests.
-  // Remove the RSSground half (and this whole fallback) once the store
-  // has enough history to stand alone, before RSSground goes away — #81.
-  //
-  // NOTE: this union is page-only. The feed at /api/critical-darlings/
-  // feed.xml that Parachord polls stays store-only by design, so it
-  // ships only clean, first-party picks.
-  let fallback: CriticsPickAlbum[] = [];
-  try {
-    const res = await fetchWithTimeout(RSS_URL, {
-      headers: {
-        "User-Agent": "Achordion/0.1 (jherskow@gmail.com)",
-        Accept: "application/rss+xml, application/xml, text/xml",
-      },
-      next: { revalidate: 60 * 60 * 12, tags: ["critical-darlings"] },
-    });
-    if (res.ok) fallback = parseRss(await res.text());
-  } catch {
-    // RSSground unreachable — the store alone is a fine result.
-  }
-
+  // The store upserts dedupe on ingest, but keep a defensive pass so a
+  // stray duplicate never double-renders.
   const seen = new Set<string>();
-  const merged: CriticsPickAlbum[] = [];
-  for (const p of [...stored, ...fallback]) {
-    if (seen.has(p.id)) continue; // store iterated first → store wins
+  const picks: CriticsPickAlbum[] = [];
+  for (const p of stored) {
+    if (seen.has(p.id)) continue;
     seen.add(p.id);
-    merged.push(p);
+    picks.push(p);
   }
   // Newest-first by pubDate; missing/unparseable dates sort last.
-  merged.sort(
+  picks.sort(
     (a, b) =>
       (Date.parse(b.pubDate ?? "") || 0) - (Date.parse(a.pubDate ?? "") || 0),
   );
   // Normalize descriptions on read. Store entries written under the old
   // single-pass decoder kept a residual `&amp;`; re-decoding here repairs
   // them without a re-ingest (idempotent for already-clean text).
-  return merged.map((p) => ({
+  return picks.map((p) => ({
     ...p,
     description: decodeHtmlEntities(p.description),
   }));

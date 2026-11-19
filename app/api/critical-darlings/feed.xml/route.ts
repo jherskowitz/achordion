@@ -7,14 +7,13 @@ import { decodeHtmlEntities } from "@/lib/clients/critical-darlings";
  * to poll.
  *
  * Byte-compatible with the shape Parachord's `parseCriticsPicksRSS()`
- * (and Achordion's own `parseRss`) already consume, so Parachord repoints
- * from `rssground.com/p/uncoveries` to here with only a URL change — no
- * parser rewrite:
+ * consumes, so Parachord repointed from `rssground.com/p/uncoveries` to
+ * here with only a URL change — no parser rewrite:
  *   - `<title>` is `"Album by Artist"` (the parser splits on the last
  *     " by ").
  *   - `<description>` carries the AI summary with the Spotify album URL
- *     appended, so the parser's `extractSpotifyUrl` finds it (mirrors
- *     RSSground's `{{Response}} {{AlbumUrl}}` item body).
+ *     appended, so a Spotify-URL regex finds it (mirrors RSSground's
+ *     `{{Response}} {{AlbumUrl}}` item body).
  *   - `<link>` is the Metacritic review URL; `<guid>` is the stable id.
  *
  * Reads the webhook-fed store only (no rssground fallback — the point is
