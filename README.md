@@ -102,6 +102,25 @@ npx auth secret
 
 `LISTENBRAINZ_TOKEN` is required for LB Radio and the personalised feed. Find yours on your [ListenBrainz profile](https://listenbrainz.org/profile/) page.
 
+## Scripts
+
+| Command | What it does |
+| --- | --- |
+| `npm run dev` | Local dev server (webpack). |
+| `npm run build` | Production build (webpack). |
+| `npm run start` | Serve a production build. |
+| `npm run lint` | ESLint. |
+| `npm run e2e` | Playwright smoke suite against a fresh `build && start`. |
+| `npm run test:unit` | Node unit tests under `lib/`. |
+
+Both `dev` and `build` use **webpack**, not Turbopack, on purpose — see `AGENTS.md` for the reasons. Before committing, typecheck with `npx --no-install tsc --noEmit`.
+
+The Playwright smoke suite can also run against a live deployment (skips the local server boot):
+
+```bash
+E2E_BASE_URL=https://achordion.xyz npm run e2e
+```
+
 ## Deployment
 
 Deployed on Vercel. Required environment variables (Project Settings → Environment Variables, all in the Production scope):
