@@ -4,7 +4,7 @@ A modern, open-source alternative front-end for [ListenBrainz](https://listenbra
 
 ## What it is
 
-Achordion [https://achordion.xyz] mirrors every functional page that listenbrainz.org offers, with a fresh visual language and cleaner information architecture. Sign in with MusicBrainz (the same identity ListenBrainz itself uses), then browse your listens, stats, charts, recommendations, your feed, and the full LB explore surface — fresh releases, weekly playlists, similar listeners, Year in Music, LB Radio, Critical Darlings, and curated radio rewinds from public stations via [spinbin](https://github.com/jherskowitz/spinbin).
+[Achordion](https://achordion.xyz) mirrors every functional page that listenbrainz.org offers, with a fresh visual language and cleaner information architecture. Sign in with MusicBrainz (the same identity ListenBrainz itself uses), then browse your listens, stats, charts, recommendations, your feed, and the full LB explore surface — fresh releases, weekly playlists, similar listeners, Year in Music, LB Radio, Critical Darlings, and curated radio rewinds from public stations via [spinbin](https://github.com/jherskowitz/spinbin).
 
 ## Built to work with Parachord
 
